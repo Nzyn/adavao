@@ -20,6 +20,11 @@ if not exist AdminSide\admin\.env (
     )
 )
 
+echo [INFO] Verifying Storage Directories...
+if not exist AdminSide\admin\storage\framework\sessions mkdir AdminSide\admin\storage\framework\sessions
+if not exist AdminSide\admin\storage\framework\views mkdir AdminSide\admin\storage\framework\views
+if not exist AdminSide\admin\storage\framework\cache\data mkdir AdminSide\admin\storage\framework\cache\data
+
 echo [2/4] Installing UserSide dependencies...
 cd UserSide
 if not exist node_modules (
@@ -46,7 +51,7 @@ where mysql >nul 2>nul
 if %ERRORLEVEL% equ 0 (
     if exist ..\..\sql\latest.sql (
         echo [DB] Found sql\latest.sql. Importing database...
-        mysql -u root -p1234 alertdavao < ..\..\sql\latest.sql
+        mysql -u root -p alertdavao < ..\..\sql\latest.sql
         if %ERRORLEVEL% equ 0 (
             echo [DB] Import successful.
         ) else (

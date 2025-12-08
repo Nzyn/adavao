@@ -30,6 +30,11 @@ AdminSide/admin/storage/framework/cache/data/*
 AdminSide/admin/storage/framework/sessions/*
 AdminSide/admin/storage/framework/views/*
 AdminSide/admin/bootstrap/cache/*
+# Allow .gitkeep to ensure folder structure
+!AdminSide/admin/storage/framework/cache/data/.gitkeep
+!AdminSide/admin/storage/framework/sessions/.gitkeep
+!AdminSide/admin/storage/framework/views/.gitkeep
+!AdminSide/admin/storage/logs/.gitkeep
 
 # ==========================================
 # Build & Compilation Output
