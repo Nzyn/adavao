@@ -16,6 +16,7 @@ if not exist AdminSide\admin\.env (
     if exist AdminSide\admin\.env.example (
         echo Copying AdminSide .env.example to .env...
         copy AdminSide\admin\.env.example AdminSide\admin\.env
+        echo [INFO] AdminSide .env initialized.
     )
 )
 
@@ -39,8 +40,28 @@ if not exist vendor (
     echo vendor directory already exists, skipping install...
 )
 
-echo [4/4] Checking Database ...
-call php artisan migrate --force
+echo [4/4] Setting up Database...
+REM Check if mysql is available in path
+where mysql >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    if exist ..\..\sql\latest.sql (
+        echo [DB] Found sql\latest.sql. Importing database...
+        mysql -u root -p1234 alertdavao < ..\..\sql\latest.sql
+        if %ERRORLEVEL% equ 0 (
+            echo [DB] Import successful.
+        ) else (
+            echo [WARNING] Database import failed. Please check your credentials or run migrations manually.
+        )
+    ) else (
+        echo [DB] No latest.sql found. Running migrations...
+        call php artisan migrate --force
+    )
+) else (
+    echo [WARNING] 'mysql' command not found in PATH. Skipping auto-import.
+    echo [DB] Running migrations instead...
+    call php artisan migrate --force
+)
+
 cd ..\..
 
 echo [Setup Complete!]
