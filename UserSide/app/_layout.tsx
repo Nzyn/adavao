@@ -1,0 +1,129 @@
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useState, useEffect } from 'react';
+import 'react-native-reanimated';
+import * as SplashScreen from 'expo-splash-screen';
+import * as Font from 'expo-font';
+import { Pressable, View } from 'react-native';
+import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
+
+import { useColorScheme } from '@/hooks/useColorScheme';
+import LoadingScreen from '../components/LoadingScreen';
+import LoadingOverlay from '../components/LoadingOverlay';
+import GradientBackground from '../components/GradientBackground';
+import { UserProvider } from '../contexts/UserContext';
+import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
+import { inactivityManager } from '../services/inactivityManager';
+
+// Prevent auto-hiding splash screen
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
+  const [isAppReady, setIsAppReady] = useState(false);
+
+  useEffect(() => {
+    async function prepare() {
+      try {
+        // Preload fonts to prevent FontFaceObserver timeout
+        await Font.loadAsync({
+          ...Ionicons.font,
+          ...MaterialIcons.font,
+          ...FontAwesome.font,
+        });
+
+        // Wait for the AlertDavao animation to complete
+        // Animation timing: 1500ms (A letter) + 900ms (rest of letters) = 2400ms
+        // Adding 600ms buffer for smooth transition = 3000ms total
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        setIsAppReady(true);
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        console.warn('Error during app initialization:', e);
+        setIsAppReady(true);
+        await SplashScreen.hideAsync();
+      }
+    }
+
+    prepare();
+  }, []);
+
+  // Show loading screen until app is ready
+  if (!isAppReady) {
+    return <LoadingScreen visible={true} />;
+  }
+
+  return (
+    <LoadingProvider>
+      <UserProvider>
+        <AppContent />
+      </UserProvider>
+    </LoadingProvider>
+  );
+}
+
+function AppContent() {
+  const colorScheme = useColorScheme();
+  const { isLoading, loadingMessage } = useLoading();
+
+  // Start inactivity manager when app loads
+  useEffect(() => {
+    inactivityManager.start();
+
+    return () => {
+      inactivityManager.stop();
+    };
+  }, []);
+
+  // Reset inactivity timer on any touch - using onStartShouldSetResponder to capture all touches
+  const handleUserActivity = () => {
+    inactivityManager.resetActivity();
+  };
+
+  return (
+    <View
+      onTouchStart={handleUserActivity}
+      style={{ flex: 1 }}
+    >
+      <GradientBackground>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack
+            screenOptions={{
+              // Add page transition animations
+              animation: 'simple_push',
+              animationDuration: 300,
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="register"
+              options={{
+                headerShown: false,
+                animation: 'slide_from_right',
+                animationDuration: 300,
+              }}
+            />
+            <Stack.Screen
+              name="edit-profile"
+              options={{
+                headerShown: false,
+                animation: 'slide_from_right',
+                animationDuration: 300,
+              }}
+            />
+            <Stack.Screen
+              name="+not-found"
+              options={{
+                animation: 'fade_from_bottom',
+                animationDuration: 200,
+              }}
+            />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+        <LoadingOverlay visible={isLoading} message={loadingMessage} />
+      </GradientBackground>
+    </View>
+  );
+}

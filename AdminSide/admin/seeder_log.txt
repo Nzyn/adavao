@@ -1,0 +1,1 @@
+Row Error: SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'station_id' cannot be null (Connection: mysql, SQL: insert into `barangays` (`barangay_name`, `station_id`, `latitude`, `longitude`, `updated_at`, `created_at`) values (TUNGKALAN, ?, 7.0637017332035, 125.45803060289, 2025-12-07 10:29:58, 2025-12-07 10:29:58))

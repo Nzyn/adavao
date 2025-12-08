@@ -1,0 +1,104 @@
+{
+  "faq": [
+    {
+      "id": 1,
+      "question": "How do I report an incident using the system?",
+      "answer": "Go to the 'Report Now', select the type of incident, fill out the required details, indicate the type and the address of the crime and click Submit. You will receive a confirmation once your report is recorded."
+    },
+    {
+      "id": 2,
+      "question": "What are the requirements before submitting a report?",
+      "answer": "You only need basic information such as the type of incident, location, date and time, and a short description. Uploading supporting media is optional but helpful."
+    },
+    {
+      "id": 3,
+      "question": "Can I edit or update my report after submitting?",
+      "answer": "Yes, go to your 'My Reports' section, open the report, and click 'Edit Report'. Updates will be recorded in the activity log."
+    },
+    {
+      "id": 4,
+      "question": "How long does it take for authorities to respond to my report?",
+      "answer": "Response time varies depending on the severity and availability of units. However, each reports are prioritized and forwarded immediately for investigation."
+    },
+    {
+      "id": 5,
+      "question": "How do I check the status of my submitted report?",
+      "answer": "You can track it inside the 'History' section. Status updates include Pending, Reviewed, In Progress, and Resolved."
+    },
+    {
+      "id": 6,
+      "question": "Is my personal data safe when submitting reports?",
+      "answer": "Yes. The system follows strict data protection protocols, encryption standards, and complies with the Data Privacy Act of 2012 to ensure your information is secure."
+    },
+    {
+      "id": 7,
+      "question": "Is my identity visible when I report an incident?",
+      "answer": "No, your identity is kept confidential. Only authorized personnel can view your information when necessary for verification. Additionally, the system provides an option to report anonymously. When using anonymous mode, your personal information is completely hidden from regular personnel and is accessible only to the highest-level administrator for security and validation purposes."
+    },
+    {
+      "id": 8,
+      "question": "Does the system store my location?",
+      "answer": "Location is only captured when you grant permission and is solely used to identify and direct your reports to the station incharged with your barangay for a faster response."
+    },
+    {
+      "id": 9,
+      "question": "What can I do if I encounter an error while using the system?",
+      "answer": "Try refreshing the page or clearing your browser cache. If the issue continues, contact our email through alertdavao.ph@gmail.com."
+    },
+    {
+      "id": 10,
+      "question": "Can I submit anonymous reports?",
+      "answer": "Yes, you may submit reports anonymously. However, providing basic contact details helps authorities verify information if needed."
+    },
+    {
+      "id": 11,
+      "question": "How do I reset my password?",
+      "answer": "Go to the login page, click 'Forgot Password', enter your email, and follow the link sent to you to reset your password."
+    },
+    {
+      "id": 12,
+      "question": "What types of incidents can I report here?",
+      "answer": "You can report crimes, disturbances, emergencies, missing persons, suspicious activities, and other community-related incidents."
+    },
+    {
+      "id": 13,
+      "question": "Is the system monitored 24/7?",
+      "answer": "Yes. The monitoring unit is active around the clock to ensure immediate action on critical reports."
+    },
+    {
+      "id": 14,
+      "question": "Who has access to my submitted information?",
+      "answer": "Only authorized law enforcement and system administrators with proper clearance can access your data."
+    },
+    {
+      "id": 15,
+      "question": "What browsers or devices are supported?",
+      "answer": "The system works on all modern browsers and mobile application is available for IOS and Android devices. For best performance, use Chrome or Firefox."
+    },
+    {
+      "id": 16,
+      "question": "What should I do if I accidentally submitted the wrong information?",
+      "answer": "Each reports and processed live and is already under review, use the 'Contact Support' button to notify the administrators."
+    },
+    {
+      "id": 17,
+      "question": "How do I verify if my report was received?",
+      "answer": "After submitting, you will see a confirmation message and the report will appear in your 'History' list."
+    },
+    {
+      "id": 18,
+      "question": "Does the system use my data for anything other than reporting?",
+      "answer": "No. The system only uses your data for processing reports and improving response accuracy. It is never shared with third parties without consent."
+    },
+    {
+      "id": 19,
+      "question": "What should I do if I wanna delete and cancel my report?",
+      "answer": "You may cancel or delete your report within the first 5 minutes after submission. After this period, the report is locked for review and can no longer be canceled."
+    },
+    {
+      "id": 20,
+      "question": "Others",
+      "answer": "For concerns not listed above, please contact our support team through alertdavao.ph@gmail.com or email us for assistance."
+    }
+  ]
+}

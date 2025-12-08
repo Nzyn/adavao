@@ -1,0 +1,15 @@
+node_modules/
+.expo/
+.vscode/
+.DS_Store
+uploads/
+backends/
+evidence/
+*.md
+*.sql
+scripts/
+test*
+.git/
+.gitignore
+.env
+.env.*

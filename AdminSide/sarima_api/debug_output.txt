@@ -1,0 +1,117 @@
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\miyatot\AppData\Roaming\Python\Python313\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+Found 15 crime types.
+
+--- Testing: Homicide ---
+  Max Historical: 34.0
+  Raw Upper CI (first 3): [951306310.0111353, 1021648616.8875368, 1087450283.8647864]
+  Clamp Limit: 170.0
+  Clamped Upper CI (first 3): [170.0, 170.0, 170.0]
+
+--- Testing: Carnapping ---
+  Max Historical: 38.0
+  Raw Upper CI (first 3): [3922660770.419815, 4030424918.9581747, 4135381798.822414]
+  Clamp Limit: 190.0
+  Clamped Upper CI (first 3): [190.0, 190.0, 190.0]
+
+--- Testing: Phishing ---
+  Max Historical: 37.0
+  Raw Upper CI (first 3): [74263099.781574, 75936762.94977096, 77574298.0952233]
+  Clamp Limit: 185.0
+  Clamped Upper CI (first 3): [185.0, 185.0, 185.0]
+
+--- Testing: Online Scam ---
+  Max Historical: 32.0
+  Raw Upper CI (first 3): [72137239.66318908, 76050439.71158509, 79771914.9912163]
+  Clamp Limit: 160.0
+  Clamped Upper CI (first 3): [160.0, 160.0, 160.0]
+
+--- Testing: Physical Injury ---
+  Max Historical: 28.0
+  Raw Upper CI (first 3): [8016703799.657239, 8349753531.794853, 8670018937.389275]
+  Clamp Limit: 140.0
+  Clamped Upper CI (first 3): [140.0, 140.0, 140.0]
+
+--- Testing: Vandalism ---
+  Max Historical: 30.0
+  Raw Upper CI (first 3): [4655706232.7588215, 4865807866.506426, 5067205537.980488]
+  Clamp Limit: 150.0
+  Clamped Upper CI (first 3): [150.0, 150.0, 150.0]
+
+--- Testing: Robbery ---
+  Max Historical: 36.0
+  Raw Upper CI (first 3): [631258766.6660724, 769503908.2796483, 886445113.5147877]
+  Clamp Limit: 180.0
+  Clamped Upper CI (first 3): [180.0, 180.0, 180.0]
+
+--- Testing: Assault ---
+  Max Historical: 33.0
+  Raw Upper CI (first 3): [2832458154.1996584, 3161035108.670125, 3458535344.6893077]
+  Clamp Limit: 165.0
+  Clamped Upper CI (first 3): [165.0, 165.0, 165.0]
+
+--- Testing: Cyber Fraud ---
+  Max Historical: 23.0
+  Raw Upper CI (first 3): [248841564.5002681, 260653344.0985992, 271952598.2140511]
+  Clamp Limit: 115.0
+  Clamped Upper CI (first 3): [115.0, 115.0, 115.0]
+
+--- Testing: Illegal Drugs ---
+  Max Historical: 30.0
+  Raw Upper CI (first 3): [44877238.27083353, 45868703.943230234, 46839189.39484206]
+  Clamp Limit: 150.0
+  Clamped Upper CI (first 3): [150.0, 150.0, 150.0]
+
+--- Testing: Theft ---
+  Max Historical: 28.0
+  Raw Upper CI (first 3): [24759120.378871836, 24836573.521497957, 24913782.831726015]
+  Clamp Limit: 140.0
+  Clamped Upper CI (first 3): [140.0, 140.0, 140.0]
+
+--- Testing: Identity Theft ---
+  Max Historical: 32.0
+  Raw Upper CI (first 3): [681028122.085451, 800215458.5174683, 903819822.563282]
+  Clamp Limit: 160.0
+  Clamped Upper CI (first 3): [160.0, 160.0, 160.0]
+
+--- Testing: Hacking ---
+  Max Historical: 38.0
+  Raw Upper CI (first 3): [77741921.93463182, 79709332.12225875, 81629325.16944598]
+  Clamp Limit: 190.0
+  Clamped Upper CI (first 3): [190.0, 190.0, 190.0]
+
+--- Testing: Cyberbullying ---
+  Max Historical: 26.0
+  Raw Upper CI (first 3): [1817765729.1499557, 1853998106.4182572, 1889535859.9233422]
+  Clamp Limit: 130.0
+  Clamped Upper CI (first 3): [130.0, 130.0, 130.0]
+
+--- Testing: Murder ---
+  Max Historical: 41.0
+  Raw Upper CI (first 3): [1959887845.9362366, 2138688527.2224464, 2303652954.035293]
+  Clamp Limit: 205.0
+  Clamped Upper CI (first 3): [205.0, 205.0, 205.0]

@@ -1,0 +1,632 @@
+{
+    "barangays": [
+        {
+            "name": "BAGO APLAYA",
+            "latitude": 7.0437,
+            "longitude": 125.5312
+        },
+        {
+            "name": "PAMPANGA",
+            "latitude": 7.1191,
+            "longitude": 125.6487
+        },
+        {
+            "name": "BARANGAY 37-D",
+            "latitude": 7.0641,
+            "longitude": 125.6148
+        },
+        {
+            "name": "BUNAWAN",
+            "latitude": 7.2358,
+            "longitude": 125.6424
+        },
+        {
+            "name": "BARANGAY 19-B",
+            "latitude": 7.091,
+            "longitude": 125.6064
+        },
+        {
+            "name": "BARANGAY 14-B",
+            "latitude": 7.0787,
+            "longitude": 125.6172
+        },
+        {
+            "name": "TOMAS MONTEVERDE SR",
+            "latitude": 7.0708,
+            "longitude": 125.6098
+        },
+        {
+            "name": "AGDAO PROPER",
+            "latitude": 7.0812,
+            "longitude": 125.6223
+        },
+        {
+            "name": "BARANGAY 18-B",
+            "latitude": 7.0851,
+            "longitude": 125.6143
+        },
+        {
+            "name": "SALAPAWAN",
+            "latitude": 7.4617,
+            "longitude": 125.4623
+        },
+        {
+            "name": "BARANGAY 28-C",
+            "latitude": 7.0726,
+            "longitude": 125.6185
+        },
+        {
+            "name": "WANGAN",
+            "latitude": 7.1623,
+            "longitude": 125.4406
+        },
+        {
+            "name": "INDANGAN",
+            "latitude": 7.1673,
+            "longitude": 125.5946
+        },
+        {
+            "name": "BALIOK",
+            "latitude": 7.0467,
+            "longitude": 125.5005
+        },
+        {
+            "name": "TUNGKALAN",
+            "latitude": 7.0747,
+            "longitude": 125.4248
+        },
+        {
+            "name": "BUDA",
+            "latitude": 7.5198,
+            "longitude": 125.2367
+        },
+        {
+            "name": "SUBASTA",
+            "latitude": 7.149,
+            "longitude": 125.4382
+        },
+        {
+            "name": "MAGTUOD",
+            "latitude": 7.1227,
+            "longitude": 125.5657
+        },
+        {
+            "name": "76-A BUCANA",
+            "latitude": 7.0539,
+            "longitude": 125.5989
+        },
+        {
+            "name": "74-A MATINA CROSSING",
+            "latitude": 7.0587,
+            "longitude": 125.5688
+        },
+        {
+            "name": "LACSON",
+            "latitude": 7.2249,
+            "longitude": 125.4416
+        },
+        {
+            "name": "TIBULOY",
+            "latitude": 6.9829,
+            "longitude": 125.4375
+        },
+        {
+            "name": "TACUNAN",
+            "latitude": 7.1136,
+            "longitude": 125.5169
+        },
+        {
+            "name": "SALOY",
+            "latitude": 7.3004,
+            "longitude": 125.4102
+        },
+        {
+            "name": "BARANGAY 2-A",
+            "latitude": 7.0664,
+            "longitude": 125.6049
+        },
+        {
+            "name": "BINUGAO",
+            "latitude": 6.976,
+            "longitude": 125.478
+        },
+        {
+            "name": "DUMOY",
+            "latitude": 7.0316,
+            "longitude": 125.5127
+        },
+        {
+            "name": "PACIANO BANGOY",
+            "latitude": 7.0923,
+            "longitude": 125.6179
+        },
+        {
+            "name": "BARANGAY 5-A",
+            "latitude": 7.0696,
+            "longitude": 125.5989
+        },
+        {
+            "name": "BARANGAY 3-A",
+            "latitude": 7.0682,
+            "longitude": 125.6065
+        },
+        {
+            "name": "BARANGAY 10-A",
+            "latitude": 7.0786,
+            "longitude": 125.6073
+        },
+        {
+            "name": "BARANGAY 13-B",
+            "latitude": 7.0809,
+            "longitude": 125.6137
+        },
+        {
+            "name": "LAPU-LAPU",
+            "latitude": 7.0961,
+            "longitude": 125.6416
+        },
+        {
+            "name": "SAN ISIDRO",
+            "latitude": 7.2587,
+            "longitude": 125.6365
+        },
+        {
+            "name": "MAHAYAG",
+            "latitude": 7.2188,
+            "longitude": 125.6194
+        },
+        {
+            "name": "BARANGAY 11-A",
+            "latitude": 7.3246,
+            "longitude": 125.4619
+        },
+        {
+            "name": "BARANGAY 39-D",
+            "latitude": 7.0627,
+            "longitude": 125.6098
+        },
+        {
+            "name": "CARMEN",
+            "latitude": 7.1136,
+            "longitude": 125.3455
+        },
+        {
+            "name": "DALIAO",
+            "latitude": 7.009,
+            "longitude": 125.5041
+        },
+        {
+            "name": "BARANGAY 8-A",
+            "latitude": 7.0744,
+            "longitude": 125.6002
+        },
+        {
+            "name": "BAGANIHAN",
+            "latitude": 7.4741,
+            "longitude": 125.2438
+        },
+        {
+            "name": "BARANGAY 20-B",
+            "latitude": 7.087,
+            "longitude": 125.613
+        },
+        {
+            "name": "TAMUGAN",
+            "latitude": 7.2511,
+            "longitude": 125.3909
+        },
+        {
+            "name": "SAN ANTONIO",
+            "latitude": 7.0913,
+            "longitude": 125.6287
+        },
+        {
+            "name": "MALAGOS",
+            "latitude": 7.19,
+            "longitude": 125.4322
+        },
+        {
+            "name": "RIVERSIDE",
+            "latitude": 7.1658,
+            "longitude": 125.4724
+        },
+        {
+            "name": "TAMAYONG",
+            "latitude": 7.1329,
+            "longitude": 125.3797
+        },
+        {
+            "name": "MALABOG",
+            "latitude": 7.3246,
+            "longitude": 125.4619
+        },
+        {
+            "name": "TALOMO RIVER",
+            "latitude": 7.1914,
+            "longitude": 125.4805
+        },
+        {
+            "name": "WINES",
+            "latitude": 7.1935,
+            "longitude": 125.3891
+        },
+        {
+            "name": "GUMALANG",
+            "latitude": 7.2086,
+            "longitude": 125.4045
+        },
+        {
+            "name": "ALAMBRE",
+            "latitude": 7.0604,
+            "longitude": 125.4712
+        },
+        {
+            "name": "BAYABAS",
+            "latitude": 7.0249,
+            "longitude": 125.4388
+        },
+        {
+            "name": "ULAS",
+            "latitude": 7.0549,
+            "longitude": 125.5455
+        },
+        {
+            "name": "MATINA PANGI",
+            "latitude": 7.0823,
+            "longitude": 125.5606
+        },
+        {
+            "name": "CAWAYAN",
+            "latitude": 7.1584,
+            "longitude": 125.4117
+        },
+        {
+            "name": "BANGKAS HEIGHTS",
+            "latitude": 7.0576,
+            "longitude": 125.4897
+        },
+        {
+            "name": "BARANGAY 9-A",
+            "latitude": 7.076,
+            "longitude": 125.6046
+        },
+        {
+            "name": "EDEN",
+            "latitude": 7.0319,
+            "longitude": 125.3978
+        },
+        {
+            "name": "MULIG",
+            "latitude": 7.0808,
+            "longitude": 125.4588
+        },
+        {
+            "name": "SALAYSAY",
+            "latitude": 7.2656,
+            "longitude": 125.2901
+        },
+        {
+            "name": "BARANGAY 17-B",
+            "latitude": 7.0837,
+            "longitude": 125.6158
+        },
+        {
+            "name": "MAGSAYSAY",
+            "latitude": 7.3095,
+            "longitude": 125.2676
+        },
+        {
+            "name": "LOS AMIGOS",
+            "latitude": 7.1413,
+            "longitude": 125.4796
+        },
+        {
+            "name": "TAGURANO",
+            "latitude": 7.0463,
+            "longitude": 125.4143
+        },
+        {
+            "name": "MATINA APLAYA",
+            "latitude": 7.0445,
+            "longitude": 125.5687
+        },
+        {
+            "name": "MAA",
+            "latitude": 7.0807,
+            "longitude": 125.5827
+        },
+        {
+            "name": "TUGBOK",
+            "latitude": 7.132,
+            "longitude": 125.4942
+        },
+        {
+            "name": "TALOMO",
+            "latitude": 7.0799,
+            "longitude": 125.5539
+        },
+        {
+            "name": "CATALUNAN GRANDE",
+            "latitude": 7.0802,
+            "longitude": 125.5438
+        },
+        {
+            "name": "CATALUNAN PEQUENO",
+            "latitude": 7.0754,
+            "longitude": 125.5203
+        },
+        {
+            "name": "GUMITAN",
+            "latitude": 7.4396,
+            "longitude": 125.3476
+        },
+        {
+            "name": "BALENGAENG",
+            "latitude": 7.1335,
+            "longitude": 125.4658
+        },
+        {
+            "name": "TAMBOBONG",
+            "latitude": 7.188,
+            "longitude": 125.3458
+        },
+        {
+            "name": "SALUMAY",
+            "latitude": 7.4825,
+            "longitude": 125.2506
+        },
+        {
+            "name": "MARILOG",
+            "latitude": 7.369,
+            "longitude": 125.3287
+        },
+        {
+            "name": "VICENTE HIZON SR",
+            "latitude": 7.1111,
+            "longitude": 125.6496
+        },
+        {
+            "name": "MARAPANGI",
+            "latitude": 7.0159,
+            "longitude": 125.4872
+        },
+        {
+            "name": "PANALUM",
+            "latitude": 7.3561,
+            "longitude": 125.5036
+        },
+        {
+            "name": "LASANG",
+            "latitude": 7.2671,
+            "longitude": 125.665
+        },
+        {
+            "name": "BARANGAY 38-D",
+            "latitude": 7.0647,
+            "longitude": 125.6114
+        },
+        {
+            "name": "BARANGAY 22-C",
+            "latitude": 7.0698,
+            "longitude": 125.621
+        },
+        {
+            "name": "CENTRO",
+            "latitude": 7.0013,
+            "longitude": 125.4292
+        },
+        {
+            "name": "CALINAN",
+            "latitude": 7.1902,
+            "longitude": 125.4525
+        },
+        {
+            "name": "BARANGAY 23-C",
+            "latitude": 7.0714,
+            "longitude": 125.6223
+        },
+        {
+            "name": "BANTOL",
+            "latitude": 7.302,
+            "longitude": 125.3392
+        },
+        {
+            "name": "CABANTIAN",
+            "latitude": 7.1279,
+            "longitude": 125.6195
+        },
+        {
+            "name": "TAPAK",
+            "latitude": 7.516,
+            "longitude": 125.4534
+        },
+        {
+            "name": "AQUINO",
+            "latitude": 7.0943,
+            "longitude": 125.6237
+        },
+        {
+            "name": "ALFONSO ANGLIONGTO SR",
+            "latitude": 7.11,
+            "longitude": 125.6354
+        },
+        {
+            "name": "BARANGAY 32-D",
+            "latitude": 7.0692,
+            "longitude": 125.6156
+        },
+        {
+            "name": "CATIGAN",
+            "latitude": 7.0009,
+            "longitude": 125.4274
+        },
+        {
+            "name": "DUTERTE",
+            "latitude": 7.0873,
+            "longitude": 125.6293
+        },
+        {
+            "name": "SASA",
+            "latitude": 7.1248,
+            "longitude": 125.6612
+        },
+        {
+            "name": "LUBOGAN",
+            "latitude": 7.0332,
+            "longitude": 125.4942
+        },
+        {
+            "name": "BAO ESCUELA",
+            "latitude": 7.0794,
+            "longitude": 125.5453
+        },
+        {
+            "name": "ACACIA",
+            "latitude": 7.1921,
+            "longitude": 125.6025
+        },
+        {
+            "name": "MANDUG",
+            "latitude": 7.1651,
+            "longitude": 125.5768
+        },
+        {
+            "name": "NEW VALENCIA",
+            "latitude": 7.1719,
+            "longitude": 125.5375
+        },
+        {
+            "name": "LIZADA",
+            "latitude": 7.0112,
+            "longitude": 125.4889
+        },
+        {
+            "name": "TORIL",
+            "latitude": 7.0269,
+            "longitude": 125.4092
+        },
+        {
+            "name": "LAMANAN",
+            "latitude": 7.2454,
+            "longitude": 125.4443
+        },
+        {
+            "name": "FATIMA",
+            "latitude": 7.2894,
+            "longitude": 125.5313
+        },
+        {
+            "name": "SUAWAN",
+            "latitude": 7.2463,
+            "longitude": 125.3492
+        },
+        {
+            "name": "WAAN",
+            "latitude": 7.1283,
+            "longitude": 125.5764
+        },
+        {
+            "name": "TALANDANG",
+            "latitude": 7.184,
+            "longitude": 125.5179
+        },
+        {
+            "name": "ANGALAN",
+            "latitude": 7.1187,
+            "longitude": 125.4636
+        },
+        {
+            "name": "BUHANGIN",
+            "latitude": 7.1757,
+            "longitude": 125.5823
+        },
+        {
+            "name": "COMMUNAL",
+            "latitude": 7.1413,
+            "longitude": 125.6226
+        },
+        {
+            "name": "TIGATTO",
+            "latitude": 7.1195,
+            "longitude": 125.5987
+        },
+        {
+            "name": "SIRIB",
+            "latitude": 7.1298,
+            "longitude": 125.3956
+        },
+        {
+            "name": "PAQUIBATO",
+            "latitude": 7.4277,
+            "longitude": 125.4593
+        },
+        {
+            "name": "PANACAN",
+            "latitude": 7.1515,
+            "longitude": 125.6587
+        },
+        {
+            "name": "MINTAL",
+            "latitude": 7.0924,
+            "longitude": 125.5019
+        },
+        {
+            "name": "BAGO GALLERA",
+            "latitude": 7.0546,
+            "longitude": 125.5103
+        },
+        {
+            "name": "BAGO OSHIRO",
+            "latitude": 7.0774,
+            "longitude": 125.4964
+        },
+        {
+            "name": "MANUEL GUIANGA",
+            "latitude": 7.1046,
+            "longitude": 125.4133
+        },
+        {
+            "name": "SANTO NINO",
+            "latitude": 7.0856,
+            "longitude": 125.5082
+        },
+        {
+            "name": "MABUHAY",
+            "latitude": 7.3269,
+            "longitude": 125.529
+        },
+        {
+            "name": "BARANGAY 26-C",
+            "latitude": 7.0734,
+            "longitude": 125.6224
+        },
+        {
+            "name": "BARANGAY 27-C",
+            "latitude": 7.0747,
+            "longitude": 125.6252
+        },
+        {
+            "name": "ILANG",
+            "latitude": 7.1807,
+            "longitude": 125.652
+        },
+        {
+            "name": "BAGUIO PROPER",
+            "latitude": 7.1724,
+            "longitude": 125.4034
+        },
+        {
+            "name": "TIBUNGCO",
+            "latitude": 7.1905,
+            "longitude": 125.6488
+        }
+    ],
+    "metadata": {
+        "city": "Davao City",
+        "region": "Davao Region",
+        "country": "Philippines",
+        "total_barangays": 124,
+        "source": "OpenStreetMap Nominatim",
+        "last_updated": "2025-12-01T03:45:43+08:00"
+    }
+}

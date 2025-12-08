@@ -1,0 +1,713 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use App\Models\UserAdmin;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
+use App\Notifications\EmailVerification;
+use App\Notifications\PasswordResetNotification;
+use App\Models\AdminLoginAttempt;
+
+class AuthController extends Controller
+{
+    // Show registration form
+    public function showRegister()
+    {
+        return view('auth.register');
+    }
+
+    // Handle registration - AdminSide only (admin/police users)
+    public function register(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'firstname' => 'required|string|max:50',
+            'lastname' => 'required|string|max:50',
+            'email' => [
+                'required',
+                'email',
+                'unique:user_admin,email',
+                'max:100',
+                'regex:/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'
+            ],
+            'contact' => 'required|string|max:15',
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'regex:/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/'
+            ],
+            'password_confirmation' => 'required|same:password',
+            'captcha_input' => 'required|string|size:6',
+            'captcha_word' => 'required|string|size:6'
+        ], [
+            'email.regex' => 'Please enter a valid email address with @ and domain (e.g., user@gmail.com, admin@yahoo.com)',
+            'email.email' => 'Email must be a valid email format',
+            'email.unique' => 'This email is already registered in the system',
+            'password.regex' => 'Password must contain at least one letter, one number, and one symbol (@$!%*?&)',
+            'password.min' => 'Password must be at least 8 characters long',
+            'captcha_input.required' => 'Please enter the security code',
+            'captcha_input.size' => 'Security code must be 6 characters'
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        // Verify captcha
+        if (strtoupper($request->captcha_input) !== strtoupper($request->captcha_word)) {
+            return back()->withErrors(['captcha_input' => 'Invalid security code. Please try again.'])->withInput();
+        }
+
+        // Generate verification token
+        $verificationToken = Str::random(64);
+        $tokenExpiresAt = Carbon::now()->addHours(24);
+
+        // Create user_admin with verification token (email not verified yet)
+        $userAdmin = UserAdmin::create([
+            'firstname' => $request->firstname,
+            'lastname' => $request->lastname,
+            'email' => $request->email,
+            'contact' => $request->contact,
+            'password' => Hash::make($request->password),
+            'verification_token' => $verificationToken,
+            'token_expires_at' => $tokenExpiresAt,
+            'email_verified_at' => null, // Not verified yet
+        ]);
+
+        // Generate verification URL
+        $verificationUrl = route('email.verify', ['token' => $verificationToken]);
+
+        // Send verification email
+        try {
+            $userAdmin->notify(new EmailVerification($verificationUrl, $userAdmin->firstname));
+            
+            return redirect()->route('login')->with('success', 
+                'Registration successful! Please check your email (' . $userAdmin->email . ') for a verification link to activate your account. The link will expire in 24 hours.');
+        } catch (\Exception $e) {
+            // Delete user if email fails to send
+            $userAdmin->delete();
+            \Log::error('Email verification failed: ' . $e->getMessage());
+            
+            return back()->withErrors(['email' => 'Failed to send verification email. Please check your email address and try again.'])->withInput();
+        }
+    }
+
+    // Show login form
+    public function showLogin()
+    {
+        return view('auth.login');
+    }
+
+    // Handle login - AdminSide only (admin/police users)
+    public function login(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required'
+        ]);
+
+        // Check if user exists in user_admin table (AdminSide users only)
+        $userAdmin = UserAdmin::where('email', $credentials['email'])->first();
+        
+        if (!$userAdmin) {
+            // Log failed attempt
+            // Log failed attempt to system log only (since we don't have a user_admin_id for DB)
+            \Log::info('Failed admin login attempt - user not found', [
+                'email' => $credentials['email'],
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
+
+            return back()->withErrors([
+                'email' => 'The provided credentials do not match our records. This account is for the UserSide application only.',
+            ])->withInput($request->except('password'));
+        }
+
+        // Check if account is locked
+        if ($userAdmin->lockout_until && Carbon::now()->lessThan($userAdmin->lockout_until)) {
+            $remainingMinutes = Carbon::now()->diffInMinutes($userAdmin->lockout_until) + 1;
+            
+            // Log failed attempt
+            try {
+                AdminLoginAttempt::create([
+                    'user_admin_id' => $userAdmin->id,
+                    'email' => $credentials['email'],
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'status' => 'locked'
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Failed to log admin login attempt: ' . $e->getMessage());
+            }
+
+            return back()->withErrors([
+                'email' => "Account temporarily locked due to too many failed login attempts. Please try again in {$remainingMinutes} minute(s).",
+            ])->withInput($request->except('password'));
+        }
+
+        // Reset lockout if expired
+        if ($userAdmin->lockout_until && Carbon::now()->greaterThanOrEqualTo($userAdmin->lockout_until)) {
+            $userAdmin->failed_login_attempts = 0;
+            $userAdmin->lockout_until = null;
+            $userAdmin->save();
+        }
+
+        // Check if email is verified
+        if (is_null($userAdmin->email_verified_at)) {
+            return back()->withErrors([
+                'email' => 'Please verify your email address before logging in. Check your inbox for the verification link.',
+            ])->withInput($request->except('password'));
+        }
+
+        // Verify password
+        if (!Hash::check($credentials['password'], $userAdmin->password)) {
+            // Failed login - increment attempt counter
+            $userAdmin->failed_login_attempts += 1;
+            $userAdmin->last_failed_login = Carbon::now();
+
+            // Apply lockout based on attempt count
+            if ($userAdmin->failed_login_attempts >= 15) {
+                // 15+ attempts: 15 minute lockout + email alert
+                $userAdmin->lockout_until = Carbon::now()->addMinutes(15);
+                $userAdmin->save();
+                
+                // Log failed attempt
+                try {
+                    AdminLoginAttempt::create([
+                        'user_admin_id' => $userAdmin->id,
+                        'email' => $credentials['email'],
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'status' => 'locked'
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to log admin login attempt: ' . $e->getMessage());
+                }
+                
+                // Send email notification
+                try {
+                    $userAdmin->notify(new \App\Notifications\AccountLockoutNotification($userAdmin->failed_login_attempts));
+                } catch (\Exception $e) {
+                    \Log::error('Failed to send lockout email: ' . $e->getMessage());
+                }
+                
+                return back()->withErrors([
+                    'email' => 'Account locked for 15 minutes due to 15 failed login attempts. A security alert has been sent to your email.',
+                ])->withInput($request->except('password'));
+            } else if ($userAdmin->failed_login_attempts >= 10) {
+                // 10-14 attempts: 10 minute lockout
+                $userAdmin->lockout_until = Carbon::now()->addMinutes(10);
+                $userAdmin->save();
+                
+                // Log failed attempt
+                try {
+                    AdminLoginAttempt::create([
+                        'user_admin_id' => $userAdmin->id,
+                        'email' => $credentials['email'],
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'status' => 'locked'
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to log admin login attempt: ' . $e->getMessage());
+                }
+                
+                return back()->withErrors([
+                    'email' => 'Account locked for 10 minutes due to multiple failed login attempts.',
+                ])->withInput($request->except('password'));
+            } else if ($userAdmin->failed_login_attempts >= 5) {
+                // 5-9 attempts: 5 minute lockout
+                $userAdmin->lockout_until = Carbon::now()->addMinutes(5);
+                $userAdmin->save();
+                
+                // Log failed attempt
+                try {
+                    AdminLoginAttempt::create([
+                        'user_admin_id' => $userAdmin->id,
+                        'email' => $credentials['email'],
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'status' => 'locked'
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to log admin login attempt: ' . $e->getMessage());
+                }
+                
+                return back()->withErrors([
+                    'email' => 'Account locked for 5 minutes due to multiple failed login attempts.',
+                ])->withInput($request->except('password'));
+            } else {
+                // Less than 5 attempts: just save the counter
+                $userAdmin->save();
+                
+                // Log failed attempt
+                try {
+                    AdminLoginAttempt::create([
+                        'user_admin_id' => $userAdmin->id,
+                        'email' => $credentials['email'],
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'status' => 'failed'
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to log admin login attempt: ' . $e->getMessage());
+                }
+                
+                $remainingAttempts = 5 - $userAdmin->failed_login_attempts;
+                return back()->withErrors([
+                    'email' => "The provided credentials do not match our records. {$remainingAttempts} attempt(s) remaining before account lockout.",
+                ])->withInput($request->except('password'));
+            }
+        }
+
+        // Password is correct - INSTEAD of logging in, generate OTP and redirect
+        
+        // 1. Generate OTP
+        $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        
+        // DEBUG: Log OTP so user can see it in debug view if SMS fails
+        \Log::info("🔐 [DEBUG] Generated OTP for {$userAdmin->email}: {$otp}");
+        
+        $otpHash = Hash::make($otp);
+        $expiresAt = Carbon::now()->addMinutes(5);
+        
+        // 2. Store OTP in database
+        // Use user's contact number
+        $phone = $userAdmin->contact; 
+        
+        // Normalize phone if needed
+        // Normalize phone if needed
+        $phone = trim($phone);
+        $phone = preg_replace('/[^\d\+]/', '', $phone); // Keep + and digits
+
+        if (str_starts_with($phone, '0')) {
+            $phone = '+63' . substr($phone, 1);
+        } elseif (str_starts_with($phone, '9') && strlen($phone) == 10) {
+            $phone = '+63' . $phone;
+        } elseif (str_starts_with($phone, '63') && strlen($phone) == 12) {
+             $phone = '+' . $phone;
+        } elseif (!str_starts_with($phone, '+')) {
+             $phone = '+' . $phone;
+        }
+        
+        // Clear old OTPs for this purpose
+        \DB::table('otp_codes')->where('phone', $phone)->where('purpose', 'admin_login')->delete();
+        
+        \DB::table('otp_codes')->insert([
+            'phone' => $phone,
+            'otp_hash' => $otpHash,
+            'purpose' => 'admin_login',
+            'user_id' => $userAdmin->id,
+            'expires_at' => $expiresAt,
+            'created_at' => Carbon::now()
+        ]);
+        
+        // 3. Send OTP via Twilio WhatsApp (Free Sandbox)
+        \Log::info("Initiating Login OTP for {$userAdmin->email}. Target phone: {$phone}");
+        
+        // Reverted to WhatsApp: SMS failed (Error 21612 - Trial Account)
+        $sent = $this->sendTwilioWhatsapp($phone, $otp, $userAdmin->email);
+        
+        // 4. Store partially authenticated user ID in session
+        $request->session()->put('auth.otp.admin_id', $userAdmin->id);
+        $request->session()->put('auth.otp.phone', $phone);
+        
+        \Log::info('Admin login OTP generated', [
+            'admin_id' => $userAdmin->id,
+            'phone' => $phone,
+            'channel' => 'whatsapp',
+            'sent' => $sent
+        ]);
+        
+        return redirect()->route('otp.login.verify')->with('success', 'Credentials verified. Please check your WhatsApp for the code.');
+    }
+
+    // Helper to send WhatsApp via Twilio
+    private function sendTwilioWhatsapp($phone, $otp, $email)
+    {
+        $message = "AlertDavao\n\nHi {$email} Your verification code is {$otp}. It is valid for 5 minutes. Do not share this code with anyone for your security.";
+        // Manually parse .env to avoid caching issues with artisan serve
+        $envPath = base_path('.env');
+        $env = [];
+        if (file_exists($envPath)) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos(trim($line), '#') === 0) continue;
+                if (strpos($line, '=') !== false) {
+                    list($key, $value) = explode('=', $line, 2);
+                    $env[trim($key)] = trim($value);
+                }
+            }
+        }
+
+        $sid = $env['TWILIO_SID'] ?? env('TWILIO_SID');
+        $token = $env['TWILIO_TOKEN'] ?? env('TWILIO_TOKEN');
+        // Standard Twilio Sandbox Number
+        $from = "whatsapp:+14155238886"; 
+
+        if ($sid && $token) {
+            try {
+                $url = "https://api.twilio.com/2010-04-01/Accounts/$sid/Messages.json";
+                
+                // Ensure phone has + sign (double check, though login handles it mostly)
+                $cleanPhone = $phone;
+                if (!str_starts_with($phone, '+')) {
+                    $cleanPhone = '+' . $phone;
+                }
+                
+                \Log::info("Sending Twilio WhatsApp", [
+                    'to' => "whatsapp:$cleanPhone",
+                    'from' => $from,
+                    'sid_prefix' => substr($sid, 0, 5) . '...'
+                ]);
+
+                $data = [
+                    'To' => "whatsapp:$cleanPhone",
+                    'From' => $from,
+                    'Body' => $message
+                ];
+
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+                curl_setopt($ch, CURLOPT_USERPWD, "$sid:$token");
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                
+                if ($httpCode >= 200 && $httpCode < 300) {
+                    \Log::info("WhatsApp sent successfully: {$httpCode}");
+                    return true;
+                } else {
+                    \Log::error("WhatsApp failed: {$httpCode} Response: {$response}");
+                    return false;
+                }
+            } catch (\Exception $e) {
+                \Log::error("WhatsApp Exception: " . $e->getMessage());
+                return false;
+            }
+        }
+        return false;
+    }
+
+    // Unused SMS Method (Failed due to Trial Account)
+    private function sendTwilioSms($phone, $otp) { return false; }
+
+    // Deprecated SMS Methods (Preserved but unused)
+    private function sendSemaphoreSms($phone, $otp) { return false; }
+
+
+    // Show OTP verify form
+    public function showVerifyOtp(Request $request)
+    {
+        if (!$request->session()->has('auth.otp.admin_id')) {
+            return redirect()->route('login');
+        }
+        
+        // Mask phone number
+        $phone = $request->session()->get('auth.otp.phone', '');
+        $maskedPhone = '...' . substr($phone, -4);
+        
+        return view('auth.verify-otp', compact('maskedPhone'));
+    }
+
+    // Verify OTP and Finalize Login
+    public function verifyOtpLogin(Request $request)
+    {
+        if (!$request->session()->has('auth.otp.admin_id')) {
+            return redirect()->route('login');
+        }
+
+        $request->validate([
+            'otp' => 'required|string|size:6'
+        ]);
+
+        $adminId = $request->session()->get('auth.otp.admin_id');
+        $userAdmin = UserAdmin::find($adminId);
+        
+        if (!$userAdmin) {
+            return redirect()->route('login')->withErrors(['email' => 'User not found.']);
+        }
+
+        // Check OTP in DB
+        $otpRecord = \DB::table('otp_codes')
+            ->where('purpose', 'admin_login')
+            ->where('user_id', $adminId)
+            ->where('expires_at', '>', Carbon::now())
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$otpRecord || !Hash::check($request->otp, $otpRecord->otp_hash)) {
+            return back()->withErrors(['otp' => 'Invalid or expired code. Please try again.']);
+        }
+        
+        // OTP Valid - Clean up
+        \DB::table('otp_codes')->where('id', $otpRecord->id)->delete();
+        $request->session()->forget(['auth.otp.admin_id', 'auth.otp.phone']);
+
+        // Finalize Login
+        Auth::guard('admin')->login($userAdmin, false); // No "remember me" for OTP flow for simplicity
+        $request->session()->regenerate();
+        
+        // Sync stats
+        $userAdmin->failed_login_attempts = 0;
+        $userAdmin->lockout_until = null;
+        $userAdmin->save();
+        
+        // Log
+        \Log::info("Admin logged in via OTP: {$userAdmin->email}");
+
+        return redirect()->intended(route('dashboard'));
+    }
+
+    // Resend OTP
+    public function resendOtp(Request $request)
+    {
+        $adminId = $request->session()->get('auth.otp.admin_id');
+        $phone = $request->session()->get('auth.otp.phone');
+
+        if (!$adminId || !$phone) {
+            return redirect()->route('login')->with('error', 'Session expired. Please login again.');
+        }
+
+        // Check recent OTPs to prevent spam (throttle 60s)
+        $recentOtp = \DB::table('otp_codes')
+            ->where('phone', $phone)
+            ->where('purpose', 'admin_login')
+            ->where('created_at', '>', Carbon::now()->subSeconds(60))
+            ->first();
+
+        if ($recentOtp) {
+            return back()->with('error', 'Please wait before resending.');
+        }
+
+        // Generate new OTP
+        $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        
+        // Save to DB
+        \DB::table('otp_codes')->insert([
+            'phone' => $phone,
+            'otp_hash' => Hash::make($otp),
+            'purpose' => 'admin_login',
+            'user_id' => $adminId,
+            'expires_at' => Carbon::now()->addMinutes(5),
+            'created_at' => Carbon::now()
+        ]);
+
+        // Fetch user to get email for the message
+        $userAdmin = UserAdmin::find($adminId);
+        $email = $userAdmin ? $userAdmin->email : 'User';
+
+        // Send via WhatsApp (Logic from login)
+        $sent = $this->sendTwilioWhatsapp($phone, $otp, $email);
+        
+        \Log::info('Admin RESEND OTP generated', [
+            'admin_id' => $adminId,
+            'phone' => $phone,
+            'sent' => $sent
+        ]);
+
+        return back()->with('success', 'A new code has been sent.');
+    }
+
+
+    // Handle logout
+    public function logout(Request $request)
+    {
+        Auth::guard('admin')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        return redirect()->route('login')->with('success', 'You have been logged out successfully!');
+    }
+
+    // Show forgot password form
+    public function showForgotPassword()
+    {
+        return view('auth.forgot-password');
+    }
+
+    // Handle forgot password request
+    public function sendResetLink(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:user_admin,email'
+        ], [
+            'email.exists' => 'We could not find an admin/police account with that email address.'
+        ]);
+
+        $userAdmin = UserAdmin::where('email', $request->email)->first();
+
+        // Check if email is verified
+        if (is_null($userAdmin->email_verified_at)) {
+            return back()->withErrors([
+                'email' => 'Your email address is not verified. Please verify your email before resetting your password.',
+            ])->withInput();
+        }
+
+        // Generate reset token
+        $resetToken = Str::random(64);
+        $tokenExpiresAt = Carbon::now()->addHour();
+
+        // Update user with reset token
+        $userAdmin->update([
+            'reset_token' => $resetToken,
+            'reset_token_expires_at' => $tokenExpiresAt,
+        ]);
+
+        // Generate reset URL
+        $resetUrl = route('password.reset.form', ['token' => $resetToken]);
+
+        // Send reset email
+        try {
+            $userAdmin->notify(new PasswordResetNotification($resetUrl, $userAdmin->firstname));
+            
+            return back()->with('success', 
+                'Password reset link has been sent to your email address. Please check your inbox.');
+        } catch (\Exception $e) {
+            \Log::error('Password reset email failed: ' . $e->getMessage());
+            
+            return back()->withErrors([
+                'email' => 'Failed to send password reset email. Please try again later.'
+            ])->withInput();
+        }
+    }
+
+    // Show reset password form
+    public function showResetPassword($token)
+    {
+        $userAdmin = UserAdmin::where('reset_token', $token)
+            ->where('reset_token_expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$userAdmin) {
+            return redirect()->route('login')->withErrors([
+                'token' => 'This password reset link is invalid or has expired.'
+            ]);
+        }
+
+        return view('auth.reset-password', ['token' => $token, 'email' => $userAdmin->email]);
+    }
+
+    // Handle password reset
+    public function resetPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'regex:/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/'
+            ],
+            'password_confirmation' => 'required|same:password',
+        ], [
+            'password.regex' => 'Password must contain at least one letter, one number, and one symbol (@$!%*?&)',
+            'password.min' => 'Password must be at least 8 characters long',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $userAdmin = UserAdmin::where('reset_token', $request->token)
+            ->where('email', $request->email)
+            ->where('reset_token_expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$userAdmin) {
+            return back()->withErrors([
+                'token' => 'This password reset link is invalid or has expired.'
+            ])->withInput();
+        }
+
+        // Update password and clear reset token
+        $userAdmin->update([
+            'password' => Hash::make($request->password),
+            'reset_token' => null,
+            'reset_token_expires_at' => null,
+        ]);
+
+        return redirect()->route('login')->with('success', 
+            'Your password has been reset successfully! Please login with your new password.');
+    }
+
+    // Verify email
+    public function verifyEmail($token)
+    {
+        $userAdmin = UserAdmin::where('verification_token', $token)
+            ->where('token_expires_at', '>', Carbon::now())
+            ->whereNull('email_verified_at')
+            ->first();
+
+        if (!$userAdmin) {
+            return redirect()->route('login')->withErrors([
+                'token' => 'This verification link is invalid or has expired.'
+            ]);
+        }
+
+        // Mark email as verified
+        $userAdmin->update([
+            'email_verified_at' => Carbon::now(),
+            'verification_token' => null,
+            'token_expires_at' => null,
+        ]);
+
+        return redirect()->route('login')->with('success', 
+            'Email verified successfully! You can now login to your account.');
+    }
+
+    // Resend verification email
+    public function resendVerification(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:user_admin,email'
+        ], [
+            'email.exists' => 'We could not find an admin/police account with that email address.'
+        ]);
+
+        $userAdmin = UserAdmin::where('email', $request->email)->first();
+
+        if ($userAdmin->email_verified_at) {
+            return back()->withErrors([
+                'email' => 'This email address is already verified.'
+            ])->withInput();
+        }
+
+        // Generate new verification token
+        $verificationToken = Str::random(64);
+        $tokenExpiresAt = Carbon::now()->addHours(24);
+
+        $userAdmin->update([
+            'verification_token' => $verificationToken,
+            'token_expires_at' => $tokenExpiresAt,
+        ]);
+
+        // Generate verification URL
+        $verificationUrl = route('email.verify', ['token' => $verificationToken]);
+
+        // Send verification email
+        try {
+            $userAdmin->notify(new EmailVerification($verificationUrl, $userAdmin->firstname));
+            
+            return back()->with('success', 
+                'Verification email has been sent! Please check your inbox.');
+        } catch (\Exception $e) {
+            \Log::error('Email verification resend failed: ' . $e->getMessage());
+            
+            return back()->withErrors([
+                'email' => 'Failed to send verification email. Please try again later.'
+            ])->withInput();
+        }
+    }
+}
