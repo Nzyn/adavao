@@ -178,6 +178,19 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/api/notifications/{id}', [NotificationController::class, 'delete'])->name('notifications.delete');
 });
 
+// TEMPORARY DEBUG ROUTE - Must be BEFORE catch-all route
+Route::get('/debug-env', function () {
+    return response()->json([
+        'DB_HOST' => env('DB_HOST', 'NOT SET'),
+        'DB_PORT' => env('DB_PORT', 'NOT SET'),
+        'DB_DATABASE' => env('DB_DATABASE', 'NOT SET'),
+        'DB_USERNAME' => env('DB_USERNAME', 'NOT SET'),
+        'DB_PASSWORD' => env('DB_PASSWORD') ? 'SET (hidden)' : 'NOT SET',
+        'config_username' => config('database.connections.mysql.username'),
+        'all_env_keys' => array_keys($_ENV),
+    ]);
+});
+
 // Proxy mobile app API requests to UserSide backend (Node.js)
 Route::any('/api/mobile/{path}', function ($path) {
     $backendUrl = env('NODE_BACKEND_URL', 'http://userside-backend:3000');
@@ -212,19 +225,6 @@ Route::any('/api/mobile/{path}', function ($path) {
         ], 503);
     }
 })->where('path', '.*');
-
-// TEMPORARY DEBUG ROUTE - DELETE AFTER FIXING
-Route::get('/debug-env', function () {
-    return response()->json([
-        'DB_HOST' => env('DB_HOST', 'NOT SET'),
-        'DB_PORT' => env('DB_PORT', 'NOT SET'),
-        'DB_DATABASE' => env('DB_DATABASE', 'NOT SET'),
-        'DB_USERNAME' => env('DB_USERNAME', 'NOT SET'),
-        'DB_PASSWORD' => env('DB_PASSWORD') ? 'SET (hidden)' : 'NOT SET',
-        'config_username' => config('database.connections.mysql.username'),
-        'all_env_keys' => array_keys($_ENV),
-    ]);
-});
 
 // Temporary Debug Route for OTP
 Route::get('/debug/otp-viewer', function () {
