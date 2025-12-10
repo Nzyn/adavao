@@ -1,13 +1,13 @@
 import { getBackendUrlSync } from '../utils/networkUtils';
 
-// Get dynamically detected backend URL (defaults to port 3000)
-const nodeBackendUrl = getBackendUrlSync();
-// Replace port 3000 with 8000 for Laravel API
-const laravelBaseUrl = nodeBackendUrl.replace(':3000', ':8000');
-
+// PRODUCTION CONFIG (Render)
 export const API_CONFIG = {
-  // Dynamic Laravel backend URL
-  BASE_URL: `${laravelBaseUrl}/api`,
+  BASE_URL: 'https://aldavao.onrender.com/api',
+
+  // DYNAMIC CONFIG (Local Development - Commented out for APK Build)
+  // const nodeBackendUrl = getBackendUrlSync();
+  // const laravelBaseUrl = nodeBackendUrl.replace(':3000', ':8000');
+  // BASE_URL: `${laravelBaseUrl}/api`,
 
   // Endpoints
   ENDPOINTS: {
