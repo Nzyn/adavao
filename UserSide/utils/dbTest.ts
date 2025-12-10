@@ -2,15 +2,15 @@
 import { directDbService } from '../services/directDbService';
 
 export class DatabaseTester {
-  
+
   static async runFullTest(): Promise<void> {
     console.log('🔧 Starting AlertDavao Database Test...\n');
-    
+
     try {
       // Test 1: Connection
       console.log('1️⃣ Testing MySQL connection to alertdavao database...');
       const connectionOk = await directDbService.testMysqlConnection();
-      
+
       if (connectionOk) {
         console.log('✅ MySQL connection successful!');
       } else {
@@ -20,9 +20,9 @@ export class DatabaseTester {
         console.log('   - Check MySQL credentials in directDbService.ts');
         return;
       }
-      
+
       console.log('\n2️⃣ Testing user data operations...');
-      
+
       // Test 2: Get user by ID
       try {
         const user = await directDbService.getUserById('1');
@@ -40,13 +40,13 @@ export class DatabaseTester {
       } catch (error) {
         console.log('❌ Error fetching user:', error);
       }
-      
+
       // Test 3: Address verification
       console.log('\n3️⃣ Testing address data mapping...');
       try {
-        const testQuery = 'SELECT id, firstname, lastname, email, contact, address FROM users LIMIT 5';
+        const testQuery = 'SELECT id, firstname, lastname, email, contact, address FROM users_public LIMIT 5';
         const result = await directDbService.executeQuery(testQuery);
-        
+
         if (result && result.data && result.data.length > 0) {
           console.log('✅ Sample users in database:');
           result.data.forEach((row: any, index: number) => {
@@ -64,9 +64,9 @@ export class DatabaseTester {
       } catch (error) {
         console.log('❌ Error querying users table:', error);
       }
-      
+
       console.log('\n🎉 Database test completed!');
-      
+
     } catch (error) {
       console.log('\n❌ Database test failed with error:', error);
       console.log('\nTroubleshooting steps:');
@@ -76,13 +76,13 @@ export class DatabaseTester {
       console.log('4. Check users table schema matches expected columns');
     }
   }
-  
+
   static async testAddressSave(userId: string, address: string): Promise<boolean> {
     console.log(`🧪 Testing address save for user ${userId}...`);
     try {
       await directDbService.updateUserAddress(userId, address);
       const verified = await directDbService.verifyAddressSave(userId, address);
-      
+
       if (verified) {
         console.log('✅ Address save test passed!');
         return true;
@@ -95,7 +95,7 @@ export class DatabaseTester {
       return false;
     }
   }
-  
+
   static logUserContext(user: any): void {
     console.log('\n📋 Current User Context State:');
     console.log('================================');

@@ -63,3 +63,6 @@ Thumbs.db
 UserSide/uploads/*
 AdminSide/admin/public/uploads/*
 .git_disabled/
+
+secrets_backup.txt
+

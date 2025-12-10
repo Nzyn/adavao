@@ -126,12 +126,60 @@
         text-overflow: ellipsis;
     }
 
+    /* Privacy Mode: Hide Name & Email when searching by ID */
+    .users-list.mode-id .user-real-name,
+    .users-list.mode-id .user-email {
+        display: none;
+    }
+
+    .users-list.mode-id .user-id-display {
+        display: block;
+        font-weight: 600;
+        color: #111827;
+        font-size: 0.95rem;
+    }
+
+    .users-list.mode-name .user-id-display {
+        display: none;
+    }
+
+    .user-real-name {
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .user-id-display {
+        display: none; /* Hidden by default in name mode */
+        color: #4b5563;
+        font-family: monospace;
+    }
+
     .user-email {
         font-size: 0.75rem;
         color: #6b7280;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    .search-type-toggle {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+        padding: 0 0.5rem;
+    }
+
+    .search-type-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        color: #4b5563;
+        cursor: pointer;
+    }
+
+    .search-type-label input {
+        accent-color: #3b82f6;
     }
 
     .user-unread-badge {
@@ -534,6 +582,16 @@
     <div class="users-list-container">
         <div class="users-list-header">
             <h3>Users</h3>
+            
+            <div class="search-type-toggle">
+                <label class="search-type-label">
+                    <input type="radio" name="searchType" value="name" checked onchange="toggleSearchMode()"> Name/Email
+                </label>
+                <label class="search-type-label">
+                    <input type="radio" name="searchType" value="id" onchange="toggleSearchMode()"> User ID
+                </label>
+            </div>
+
             <div class="user-search-box">
                 <svg class="user-search-icon" viewBox="0 0 24 24" fill="none">
                     <circle cx="11" cy="11" r="8"/>
@@ -542,20 +600,21 @@
                 <input 
                     type="text" 
                     class="user-search-input" 
-                    placeholder="Search by ID number or email..." 
+                    placeholder="Search users..." 
                     id="userSearchInput"
                     onkeyup="searchUsers()"
                 >
             </div>
         </div>
-        <div class="users-list" id="usersList">
+        <div class="users-list mode-name" id="usersList">
             @forelse($users as $user)
                 <div class="user-item" data-user-id="{{ $user->id }}" data-user-name="{{ addslashes($user->firstname) }} {{ addslashes($user->lastname) }}" data-user-id-number="{{ str_pad($user->id, 5, '0', STR_PAD_LEFT) }}">
                     <div class="user-avatar">
                         {{ strtoupper(substr($user->firstname, 0, 1)) }}{{ strtoupper(substr($user->lastname, 0, 1)) }}
                     </div>
                     <div class="user-info">
-                        <div class="user-name">ID: {{ str_pad($user->id, 5, '0', STR_PAD_LEFT) }}</div>
+                        <div class="user-real-name">{{ $user->firstname }} {{ $user->lastname }}</div>
+                        <div class="user-id-display">ID: {{ str_pad($user->id, 5, '0', STR_PAD_LEFT) }}</div>
                         <div class="user-email">{{ $user->email }}</div>
                     </div>
                     <div class="user-unread-badge">0</div>
@@ -762,7 +821,7 @@
         if (messageCheckInterval) {
             clearInterval(messageCheckInterval);
         }
-        messageCheckInterval = setInterval(() => loadConversation(userId), 2000);
+        messageCheckInterval = setInterval(() => loadConversation(userId, true), 2000);
         
         // Set up auto-refresh for typing status
         if (typingCheckInterval) {
@@ -771,10 +830,23 @@
         typingCheckInterval = setInterval(() => checkUserTypingStatus(userId), 800);
     }
 
-    function loadConversation(userId) {
+    function loadConversation(userId, isBackground = false) {
         // Skip refresh if user is actively scrolling through messages
         if (isUserScrolling) {
             return;
+        }
+        
+        if (!isBackground) {
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+               // Optional: showing a small spinner inside chat area instead of full screen
+               // But for consistency with "system-wide", we can use global or a local one.
+               // Let's use global for initial load as it might be perceived as a "page navigate" within the app.
+               // Or better: show a local spinner in chatMessages to avoid blocking the whole UI if they want to click other users.
+               // However, user said "match the color of the spinner to the ui of overall system".
+               // Let's use the global showLoading for the AUTHORITATIVE load.
+               showLoading('Loading conversation...');
+            }
         }
         
         fetch(`/messages/conversation/${userId}`, {
@@ -795,6 +867,12 @@
         })
         .catch(error => {
             // Silent fail - don't show errors during background refresh
+            console.error(error);
+        })
+        .finally(() => {
+            if (!isBackground) {
+                hideLoading();
+            }
         });
     }
 
@@ -978,6 +1056,11 @@
 
         const sendButton = document.getElementById('sendButton');
         sendButton.disabled = true;
+        
+        // Optional: Show global loading for send? It might be annoying if it blocks typing.
+        // But user asked for "anything that is possible to take a while".
+        // Let's show it to be safe and responsive.
+        showLoading('Sending...');
 
         fetch('/messages/send', {
             method: 'POST',
@@ -1002,7 +1085,7 @@
                 isAtBottom = true;
                 isUserScrolling = false;
                 
-                loadConversation(currentUserId);
+                loadConversation(currentUserId, true); // Use background mode to avoid double spinner
                 loadConversationsList();
             }
         })
@@ -1013,6 +1096,7 @@
         .finally(() => {
             sendButton.disabled = false;
             messageInput.focus();
+            hideLoading();
         });
     }
 
@@ -1071,35 +1155,54 @@
         });
     }
 
+    function toggleSearchMode() {
+        const searchType = document.querySelector('input[name="searchType"]:checked').value;
+        const usersList = document.getElementById('usersList');
+        const input = document.getElementById('userSearchInput');
+        
+        // Reset classes
+        usersList.classList.remove('mode-name', 'mode-id');
+        usersList.classList.add('mode-' + searchType);
+        
+        // Update placeholder
+        if (searchType === 'id') {
+            input.placeholder = "Enter User ID...";
+        } else {
+            input.placeholder = "Enter Name or Email...";
+        }
+        
+        // Re-run search if there's a value
+        searchUsers();
+    }
+
     function searchUsers() {
         const input = document.getElementById('userSearchInput');
         const filter = input.value.toUpperCase();
         const usersList = document.getElementById('usersList');
         const userItems = usersList.getElementsByClassName('user-item');
-        
-        // Check if input is numeric (searching by ID number)
-        const isNumericSearch = /^[0-9]+$/.test(input.value.trim());
+        const searchType = document.querySelector('input[name="searchType"]:checked').value;
         
         for (let i = 0; i < userItems.length; i++) {
-            const userName = userItems[i].dataset.userName.toUpperCase();
-            const userIdNumber = userItems[i].dataset.userIdNumber ? userItems[i].dataset.userIdNumber.toUpperCase() : '';
-            const userInfo = userItems[i].querySelector('.user-info');
-            const userEmail = userInfo ? userInfo.querySelector('.user-email').textContent.toUpperCase() : '';
+            const item = userItems[i];
+            let match = false;
             
-            // If numeric search, prioritize id_number; otherwise search email
-            if (isNumericSearch) {
+            if (searchType === 'id') {
+                // Search ONLY by ID Number
+                const userIdNumber = item.dataset.userIdNumber ? item.dataset.userIdNumber.toUpperCase() : '';
                 if (userIdNumber.indexOf(filter) > -1) {
-                    userItems[i].style.display = '';
-                } else {
-                    userItems[i].style.display = 'none';
+                    match = true;
                 }
             } else {
-                if (userEmail.indexOf(filter) > -1 || userIdNumber.indexOf(filter) > -1) {
-                    userItems[i].style.display = '';
-                } else {
-                    userItems[i].style.display = 'none';
+                // Search by Name OR Email
+                const userName = item.dataset.userName.toUpperCase();
+                const userEmail = item.querySelector('.user-email').textContent.toUpperCase();
+                
+                if (userName.indexOf(filter) > -1 || userEmail.indexOf(filter) > -1) {
+                    match = true;
                 }
             }
+            
+            item.style.display = match ? '' : 'none';
         }
     }
 

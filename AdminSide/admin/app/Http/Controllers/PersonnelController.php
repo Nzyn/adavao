@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use App\Models\PoliceOfficer;
 use App\Models\PoliceStation;
 
@@ -41,7 +42,9 @@ class PersonnelController extends Controller
         });
 
         // 3. Use only UserAdmin personnel
-        $officers = $mappedAdmins;
+        $officers = Cache::remember('personnel_list', 300, function() use ($mappedAdmins) {
+            return $mappedAdmins;
+        });
         
         return view('personnel', compact('officers'));
     }

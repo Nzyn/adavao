@@ -241,48 +241,48 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
     };
 
     // Determine barangay from street address using reverse geocoding
-    const determineBarangayFromCoordinates = async (lat: number, lon: number) => {
+    const determineBarangayFromCoordinates = async (lat: number, lon: number, addressComponents: any = null) => {
         console.log('🔍 Determining barangay from coordinates:', { lat, lon });
 
-        // First, try to get barangay from reverse geocoding the street address
-        if (streetAddress.trim()) {
+        // First, try to get barangay from provided address components (from reverse geocoding)
+        if (addressComponents) {
             try {
-                console.log('🗺️ Reverse geocoding street address:', streetAddress);
-                const geocodeResponse = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(streetAddress + ', Davao City')}&limit=1`
-                );
+                console.log('🗺️ Using provided address components:', addressComponents);
 
-                if (geocodeResponse.ok) {
-                    const geocodeData = await geocodeResponse.json();
-                    console.log('🗺️ Geocode response:', geocodeData);
+                // Construct a string to search for - prioritize likely barangay fields
+                // Nominatim often puts barangay in: village, suburb, residential, neighbourhood, quarter
+                const potentialBarangayNames = [
+                    addressComponents.village,
+                    addressComponents.suburb,
+                    addressComponents.residential,
+                    addressComponents.neighbourhood,
+                    addressComponents.quarter,
+                    addressComponents.city_district
+                ].filter(Boolean); // Remove null/undefined
 
-                    if (geocodeData && geocodeData.length > 0) {
-                        const addressComponents = geocodeData[0].display_name;
-                        console.log('🗺️ Address components:', addressComponents);
+                console.log('🔍 Checking potential barangay names:', potentialBarangayNames);
 
-                        // Try to find barangay in the address
-                        const matchedBarangay = barangays.find(b => {
-                            const barangayName = b.barangay_name.toLowerCase();
-                            const addressLower = addressComponents.toLowerCase();
-                            return addressLower.includes(barangayName);
-                        });
+                for (const name of potentialBarangayNames) {
+                    const matchedBarangay = barangays.find(b =>
+                        b.barangay_name.toLowerCase().includes(name.toLowerCase()) ||
+                        name.toLowerCase().includes(b.barangay_name.toLowerCase())
+                    );
 
-                        if (matchedBarangay) {
-                            console.log('✅ Barangay matched from address:', matchedBarangay.barangay_name);
-                            setSelectedBarangay(matchedBarangay);
-                            setBarangaySearch(matchedBarangay.barangay_name);
-                            setShowBarangayDropdown(false);
-                            setBarangayAutoDetected(true);
-                            return; // Successfully found barangay
-                        }
+                    if (matchedBarangay) {
+                        console.log('✅ Barangay matched from address component:', matchedBarangay.barangay_name);
+                        setSelectedBarangay(matchedBarangay);
+                        setBarangaySearch(matchedBarangay.barangay_name);
+                        setShowBarangayDropdown(false);
+                        setBarangayAutoDetected(true);
+                        return; // Successfully found barangay
                     }
                 }
             } catch (error) {
-                console.log('⚠️ Reverse geocoding error:', error);
+                console.log('⚠️ Error matching address components:', error);
             }
         }
 
-        // Fallback: Try coordinate-based barangay detection
+        // Fallback: Try coordinate-based barangay detection (Database PIP)
         try {
             const response = await fetch(
                 `${BACKEND_URL}/api/barangay/by-coordinates?latitude=${lat}&longitude=${lon}`
@@ -367,15 +367,18 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                 `${BACKEND_URL}/api/location/reverse?lat=${latitude}&lon=${longitude}`
             );
 
+            let rawAddress = null;
             if (response.ok) {
-                const data = await response.json();
+                const data = await response.json().catch(() => ({}));
                 if (data.success && data.address) {
                     setStreetAddress(data.address);
+                    if (data.raw && data.raw.address) {
+                        rawAddress = data.raw.address;
+                    }
                 }
             }
 
-            // Determine barangay from coordinates
-            await determineBarangayFromCoordinates(latitude, longitude);
+            await determineBarangayFromCoordinates(latitude, longitude, rawAddress);
 
         } catch (error) {
             console.error('Error getting current location:', error);
@@ -467,12 +470,17 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                                 console.log('🏠 Reverse geocoded address:', data.address);
                                 setStreetAddress(data.address);
                             }
-                        })
-                        .catch(err => console.error('Reverse geocode error:', err));
 
-                    // Determine barangay
-                    console.log('🔍 Calling determineBarangayFromCoordinates (web)');
-                    determineBarangayFromCoordinates(latitude, longitude);
+                            // Determine barangay using raw address components if available
+                            const rawAddress = (data.success && data.raw && data.raw.address) ? data.raw.address : null;
+                            console.log('🔍 Calling determineBarangayFromCoordinates (web) with address:', rawAddress);
+                            determineBarangayFromCoordinates(latitude, longitude, rawAddress);
+                        })
+                        .catch(err => {
+                            console.error('Reverse geocode error (Web):', err);
+                            setStreetAddress("Error retrieving address"); // Temporary visual feedback
+                            determineBarangayFromCoordinates(latitude, longitude);
+                        });
                 }
             };
 
@@ -665,6 +673,18 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                 // Store the last valid position
                 var lastValidPosition = [${mapCoordinates?.latitude || 7.0731}, ${mapCoordinates?.longitude || 125.6128}];
 
+                function sendMessage(data) {
+                    console.log('Posting message:', data);
+                    // Web Platform
+                    if (window.parent) {
+                        window.parent.postMessage(data, '*');
+                    }
+                    // Mobile Platform (React Native WebView)
+                    if (window.ReactNativeWebView) {
+                        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+                    }
+                }
+
                 marker.on('dragend', function(e) {
                     var pos = marker.getLatLng();
                     console.log('Marker dragged to:', pos.lat, pos.lng);
@@ -672,22 +692,22 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                     if (isInsideDavao(pos.lat, pos.lng)) {
                         console.log('Position is inside Davao City - updating coordinates');
                         lastValidPosition = [pos.lat, pos.lng];
-                        window.parent.postMessage({
+                        sendMessage({
                             type: 'locationSelected',
                             latitude: pos.lat,
                             longitude: pos.lng
-                        }, '*');
+                        });
                     } else {
                         console.log('Position is OUTSIDE Davao City - showing alert');
                         // Snap back to last valid position
                         marker.setLatLng(lastValidPosition);
                         
                         // Send message to show alert
-                        window.parent.postMessage({
+                        sendMessage({
                             type: 'locationOutOfBounds',
                             latitude: pos.lat,
                             longitude: pos.lng
-                        }, '*');
+                        });
                     }
                 });
 
@@ -698,18 +718,18 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                         console.log('Click is inside Davao City - updating marker');
                         lastValidPosition = [e.latlng.lat, e.latlng.lng];
                         marker.setLatLng(e.latlng);
-                        window.parent.postMessage({
+                        sendMessage({
                             type: 'locationSelected',
                             latitude: e.latlng.lat,
                             longitude: e.latlng.lng
-                        }, '*');
+                        });
                     } else {
                         console.log('Click is OUTSIDE Davao City - showing alert');
-                        window.parent.postMessage({
+                        sendMessage({
                             type: 'locationOutOfBounds',
                             latitude: e.latlng.lat,
                             longitude: e.latlng.lng
-                        }, '*');
+                        });
                     }
                 });
 
@@ -980,15 +1000,22 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                                                     fetch(`${BACKEND_URL}/api/location/reverse?lat=${latitude}&lon=${longitude}`)
                                                         .then(res => res.json())
                                                         .then(addressData => {
+                                                            let rawAddress = null;
                                                             if (addressData.success && addressData.address) {
                                                                 console.log('🏠 Reverse geocoded address (mobile):', addressData.address);
                                                                 setStreetAddress(addressData.address);
+                                                                if (addressData.raw && addressData.raw.address) {
+                                                                    rawAddress = addressData.raw.address;
+                                                                }
                                                             }
+                                                            // Determine barangay with address components
+                                                            determineBarangayFromCoordinates(latitude, longitude, rawAddress);
                                                         })
-                                                        .catch(err => console.error('Reverse geocode error:', err));
-
-                                                    // Determine barangay
-                                                    determineBarangayFromCoordinates(latitude, longitude);
+                                                        .catch(err => {
+                                                            console.error('Reverse geocode error (Mobile):', err);
+                                                            // Alert.alert("Debug", "Reverse geocode failed: " + err.message);
+                                                            determineBarangayFromCoordinates(latitude, longitude);
+                                                        });
                                                 }
                                             }}
                                         />

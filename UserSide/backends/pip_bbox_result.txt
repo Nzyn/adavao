@@ -1,0 +1,9 @@
+Testing Coordinate: Lat 7.069615, Lng 125.598892
+Loaded GeoJSON features: 40
+
+Inspecting Feature: Barangay 2-A
+BOUNDING BOX: Lat [7.0637224, 7.0688807], Lng [125.6017219, 125.6088553]
+TEST POINT: Lat 7.069615, Lng 125.598892
+❌ Point is OUTSIDE bounding box (Impossible match)
+
+No matches found for 2-A.

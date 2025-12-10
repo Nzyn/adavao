@@ -1,12 +1,14 @@
 // db.js
 const mysql = require("mysql2");
+require("dotenv").config();
 
 // Create a promise-based connection pool
 const db = mysql.createPool({
-  host: "127.0.0.1",   // or localhost
-  user: "root",        // your MySQL username
-  password: "1234",    // ✅ MySQL Server 80 password
-  database: "alertdavao", // ✅ correct DB name
+  host: process.env.DB_HOST || "127.0.0.1",
+  user: process.env.DB_USERNAME || "root",
+  password: process.env.DB_PASSWORD || "1234",
+  database: process.env.DB_DATABASE || "alertdavao",
+  port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0

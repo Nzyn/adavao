@@ -560,14 +560,14 @@
     </div>
                 
                 <!-- Statistics Cards -->
-                <div class="stats-grid">
+                <div class="stats-grid" @if($userRole !== 'police') style="grid-template-columns: repeat(4, 1fr);" @endif>
                     @if($userRole === 'police')
                         <!-- Police Officer Stats: Custom View -->
                         <a href="{{ route('reports') }}" class="stat-card total">
                             <div class="stat-title">Total Reports</div>
                             <div class="stat-value">{{ $totalReports }}</div>
                         </a>
-                        <a href="{{ route('reports') }}" class="stat-card verified" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white;">
+                        <a href="{{ route('reports') }}" class="stat-card" style="border-left-color: #3b82f6;">
                             <div class="stat-title">Reports Today</div>
                             <div class="stat-value">{{ $reportsToday }}</div>
                         </a>
@@ -576,28 +576,66 @@
                             <div class="stat-value">{{ $unreadMessages }}</div>
                         </a>
                     @else
-                        <!-- Admin Stats -->
+                        <!-- ADMIN DASHBOARD: Summary Grid -->
+                        
+                        <!-- 1. Reports -->
                         <a href="{{ route('reports') }}" class="stat-card total">
-                            <div class="stat-title">Total Reports</div>
+                            <div class="stat-title">Reports</div>
                             <div class="stat-value">{{ $totalReports }}</div>
                         </a>
+                        
+                        <!-- 2. Messages -->
+                        <a href="{{ route('messages') }}" class="stat-card pending">
+                            <div class="stat-title">Messages</div>
+                            <div class="stat-value">{{ $unreadMessages }}</div>
+                        </a>
+                        
+                        <!-- 3. Users -->
                         <a href="{{ route('users') }}" class="stat-card verified">
-                            <div class="stat-title">Total Users</div>
+                            <div class="stat-title">Users</div>
                             <div class="stat-value">{{ $totalUsers }}</div>
                         </a>
-                        <a href="{{ route('personnel') }}" class="stat-card pending">
-                            <div class="stat-title">Police Officers</div>
+                        
+                        <!-- 4. Flagged Users -->
+                        <a href="{{ route('flagged-users') }}" class="stat-card pending" style="border-left-color: #ef4444;">
+                            <div class="stat-title">Flagged Users</div>
+                            <div class="stat-value">{{ $flaggedUsersCount }}</div>
+                        </a>
+                        
+                        <!-- 5. Personnel -->
+                        <a href="{{ route('personnel') }}" class="stat-card pending" style="border-left-color: #6366f1;">
+                            <div class="stat-title">Personnel</div>
                             <div class="stat-value">{{ $totalPoliceOfficers }}</div>
+                        </a>
+                        
+                        <!-- 6. Verification -->
+                        <a href="{{ route('verification') }}" class="stat-card total" style="border-left-color: #8b5cf6;">
+                            <div class="stat-title">Verification</div>
+                            <div class="stat-value">{{ $pendingVerificationsCount }}</div>
+                        </a>
+                        
+                        <!-- 7. Statistics -->
+                        <a href="{{ route('statistics') }}" class="stat-card verified" style="border-left-color: #10b981;">
+                            <div class="stat-title">Statistics</div>
+                            <div class="stat-value" style="font-size: 1.25rem;">View Analytics</div>
+                        </a>
+                        
+                        <!-- 8. View Map -->
+                        <a href="{{ route('view-map') }}" class="stat-card total" style="border-left-color: #3b82f6;">
+                            <div class="stat-title">Crime Map</div>
+                            <div class="stat-value" style="font-size: 1.25rem;">Open Live Map</div>
                         </a>
                     @endif
                 </div>
                 
-                <!-- Priority Cases and Map -->
+                @if($userRole === 'police')
+                <!-- Priority Cases and Map (POLICE ONLY) -->
                 <div class="dashboard-grid">
                     <div class="priority-section">
                         <h2 class="section-title">Crime Map by Barangay</h2>
                         <div class="priority-content">
                             <div class="priority-cases">
+                                <!-- Police View Content -->
                                 <div style="margin-bottom: 1rem;">
                                     <label style="display: block; font-size: 0.75rem; color: #64748b; font-weight: 600; margin-bottom: 0.5rem;">FILTER BY BARANGAY</label>
                                     <select id="barangay-filter" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
@@ -620,6 +658,7 @@
                         </div>
                     </div>
                 </div>
+                @endif
 @endsection
 
 @section('scripts')

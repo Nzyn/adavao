@@ -49,13 +49,120 @@
 
         .search-icon {
             position: absolute;
-            left: 0.75rem;
+            left: 1rem;
             top: 50%;
             transform: translateY(-50%);
-            width: 18px;
-            height: 18px;
-            fill: #9ca3af;
+            width: 1.25rem;
+            height: 1.25rem;
+            fill: none;
+            stroke: #9ca3af;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
         }
+
+        /* Custom Station Selector Styles */
+        .station-selector-ui {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            background: #f9fafb;
+        }
+        
+        .station-search {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 0.875rem;
+        }
+        
+        .station-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 4px; /* Space for scrollbar */
+        }
+        
+        .station-card {
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .station-card:hover {
+            border-color: #9ca3af;
+            background: #f3f4f6;
+        }
+        
+        .station-card.selected {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            box-shadow: 0 0 0 1px #3b82f6;
+        }
+        
+        .station-card.return-admin {
+            border-color: #fca5a5;
+            background: #fef2f2;
+            margin-bottom: 8px;
+        }
+        
+        .station-card.return-admin:hover {
+            border-color: #f87171;
+            background: #fee2e2;
+        }
+        
+        .station-card.return-admin.selected {
+            border-color: #ef4444;
+            background: #fee2e2;
+            box-shadow: 0 0 0 1px #ef4444;
+        }
+        
+        .station-card-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .station-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #1f2937;
+        }
+        
+        .station-address {
+            font-size: 0.75rem;
+            color: #6b7280;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+        
+        .check-icon {
+            color: #3b82f6;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        
+        .station-card.selected .check-icon {
+            opacity: 1;
+        }
+        
+        .station-card.return-admin .check-icon {
+            color: #ef4444;
+        }
+
+
 
         .reports-table-container {
             background: white;
@@ -1221,10 +1328,31 @@
             </div>
             <div class="modal-body">
                 <div class="station-select-container">
-                    <label for="assignStationSelect">Select Police Station</label>
-                    <select id="assignStationSelect" class="station-select">
-                        <option value="">-- Select a station --</option>
-                    </select>
+                    <label>Select Destination</label>
+                    <input type="hidden" id="selectedAssignStationId">
+                    
+                    <div class="station-selector-ui">
+                        <!-- Return to Admin Option -->
+                        <div class="station-card return-admin" onclick="selectAssignStation('unassign')" id="assign-card-unassign">
+                            <div class="station-card-content">
+                                <span class="station-name" style="color: #b91c1c;">⚠️ Return to Admin</span>
+                                <span class="station-address">Unassign this report</span>
+                            </div>
+                            <svg class="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                            </svg>
+                        </div>
+
+                        <div style="border-top: 1px solid #e5e7eb; margin: 8px 0;"></div>
+                        
+                        <!-- Search -->
+                        <input type="text" class="station-search" placeholder="Search stations..." onkeyup="filterAssignStations(this.value)">
+                        
+                        <!-- Station List -->
+                        <div id="assignStationList" class="station-list">
+                            <!-- Stations will be populated here -->
+                        </div>
+                    </div>
                 </div>
                 <div class="actions-section" style="margin-top: 0; border-top: none; background: white;">
                     <button class="btn btn-primary" onclick="submitAssignStation()">
@@ -1248,10 +1376,31 @@
             </div>
             <div class="modal-body">
                 <div class="station-select-container">
-                    <label for="reassignStationSelect">Reassign to Police Station</label>
-                    <select id="reassignStationSelect" class="station-select">
-                        <option value="">-- Select a station --</option>
-                    </select>
+                    <label>Select Destination</label>
+                    <input type="hidden" id="selectedReassignStationId">
+                    
+                    <div class="station-selector-ui">
+                        <!-- Return to Admin Option -->
+                        <div class="station-card return-admin" onclick="selectStation('unassign')" id="station-card-unassign">
+                            <div class="station-card-content">
+                                <span class="station-name" style="color: #b91c1c;">⚠️ Return to Admin</span>
+                                <span class="station-address">Unassign this report and return to pool</span>
+                            </div>
+                            <svg class="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                            </svg>
+                        </div>
+
+                        <div style="border-top: 1px solid #e5e7eb; margin: 8px 0;"></div>
+                        
+                        <!-- Search -->
+                        <input type="text" class="station-search" placeholder="Search stations..." onkeyup="filterStations(this.value)">
+                        
+                        <!-- Station List -->
+                        <div id="reassignStationList" class="station-list">
+                            <!-- Stations will be populated here -->
+                        </div>
+                    </div>
                 </div>
                 <div class="station-select-container">
                     <label for="reassignReason">Reason for Reassignment</label>
@@ -1698,7 +1847,6 @@ window.downloadModalAsPDF = function() {};
                             return url;
                         };
 
-                        // Build comprehensive report info
                         const reportInfo = `
                             <div class="report-info-section">
                                 <div class="report-info-header">
@@ -1751,29 +1899,35 @@ window.downloadModalAsPDF = function() {};
                                         </div>
                                     </div>
                                     <div class="detail-item">
+                                        <div class="detail-label">🆔 User ID</div>
+                                        <div class="detail-value">
+                                            ${report.user ? report.user.id : 'N/A'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="info-row">
+                                    <div class="detail-item">
                                         <div class="detail-label">📊 Status</div>
                                         <div class="detail-value">
                                             <span class="status-badge ${report.status}">${report.status.charAt(0).toUpperCase() + report.status.slice(1)}</span>
                                             <span class="status-badge ${report.is_valid}" style="margin-left: 0.5rem;">${report.is_valid === 'valid' ? '✓ Valid' : report.is_valid === 'invalid' ? '✗ Invalid' : '⏳ Checking'}</span>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="info-row">
                                     <div class="detail-item">
                                         <div class="detail-label">📍 Location Address</div>
                                         <div class="detail-value">${getLocationDisplay(report)}</div>
                                     </div>
+                                </div>
+
+                                <div class="info-row">
                                     <div class="detail-item">
                                         <div class="detail-label">🎯 Coordinates</div>
                                         <div class="detail-value">
                                             ${report.location ? `${parseFloat(report.location.latitude).toFixed(6)}, ${parseFloat(report.location.longitude).toFixed(6)}` : 'Not available'}
                                         </div>
                                     </div>
-                                </div>
-
-                                ${report.assigned_station_id && report.police_station ? `
-                                <div class="info-row">
+                                    ${report.assigned_station_id && report.police_station ? `
                                     <div class="detail-item">
                                         <div class="detail-label">🚓 Assigned Station</div>
                                         <div class="detail-value">
@@ -1781,12 +1935,26 @@ window.downloadModalAsPDF = function() {};
                                             ${report.police_station.address ? `<br><small style="color: #6b7280;">${report.police_station.address}</small>` : ''}
                                         </div>
                                     </div>
+                                    ` : `
+                                    <div class="detail-item">
+                                        <div class="detail-label">🚓 Assigned Station</div>
+                                        <div class="detail-value">
+                                            <span style="color: #f59e0b; font-weight: 600;">⚠️ Unassigned</span>
+                                        </div>
+                                    </div>
+                                    `}
                                 </div>
-                                ` : ''}
 
-                                <div class="detail-item info-item-full">
-                                    <div class="detail-label">📝 Description</div>
-                                    <div class="detail-value" style="white-space: pre-wrap;">${report.description || 'No description provided'}</div>
+                                <div class="info-row">
+                                    <div class="detail-item">
+                                        <div class="detail-label">📝 Description</div>
+                                        <div class="detail-value" style="white-space: pre-wrap;">${report.description || 'No description provided'}</div>
+                                    </div>
+                                    <div class="detail-item">
+                                        <!-- Spacer label to align button with description text -->
+                                        <div class="detail-label" style="visibility: hidden;">Action&nbsp;</div>
+                                        ${getActionButtons(report)}
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -1800,7 +1968,7 @@ window.downloadModalAsPDF = function() {};
                                     </svg>
                                     Location Map - Crime Scene & Police Stations
                                 </div>
-                                <div id="reportDetailMap"></div>
+                                <div id="reportDetailMap" style="height: 300px; width: 100%; border-radius: 0 0 8px 8px;"></div>
                             </div>
                         `;
 
@@ -1887,7 +2055,7 @@ window.downloadModalAsPDF = function() {};
                         }
 
                         // Combine all sections
-                        modalBody.innerHTML = reportInfo + mapContainer + mediaContent + (getActionButtons(report) || '');
+                        modalBody.innerHTML = reportInfo + mapContainer + mediaContent;
                         
                         // Store current report ID and data globally
                         window.currentReportId = reportId;
@@ -1951,7 +2119,8 @@ function getVerificationBadge(report) {
  }
 
  function getActionButtons(report) {
-     const userRole = '{{ auth()->user()->role ?? "" }}';
+     const userRole = '{{ auth()->user()->hasRole("admin") ? "admin" : (auth()->user()->hasRole("police") ? "police" : "") }}';
+    //  console.log('Debug - User Role:', userRole); 
      const isUnassigned = !report.assigned_station_id;
      
      let buttons = '';
@@ -1960,9 +2129,9 @@ function getVerificationBadge(report) {
      if (userRole === 'admin') {
          const buttonText = isUnassigned ? 'Assign to Station' : 'Reassign Station';
          buttons = `
-             <div class="actions-section">
-                 <button class="btn btn-primary" onclick="openAssignStationModal(${report.report_id})">
-                     <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+             <div>
+                 <button class="btn btn-sm btn-primary" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start;" onclick="openAssignStationModal(${report.report_id})">
+                     <svg style="width: 16px; height: 16px; margin-right: 8px;" viewBox="0 0 24 24" fill="currentColor">
                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                      </svg>
                      ${buttonText}
@@ -1973,9 +2142,9 @@ function getVerificationBadge(report) {
      // For police users
      else if (userRole === 'police') {
          buttons = `
-             <div class="actions-section">
-                 <button class="btn btn-warning" onclick="openReassignmentModal(${report.report_id})">
-                     <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+             <div>
+                 <button class="btn btn-sm btn-warning" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start;" onclick="openReassignmentModal(${report.report_id})">
+                     <svg style="width: 16px; height: 16px; margin-right: 8px;" viewBox="0 0 24 24" fill="currentColor">
                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                      </svg>
                      Request Reassignment
@@ -1990,13 +2159,26 @@ function getVerificationBadge(report) {
  // Station assignment/reassignment functions
  let policeStations = [];
 
- function loadPoliceStations() {
+ window.loadPoliceStations = function() {
      if (policeStations.length > 0) return Promise.resolve();
      
      return fetch('/api/police-stations')
          .then(response => response.json())
          .then(data => {
-             policeStations = data;
+            if (data.success && Array.isArray(data.data)) {
+                policeStations = data.data;
+            } else if (Array.isArray(data)) {
+                policeStations = data;
+            } else {
+                console.error('Unexpected police stations format:', data);
+                policeStations = [];
+            }
+            
+            // Sort stations naturally (PS1, PS2, ... PS10)
+            policeStations.sort((a, b) => {
+                return a.station_name.localeCompare(b.station_name, undefined, {numeric: true, sensitivity: 'base'});
+            });
+
              console.log('Loaded police stations:', policeStations);
          })
          .catch(error => {
@@ -2005,52 +2187,170 @@ function getVerificationBadge(report) {
          });
  }
 
- function populateStationSelect(selectId) {
+ window.populateStationSelect = function(selectId) {
      const select = document.getElementById(selectId);
      select.innerHTML = '<option value="">-- Select a station --</option>';
      
-     policeStations.forEach(station => {
-         const option = document.createElement('option');
-         option.value = station.station_id;
-         option.textContent = station.station_name;
-         select.appendChild(option);
-     });
+     if (selectId === 'reassignStationSelect') {
+         const unassignOption = document.createElement('option');
+         unassignOption.value = 'unassign';
+         unassignOption.textContent = '⚠️ Return to Admin (Unassign)';
+         unassignOption.style.color = '#ef4444';
+         unassignOption.style.fontWeight = 'bold';
+         select.appendChild(unassignOption);
+     }
+     
+     if (Array.isArray(policeStations)) {
+         policeStations.forEach(station => {
+             const option = document.createElement('option');
+             option.value = station.station_id;
+             option.textContent = station.station_name;
+             select.appendChild(option);
+         });
+     } else {
+         console.warn('policeStations is not an array:', policeStations);
+     }
  }
 
- function openAssignStationModal(reportId) {
+ window.openAssignStationModal = function(reportId) {
      window.currentReportId = reportId;
-     loadPoliceStations().then(() => {
-         populateStationSelect('assignStationSelect');
+     document.getElementById('selectedAssignStationId').value = ''; // Reset selection
+     document.querySelectorAll('#assignStationModal .station-card').forEach(c => c.classList.remove('selected'));
+     
+     window.loadPoliceStations().then(() => {
+         window.renderAssignStations();
          document.getElementById('assignStationModal').classList.add('active');
      });
  }
 
- function closeAssignStationModal() {
-     document.getElementById('assignStationModal').classList.remove('active');
-     document.getElementById('assignStationSelect').value = '';
+ window.renderAssignStations = function() {
+     const listContainer = document.getElementById('assignStationList');
+     listContainer.innerHTML = '';
+     
+     if (Array.isArray(policeStations)) {
+         policeStations.forEach(station => {
+             const card = document.createElement('div');
+             card.className = 'station-card';
+             card.id = `assign-card-${station.station_id}`;
+             card.onclick = () => window.selectAssignStation(station.station_id);
+             
+             card.innerHTML = `
+                <div class="station-card-content">
+                    <span class="station-name">${station.station_name}</span>
+                    <span class="station-address">${station.address || 'Address not available'}</span>
+                </div>
+                <svg class="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+             `;
+             listContainer.appendChild(card);
+         });
+     }
  }
 
- function openReassignmentModal(reportId) {
+ window.selectAssignStation = function(stationId) {
+     document.getElementById('selectedAssignStationId').value = stationId;
+     document.querySelectorAll('#assignStationModal .station-card').forEach(c => c.classList.remove('selected'));
+     const selectedCard = document.getElementById(stationId === 'unassign' ? 'assign-card-unassign' : `assign-card-${stationId}`);
+     if (selectedCard) selectedCard.classList.add('selected');
+ }
+
+ window.filterAssignStations = function(query) {
+     const filter = query.toLowerCase();
+     const cards = document.querySelectorAll('#assignStationList .station-card');
+     cards.forEach(card => {
+         const name = card.querySelector('.station-name').textContent.toLowerCase();
+         const address = card.querySelector('.station-address').textContent.toLowerCase();
+         if (name.includes(filter) || address.includes(filter)) {
+             card.style.display = 'flex';
+         } else {
+             card.style.display = 'none';
+         }
+     });
+ }
+
+ window.closeAssignStationModal = function() {
+     document.getElementById('assignStationModal').classList.remove('active');
+     document.getElementById('selectedAssignStationId').value = '';
+ }
+
+ window.openReassignmentModal = function(reportId) {
      window.currentReportId = reportId;
-     loadPoliceStations().then(() => {
-         populateStationSelect('reassignStationSelect');
+     document.getElementById('selectedReassignStationId').value = ''; // Reset selection
+     document.querySelectorAll('.station-card').forEach(c => c.classList.remove('selected'));
+     
+     window.loadPoliceStations().then(() => {
+         window.renderReassignmentStations();
          document.getElementById('requestReassignmentModal').classList.add('active');
      });
  }
 
- function closeReassignmentModal() {
+ window.renderReassignmentStations = function() {
+     const listContainer = document.getElementById('reassignStationList');
+     listContainer.innerHTML = '';
+     
+     if (Array.isArray(policeStations)) {
+         policeStations.forEach(station => {
+             const card = document.createElement('div');
+             card.className = 'station-card';
+             card.id = `station-card-${station.station_id}`;
+             card.onclick = () => window.selectStation(station.station_id);
+             
+             card.innerHTML = `
+                <div class="station-card-content">
+                    <span class="station-name">${station.station_name}</span>
+                    <span class="station-address">${station.address || 'Address not available'}</span>
+                </div>
+                <svg class="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+             `;
+             listContainer.appendChild(card);
+         });
+     }
+ }
+ 
+ window.selectStation = function(stationId) {
+     // Update hidden input
+     document.getElementById('selectedReassignStationId').value = stationId;
+     
+     // Update visual state
+     document.querySelectorAll('.station-card').forEach(c => c.classList.remove('selected'));
+     const selectedCard = document.getElementById(stationId === 'unassign' ? 'station-card-unassign' : `station-card-${stationId}`);
+     if (selectedCard) selectedCard.classList.add('selected');
+ }
+ 
+ window.filterStations = function(query) {
+     const filter = query.toLowerCase();
+     const cards = document.querySelectorAll('#reassignStationList .station-card');
+     
+     cards.forEach(card => {
+         const name = card.querySelector('.station-name').textContent.toLowerCase();
+         const address = card.querySelector('.station-address').textContent.toLowerCase();
+         
+         if (name.includes(filter) || address.includes(filter)) {
+             card.style.display = 'flex';
+         } else {
+             card.style.display = 'none';
+         }
+     });
+ }
+
+ window.closeReassignmentModal = function() {
      document.getElementById('requestReassignmentModal').classList.remove('active');
-     document.getElementById('reassignStationSelect').value = '';
+     document.getElementById('selectedReassignStationId').value = '';
      document.getElementById('reassignReason').value = '';
  }
 
- function submitAssignStation() {
-     const stationId = document.getElementById('assignStationSelect').value;
+ window.submitAssignStation = function() {
+     const stationId = document.getElementById('selectedAssignStationId').value;
      
      if (!stationId) {
-         alert('Please select a police station');
+         alert('Please select a destination');
          return;
      }
+     
+     const payload = { station_id: stationId === 'unassign' ? null : stationId };
      
      fetch(`/reports/${window.currentReportId}/assign-station`, {
          method: 'POST',
@@ -2058,15 +2358,15 @@ function getVerificationBadge(report) {
              'Content-Type': 'application/json',
              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
          },
-         body: JSON.stringify({ station_id: stationId })
+         body: JSON.stringify(payload)
      })
      .then(response => response.json())
      .then(data => {
          if (data.success) {
-             alert('Report successfully assigned to station');
-             closeAssignStationModal();
-             closeModal();
-             location.reload(); // Refresh to show updated data
+             alert('Report successfully assigned/unassigned');
+             window.closeAssignStationModal();
+             window.closeModal();
+             location.reload(); 
          } else {
              alert('Failed to assign report: ' + (data.message || 'Unknown error'));
          }
@@ -2077,13 +2377,24 @@ function getVerificationBadge(report) {
      });
  }
 
- function submitReassignmentRequest() {
-     const stationId = document.getElementById('reassignStationSelect').value;
+ window.submitReassignmentRequest = function() {
+     const stationId = document.getElementById('selectedReassignStationId').value;
      const reason = document.getElementById('reassignReason').value;
      
      if (!stationId) {
-         alert('Please select a police station');
+         alert('Please select a destination (Station or Return to Admin)');
          return;
+     }
+     
+     const payload = {
+         reason: reason
+     };
+     
+     // Handle unassign option
+     if (stationId === 'unassign') {
+         payload.station_id = null;
+     } else {
+         payload.station_id = stationId;
      }
      
      fetch(`/reports/${window.currentReportId}/request-reassignment`, {
@@ -2092,17 +2403,14 @@ function getVerificationBadge(report) {
              'Content-Type': 'application/json',
              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
          },
-         body: JSON.stringify({ 
-             station_id: stationId,
-             reason: reason
-         })
+         body: JSON.stringify(payload)
      })
      .then(response => response.json())
      .then(data => {
          if (data.success) {
              alert('Reassignment request submitted successfully');
-             closeReassignmentModal();
-             closeModal();
+             window.closeReassignmentModal();
+             window.closeModal();
          } else {
              alert('Failed to submit request: ' + (data.message || 'Unknown error'));
          }

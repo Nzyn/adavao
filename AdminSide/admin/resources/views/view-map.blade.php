@@ -866,6 +866,10 @@
     
     <div id="map">
         <div class="hotspot-toggle">
+            <label style="margin-right: 15px;">
+                <input type="checkbox" id="mapping-overlay-toggle" checked onchange="toggleMappingOverlay()">
+                <span>Crime Mapping Overlay</span>
+            </label>
             <label>
                 <input type="checkbox" id="hotspot-overlay-toggle" onchange="toggleHotspotOverlay()">
                 <span>Crime Hotspot Overlay</span>
@@ -1018,6 +1022,17 @@
     let hotspotLayer;
     let hotspotCircles = [];
     let hotspotOverlayVisible = false;
+    let mappingOverlayVisible = true; // Default to true
+
+    function toggleMappingOverlay() {
+        if (document.getElementById('mapping-overlay-toggle').checked) {
+            map.addLayer(markerClusterGroup);
+            mappingOverlayVisible = true;
+        } else {
+            map.removeLayer(markerClusterGroup);
+            mappingOverlayVisible = false;
+        }
+    }
     
     // Crime type to icon mapping (complete mapping for all legend files)
     const crimeIcons = {
@@ -1094,6 +1109,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Add small delay to ensure map container is ready
         setTimeout(function() {
+            showLoading('Loading map...');
             // Initialize the map centered on Davao City with bounds restriction
             map = L.map('map', {
                 maxBounds: davaoCityBounds,
@@ -1108,6 +1124,14 @@
                 maxZoom: 18,
             }).addTo(map);
             
+            // Hide loading once tiles start loading or after a short delay
+            map.on('load', function() {
+                hideLoading();
+            });
+            
+            // Fallback in case map load doesn't fire
+            setTimeout(hideLoading, 1000);
+
             // Add Satellite layer (Esri World Imagery)
             satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',

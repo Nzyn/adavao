@@ -936,15 +936,6 @@ export default function ReportCrime() {
                     </View>
                 </Modal>
 
-                {/* Location Picker Modal */}
-                {showLocationPicker && (
-                    <EnhancedLocationPicker
-                        visible={showLocationPicker}
-                        onClose={handleLocationPickerClose}
-                        onLocationSelect={handleLocationSelect}
-                    />
-                )}
-
                 <CheckRow
                     label="Report Anonymously"
                     checked={isAnonymous}
@@ -1018,6 +1009,15 @@ export default function ReportCrime() {
                     />
                 )}
             </ScrollView>
+
+            {/* Location Picker Modal - Moved outside ScrollView */}
+            {showLocationPicker && (
+                <EnhancedLocationPicker
+                    visible={showLocationPicker}
+                    onClose={handleLocationPickerClose}
+                    onLocationSelect={handleLocationSelect}
+                />
+            )}
         </View>
     );
 }

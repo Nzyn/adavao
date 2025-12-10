@@ -357,6 +357,7 @@
 <script>
 let requests = [];
 let currentRequest = null;
+const userRole = '{{ auth()->user()->hasRole("admin") ? "admin" : (auth()->user()->hasRole("police") ? "police" : "") }}';
 
 // Load reassignment requests
 async function loadRequests() {
@@ -411,7 +412,7 @@ function displayRequests() {
                 <td>#${String(request.report_id).padStart(5, '0')}</td>
                 <td>${request.requested_by ? request.requested_by.firstname + ' ' + request.requested_by.lastname : 'Unknown'}</td>
                 <td>${request.current_station ? request.current_station.station_name : 'Unassigned'}</td>
-                <td>${request.requested_station ? request.requested_station.station_name : 'N/A'}</td>
+                <td>${request.requested_station ? request.requested_station.station_name : '<span style="color: #ef4444; font-weight: 600;">⚠️ Return to Admin</span>'}</td>
                 <td>${createdAt.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</td>
                 <td>
                     <span class="status-badge ${request.status}">
@@ -459,7 +460,7 @@ function viewRequest(requestId) {
         </div>
         <div class="detail-item">
             <div class="detail-label">Requested Station</div>
-            <div class="detail-value">${request.requested_station ? request.requested_station.station_name : 'N/A'}</div>
+            <div class="detail-value">${request.requested_station ? request.requested_station.station_name : '<span style="color: #ef4444; font-weight: 600;">⚠️ Return to Admin (Unassign)</span>'}</div>
         </div>
         <div class="detail-item">
             <div class="detail-label">Reason</div>
@@ -489,7 +490,7 @@ function viewRequest(requestId) {
         ` : ''}
         
         <div class="actions-section">
-            ${request.status === 'pending' ? `
+            ${request.status === 'pending' && userRole === 'admin' ? `
                 <button class="btn btn-success" onclick="reviewRequest('approve')">
                     <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>

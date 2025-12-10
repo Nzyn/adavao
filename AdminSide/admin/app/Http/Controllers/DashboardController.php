@@ -143,6 +143,17 @@ class DashboardController extends Controller
             ->where('roles.role_name', 'police')
             ->count();
         
+        // Count flagged users
+        $flaggedUsersCount = DB::table('users_public')
+            ->where('total_flags', '>', 0)
+            ->orWhere('restriction_level', '!=', 'none')
+            ->count();
+            
+        // Count pending verifications
+        $pendingVerificationsCount = DB::table('verifications')
+            ->where('status', 'pending')
+            ->count();
+        
         return view('welcome', compact(
             'userRole',
             'totalReports',
@@ -152,7 +163,9 @@ class DashboardController extends Controller
             'reportsToday',
             'unreadMessages',
             'totalUsers',
-            'totalPoliceOfficers'
+            'totalPoliceOfficers',
+            'flaggedUsersCount',
+            'pendingVerificationsCount'
         ));
     }
 }

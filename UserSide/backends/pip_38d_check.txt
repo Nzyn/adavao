@@ -1,0 +1,10 @@
+Testing Coordinate: Lat 7.065112, Lng 125.608966
+Loaded GeoJSON features: 40
+
+Inspecting Feature: Barangay 38-D
+BOUNDING BOX: Lat [7.0629215, 7.0662389], Lng [125.6088553, 125.613]
+TEST POINT: Lat 7.065112, Lng 125.608966
+⚠️ Point is INSIDE bounding box (Possible match)
+❌ Point In Polygon Check: Failed
+
+No matches found for 38-D.

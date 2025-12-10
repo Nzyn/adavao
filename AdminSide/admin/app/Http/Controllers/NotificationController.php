@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 
 class NotificationController extends Controller
 {
@@ -14,10 +15,13 @@ class NotificationController extends Controller
     public function getUnread(): JsonResponse
     {
         try {
-            $notifications = Notification::where('user_id', auth()->id())
-                ->where('read', false)
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $userId = auth()->id();
+            $notifications = Cache::remember("notifications_unread_{$userId}", 60, function() use ($userId) {
+                return Notification::where('user_id', $userId)
+                    ->where('read', false)
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+            });
 
             return response()->json([
                 'success' => true,
@@ -42,13 +46,20 @@ class NotificationController extends Controller
             $limit = $request->get('limit', 20);
             $offset = $request->get('offset', 0);
 
-            $notifications = Notification::where('user_id', auth()->id())
-                ->orderBy('created_at', 'desc')
-                ->limit($limit)
-                ->offset($offset)
-                ->get();
+            $userId = auth()->id();
+            $cacheKey = "notifications_all_{$userId}_{$limit}_{$offset}";
+            
+            $notifications = Cache::remember($cacheKey, 60, function() use ($userId, $limit, $offset) {
+                return Notification::where('user_id', $userId)
+                    ->orderBy('created_at', 'desc')
+                    ->limit($limit)
+                    ->offset($offset)
+                    ->get();
+            });
 
-            $total = Notification::where('user_id', auth()->id())->count();
+            $total = Cache::remember("notifications_count_{$userId}", 60, function() use ($userId) {
+                return Notification::where('user_id', $userId)->count();
+            });
 
             return response()->json([
                 'success' => true,
@@ -77,6 +88,14 @@ class NotificationController extends Controller
                 ->firstOrFail();
 
             $notification->markAsRead();
+            
+            // Invalidate cache
+            $userId = auth()->id();
+            Cache::forget("notifications_unread_{$userId}");
+            Cache::forget("unread_notifications_count_{$userId}");
+            // We can't easily invalidate specific pagination keys, but they have short TTL (60s)
+            // Ideally we would use tags if using Redis, but this is a quick fix.
+            // A brute-force clear could be used if strictly needed, but let's rely on TTL for pagination lists.
 
             return response()->json([
                 'success' => true,
@@ -100,6 +119,11 @@ class NotificationController extends Controller
             Notification::where('user_id', auth()->id())
                 ->where('read', false)
                 ->update(['read' => true]);
+
+            // Invalidate cache
+            $userId = auth()->id();
+            Cache::forget("notifications_unread_{$userId}");
+            Cache::forget("unread_notifications_count_{$userId}");
 
             return response()->json([
                 'success' => true,
@@ -126,6 +150,12 @@ class NotificationController extends Controller
 
             $notification->delete();
 
+            // Invalidate cache
+            $userId = auth()->id();
+            Cache::forget("notifications_unread_{$userId}");
+            Cache::forget("unread_notifications_count_{$userId}");
+            Cache::forget("notifications_count_{$userId}");
+
             return response()->json([
                 'success' => true,
                 'message' => 'Notification deleted'
@@ -145,9 +175,12 @@ class NotificationController extends Controller
     public function getUnreadCount(): JsonResponse
     {
         try {
-            $count = Notification::where('user_id', auth()->id())
-                ->where('read', false)
-                ->count();
+            $userId = auth()->id();
+            $count = Cache::remember("unread_notifications_count_{$userId}", 60, function() use ($userId) {
+                 return Notification::where('user_id', $userId)
+                    ->where('read', false)
+                    ->count();
+            });
 
             return response()->json([
                 'success' => true,

@@ -203,7 +203,7 @@ class EncryptionService
      */
     public static function canDecrypt($userRole)
     {
-        $authorizedRoles = ['police', 'admin'];
+        $authorizedRoles = ['police', 'admin', 'super_admin'];
         return in_array($userRole, $authorizedRoles);
     }
 }

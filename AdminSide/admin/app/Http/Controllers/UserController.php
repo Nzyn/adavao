@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class UserController extends Controller
 {
@@ -80,6 +81,9 @@ class UserController extends Controller
 
             // Update the user with the validated data
             $user->update($validatedData);
+            
+            // Invalidate user cache
+            Cache::forget('users_list');
 
             return response()->json([
                 'success' => true,
@@ -123,27 +127,30 @@ class UserController extends Controller
     public function index(): JsonResponse
     {
         try {
-            $users = User::select('id', 'firstname', 'lastname', 'email', 'contact', 'address', 'latitude', 'longitude', 'is_verified', 'station_id', 'created_at')
-                         ->orderBy('created_at', 'desc')
-                         ->get();
+            $users = Cache::remember('users_list', 300, function() {
+                return User::select('id', 'firstname', 'lastname', 'email', 'contact', 'address', 'latitude', 'longitude', 'is_verified', 'station_id', 'created_at')
+                             ->orderBy('created_at', 'desc')
+                             ->get()
+                             ->map(function($user) {
+                                return [
+                                    'id' => $user->id,
+                                    'firstName' => $user->firstname,
+                                    'lastName' => $user->lastname,
+                                    'email' => $user->email,
+                                    'phone' => $user->contact,
+                                    'address' => $user->address,
+                                    'latitude' => $user->latitude,
+                                    'longitude' => $user->longitude,
+                                    'is_verified' => $user->is_verified,
+                                    'station_id' => $user->station_id,
+                                    'created_at' => $user->created_at,
+                                ];
+                             });
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $users->map(function($user) {
-                    return [
-                        'id' => $user->id,
-                        'firstName' => $user->firstname,
-                        'lastName' => $user->lastname,
-                        'email' => $user->email,
-                        'phone' => $user->contact,
-                        'address' => $user->address,
-                        'latitude' => $user->latitude,
-                        'longitude' => $user->longitude,
-                        'is_verified' => $user->is_verified,
-                        'station_id' => $user->station_id,
-                        'created_at' => $user->created_at,
-                    ];
-                })
+                'data' => $users
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -274,6 +281,9 @@ class UserController extends Controller
                 $expiresAt->toIso8601String()
             );
             
+            // Invalidate cache
+            Cache::forget('users_list');
+            
             return response()->json([
                 'success' => true,
                 'message' => 'User has been flagged successfully',
@@ -367,6 +377,9 @@ class UserController extends Controller
                 \Log::error('Failed to create unflag notification: ' . $e->getMessage());
             }
             
+            // Invalidate cache
+            Cache::forget('users_list');
+
             return response()->json([
                 'success' => true,
                 'message' => 'User restrictions have been removed successfully'
@@ -422,6 +435,9 @@ class UserController extends Controller
                 'assigned_since' => now(),
                 'status' => 'active'
             ]);
+            
+            // Invalidate cache
+            Cache::forget('users_list');
             
             return response()->json([
                 'success' => true,
@@ -495,6 +511,9 @@ class UserController extends Controller
             // Update the role
             $user->role = $validatedData['role'];
             $user->save();
+            
+            // Invalidate cache
+            Cache::forget('users_list');
             
             \Log::info('Role updated successfully', ['user_id' => $user->id, 'new_role' => $user->role]);
             
@@ -630,6 +649,9 @@ class UserController extends Controller
                 'station_name' => $station->station_name
             ]);
             
+            // Invalidate cache
+            Cache::forget('users_list');
+
             return response()->json([
                 'success' => true,
                 'message' => 'User has been assigned to the police station successfully',

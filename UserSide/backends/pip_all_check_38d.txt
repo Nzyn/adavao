@@ -1,0 +1,3 @@
+Testing Coordinate: Lat 7.065112, Lng 125.608966
+Loaded GeoJSON features: 40
+✅ MATCH FOUND: Point is inside Barangay 3-A

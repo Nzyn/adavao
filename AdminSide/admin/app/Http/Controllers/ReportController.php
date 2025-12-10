@@ -42,12 +42,10 @@ class ReportController extends Controller
             $types = array_map('strtolower', $types);
             $types = array_map('trim', $types);
             
-            // Check if 'cybercrime' or 'cyber crime' is explicitly selected
-            $isCybercrime = in_array('cybercrime', $types) || in_array('cyber crime', $types);
-            
-            // Also check for variations like "cybercrime - fraud", "cyber crime - hacking"
+            // Broadly check for 'cybercrime' keyword in any of the types
+            $isCybercrime = false;
             foreach ($types as $type) {
-                if (str_starts_with($type, 'cybercrime -') || str_starts_with($type, 'cyber crime -')) {
+                if (str_contains($type, 'cybercrime') || str_contains($type, 'cyber crime')) {
                     $isCybercrime = true;
                     break;
                 }
@@ -84,25 +82,53 @@ class ReportController extends Controller
                     return;
                 }
 
-                // Use point-in-polygon detection to find the exact barangay
-                $stationId = \App\Models\Report::autoAssignPoliceStation(
-                    $location->latitude,
-                    $location->longitude
-                );
+                $stationId = null;
+                $assignmentMethod = 'none';
+
+                // PRIORITY 1: Use explicit barangay_id if provided (from frontend address match)
+                if ($location->barangay_id) {
+                    $barangay = \App\Models\Barangay::find($location->barangay_id);
+                    if ($barangay && $barangay->station_id) {
+                        $stationId = $barangay->station_id;
+                        $assignmentMethod = 'barangay_id';
+                        \Log::info('Report assigned using explicit barangay_id', [
+                            'report_id' => $report->report_id,
+                            'barangay_id' => $location->barangay_id,
+                            'barangay_name' => $barangay->barangay_name
+                        ]);
+                    }
+                }
+
+                // PRIORITY 2: If no explicit ID, use point-in-polygon detection
+                if (!$stationId) {
+                    $stationId = \App\Models\Report::autoAssignPoliceStation(
+                        $location->latitude,
+                        $location->longitude
+                    );
+                    if ($stationId) {
+                        $assignmentMethod = 'auto_detect';
+                    }
+                }
 
                 if ($stationId) {
                     $report->assigned_station_id = $stationId;
                     $report->save();
                     
-                    $barangay = \App\Helpers\GeoHelper::findBarangayByCoordinates(
-                        $location->latitude,
-                        $location->longitude
-                    );
-                    
-                    \Log::info('Report assigned to station using boundary detection', [
+                    $barangayName = 'Unknown';
+                    if ($assignmentMethod === 'barangay_id' && isset($barangay)) {
+                        $barangayName = $barangay->barangay_name;
+                    } elseif ($assignmentMethod === 'auto_detect') {
+                        $detectedBarangay = \App\Helpers\GeoHelper::findBarangayByCoordinates(
+                            $location->latitude,
+                            $location->longitude
+                        );
+                        $barangayName = $detectedBarangay ? $detectedBarangay->barangay_name : 'Nearest match';
+                    }
+
+                    \Log::info("Report assigned to station ($assignmentMethod)", [
                         'report_id' => $report->report_id,
                         'station_id' => $stationId,
-                        'barangay' => $barangay ? $barangay->barangay_name : 'Nearest match',
+                        'barangay' => $barangayName,
                         'latitude' => $location->latitude,
                         'longitude' => $location->longitude,
                     ]);
@@ -182,15 +208,26 @@ class ReportController extends Controller
                 $query->whereRaw('1 = 0'); // Return empty result
             }
         }
-        // Admin users see ONLY unassigned reports
+        // Admin users
         elseif ($isAdmin) {
-            // Admin sees ALL reports (modified to match Dashboard count)
-            // previously: $query->whereNull('reports.assigned_station_id');
-            // We do NOT filter by unassigned here, so they see everything.
-            \Log::info('Admin viewing all reports', [
-                'user_id' => $user->id,
-                'email' => $user->email
-            ]);
+            $userStationId = $user->station_id;
+            
+            if ($userStationId) {
+                // If admin has a specific station, show only that station (like a police officer)
+                $query->where('reports.assigned_station_id', $userStationId);
+                \Log::info('Admin (Station specific) viewing reports', [
+                    'user_id' => $user->id,
+                    'station_id' => $userStationId
+                ]);
+            } else {
+                // If admin has NO station (NULL), show only UNASSIGNED reports
+                // As requested: "means that all unassigned station will be viewed by this admin"
+                $query->whereNull('reports.assigned_station_id');
+                
+                \Log::info('Admin (Unassigned/Super) viewing UNASSIGNED reports only', [
+                    'user_id' => $user->id
+                ]);
+            }
         }
         else {
             // For other users, show no reports
@@ -210,7 +247,19 @@ class ReportController extends Controller
         ]);
         
         // Decrypt sensitive fields for admin and police roles
-        $userRole = auth()->check() ? auth()->user()->role : null;
+        // Decrypt sensitive fields for admin and police roles
+        $userRole = null;
+        if (auth()->check()) {
+            $authUser = auth()->user();
+            if (method_exists($authUser, 'hasRole')) {
+                if ($authUser->hasRole('super_admin')) $userRole = 'super_admin';
+                elseif ($authUser->hasRole('admin')) $userRole = 'admin';
+                elseif ($authUser->hasRole('police')) $userRole = 'police';
+                else $userRole = $authUser->role;
+            } else {
+                $userRole = $authUser->role;
+            }
+        }
         if (\App\Services\EncryptionService::canDecrypt($userRole)) {
             foreach ($reports as $report) {
                 // Decrypt report fields
@@ -361,8 +410,15 @@ class ReportController extends Controller
                 }
             }
             $types = array_map('strtolower', $types);
-            \Log::info('Aggressive assignment types', ['report_id' => $report->report_id, 'types' => $types]);
-            if (in_array('cybercrime', $types)) {
+            $isCybercrimeAggressive = false;
+            foreach ($types as $type) {
+                if (str_contains($type, 'cybercrime') || str_contains($type, 'cyber crime')) {
+                    $isCybercrimeAggressive = true;
+                    break;
+                }
+            }
+            \Log::info('Aggressive assignment types', ['report_id' => $report->report_id, 'types' => $types, 'is_cyber' => $isCybercrimeAggressive]);
+            if ($isCybercrimeAggressive) {
                 $cybercrimeStation = \App\Models\PoliceStation::where('station_name', 'Cybercrime Division')->first();
                 if ($cybercrimeStation) {
                     $report->assigned_station_id = $cybercrimeStation->station_id;
@@ -483,7 +539,19 @@ class ReportController extends Controller
 
             // Get authenticated user and role
             $authUser = auth()->user();
-            $userRole = $authUser ? $authUser->role : null;
+            $userRole = null;
+            
+            if ($authUser) {
+                // Determine role robustly
+                if (method_exists($authUser, 'hasRole')) {
+                    if ($authUser->hasRole('super_admin')) $userRole = 'super_admin';
+                    elseif ($authUser->hasRole('admin')) $userRole = 'admin';
+                    elseif ($authUser->hasRole('police')) $userRole = 'police';
+                    else $userRole = $authUser->role; // Fallback
+                } else {
+                    $userRole = $authUser->role;
+                }
+            }
             
             // Log for debugging
             \Log::info('Report details accessed', [
@@ -567,7 +635,7 @@ class ReportController extends Controller
     {
         try {
             $request->validate([
-                'station_id' => 'required|exists:police_stations,station_id',
+                'station_id' => 'nullable|exists:police_stations,station_id',
             ]);
 
             $report = Report::findOrFail($id);
@@ -603,7 +671,7 @@ class ReportController extends Controller
     {
         try {
             $request->validate([
-                'station_id' => 'required|exists:police_stations,station_id',
+                'station_id' => 'nullable|exists:police_stations,station_id',
                 'reason' => 'nullable|string|max:500',
             ]);
 
@@ -648,15 +716,27 @@ class ReportController extends Controller
     public function getReassignmentRequests()
     {
         try {
-            $requests = \App\Models\ReportReassignmentRequest::with([
+            $query = \App\Models\ReportReassignmentRequest::with([
                 'report',
                 'requestedBy',
                 'currentStation',
                 'requestedStation',
                 'reviewedBy'
-            ])
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ]);
+
+            // If user is police, show only their requests or requests from their station
+            if (auth()->user()->role === 'police') {
+                $user = auth()->user();
+                $query->where(function($q) use ($user) {
+                    $q->where('requested_by_user_id', $user->id);
+                    // Optionally include requests from their station if they have a station_id
+                    if ($user->station_id) {
+                        $q->orWhere('current_station_id', $user->station_id);
+                    }
+                });
+            }
+
+            $requests = $query->orderBy('created_at', 'desc')->get();
 
             return response()->json([
                 'success' => true,

@@ -1,8 +1,14 @@
-// API Configuration
+import { getBackendUrlSync } from '../utils/networkUtils';
+
+// Get dynamically detected backend URL (defaults to port 3000)
+const nodeBackendUrl = getBackendUrlSync();
+// Replace port 3000 with 8000 for Laravel API
+const laravelBaseUrl = nodeBackendUrl.replace(':3000', ':8000');
+
 export const API_CONFIG = {
-  // Change this to your Laravel backend URL
-  BASE_URL: 'http://127.0.0.1:8000/api',
-  
+  // Dynamic Laravel backend URL
+  BASE_URL: `${laravelBaseUrl}/api`,
+
   // Endpoints
   ENDPOINTS: {
     USERS: '/users',
@@ -11,10 +17,10 @@ export const API_CONFIG = {
     REGISTER: '/register',
     REPORTS: '/reports',
   },
-  
+
   // Request timeout in milliseconds
   TIMEOUT: 10000,
-  
+
   // Headers
   DEFAULT_HEADERS: {
     'Content-Type': 'application/json',

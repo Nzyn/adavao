@@ -332,7 +332,7 @@
                             </svg>
                             Reports
                         </a>
-                        @if(auth()->user() && auth()->user()->role === 'admin')
+                        @if(auth()->user() && auth()->user()->hasRole('admin'))
                         <ul style="padding-left: 2rem; margin-top: 0.5rem;">
                             <li class="nav-item">
                                 <a href="{{ route('reassignment-requests') }}" class="nav-link {{ request()->routeIs('reassignment-requests') ? 'active' : '' }}" style="font-size: 0.875rem;">
@@ -596,7 +596,7 @@
                 width: 48px;
                 height: 48px;
                 border: 4px solid #e5e7eb;
-                border-top-color: #1D3557;
+                border-top-color: #3b82f6;
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
                 margin: 0 auto 1rem;
@@ -681,6 +681,7 @@
         </style>
         
         <!-- Global Loading Overlay -->
+    <body>
         <div id="globalLoading">
             <div class="loading-container">
                 <div class="loading-spinner"></div>

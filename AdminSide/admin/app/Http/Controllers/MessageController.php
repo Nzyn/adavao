@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class MessageController extends Controller
 {
@@ -45,10 +46,15 @@ class MessageController extends Controller
         ->get();
 
         // Mark messages as read
-        Message::where('sender_id', $userId)
+        $updated = Message::where('sender_id', $userId)
             ->where('receiver_id', $currentUserId)
             ->where('status', false)
             ->update(['status' => true]);
+            
+        // Invalidate unread count cache if messages were marked as read
+        if ($updated > 0) {
+            Cache::forget('unread_messages_' . $currentUserId);
+        }
 
         return response()->json([
             'success' => true,
@@ -75,6 +81,9 @@ class MessageController extends Controller
         ]);
 
         $message->load(['sender', 'receiver']);
+        
+        // Invalidate unread cache for the receiver
+        Cache::forget('unread_messages_' . $request->receiver_id);
 
         return response()->json([
             'success' => true,
@@ -87,9 +96,15 @@ class MessageController extends Controller
      */
     public function getUnreadCount()
     {
-        $unreadCount = Message::where('receiver_id', Auth::id())
-            ->where('status', false)
-            ->count();
+        $userId = Auth::id();
+        $cacheKey = 'unread_messages_' . $userId;
+        
+        // Cache for 30 seconds to reduce DB load from polling
+        $unreadCount = Cache::remember($cacheKey, 30, function() use ($userId) {
+            return Message::where('receiver_id', $userId)
+                ->where('status', false)
+                ->count();
+        });
 
         return response()->json([
             'success' => true,

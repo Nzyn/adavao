@@ -255,6 +255,7 @@ const Login = () => {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+
       const data = await response.json();
       console.log('📥 Login response:', data);
       if (response.ok) {
@@ -302,8 +303,8 @@ const Login = () => {
 
         // Reset navigation stack and go to home
         setTimeout(() => {
-          console.log('🚀 Navigating to / (home)...');
-          router.replace('/');
+          console.log('🚀 Navigating to /(tabs) (home)...');
+          router.replace('/(tabs)');
         }, 100);
       } else {
         // Display error messages under relevant input fields

@@ -6,6 +6,7 @@ use App\Models\Verification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class VerificationController extends Controller
 {
@@ -15,9 +16,11 @@ class VerificationController extends Controller
     public function getAllVerifications()
     {
         try {
-            $verifications = Verification::with('user')
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $verifications = Cache::remember('verifications_all', 60, function() {
+                return Verification::with('user')
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+            });
             
             // Debug log
             Log::info('getAllVerifications called', ['count' => $verifications->count()]);
@@ -63,10 +66,12 @@ class VerificationController extends Controller
     public function getPendingVerifications()
     {
         try {
-            $verifications = Verification::with('user')
-                ->where('status', 'pending')
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $verifications = Cache::remember('verifications_pending', 60, function() {
+                return Verification::with('user')
+                    ->where('status', 'pending')
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+            });
             
             return response()->json([
                 'success' => true,
@@ -103,6 +108,10 @@ class VerificationController extends Controller
             $user->is_verified = true;
             $user->save();
             
+            // Invalidate cache
+            Cache::forget('verifications_all');
+            Cache::forget('verifications_pending');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Verification approved successfully'
@@ -134,6 +143,10 @@ class VerificationController extends Controller
             $verification->save();
             
             // Note: We don't update the user's is_verified status here because they should be able to resubmit
+            
+            // Invalidate cache
+            Cache::forget('verifications_all');
+            Cache::forget('verifications_pending');
             
             return response()->json([
                 'success' => true,

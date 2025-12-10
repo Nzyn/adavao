@@ -2,8 +2,18 @@ const express = require("express");
 const cors = require("cors");
 const path = require('path');
 const multer = require('multer');
+require("dotenv").config();
 
-// Request Logging Middleware
+const app = express();
+const PORT = process.env.PORT || 8081;
+
+app.use(cors());
+app.use(express.json());
+
+// Serve static files from 'evidence' directory
+app.use('/evidence', express.static(path.join(__dirname, '../evidence')));
+app.use('/verifications', express.static(path.join(__dirname, '../verifications')));
+
 const requestLogger = (req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} from ${req.ip}`);
   next();
@@ -162,6 +172,7 @@ const {
   debugReportStructure,
   forceAssignReportsToStation,
   forceUpdateUserStation
+} = require("./debugAssignment");
 // 🔐 Secure file serving with decryption (Admin/Police only)
 // Files are encrypted at rest and decrypted on-demand for authorized users
 const { decryptFile } = require('./encryptionService');
@@ -486,7 +497,14 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
+// Catch-all for undefined routes
+app.use('*', (req, res) => {
+  console.log(`❌ 404 Hit: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ error: 'Not found', path: req.originalUrl, method: req.method });
+});
+
 // Start server
-app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
+  // console.log(`   Local Network: http://${require('ip').address()}:${PORT}`);
 });

@@ -609,6 +609,7 @@ function clearFilter() {
 // Load crime statistics
 async function loadCrimeStats() {
     console.log('Loading crime statistics...');
+    showLoading('Loading crime statistics...');
     try {
         // Build URL with filter parameters
         let url = '/api/statistics/crime-stats';
@@ -644,6 +645,8 @@ async function loadCrimeStats() {
     } catch (error) {
         console.error('Error loading crime stats:', error);
         alert('Failed to load crime statistics. Please ensure you are logged in and try again.');
+    } finally {
+        hideLoading();
     }
 }
 
@@ -656,6 +659,7 @@ async function loadForecast() {
     const forecastInfoText = document.getElementById('forecastInfoText');
     
     console.log(`🔮 Loading SARIMA forecast: ${crimeType || 'All Crimes'}, ${horizon} months...`);
+    showLoading('Generating forecast...');
     
     // Show loading
     if (trendChart) {
@@ -759,6 +763,8 @@ async function loadForecast() {
                 </div>
             `;
         }
+    } finally {
+        hideLoading();
     }
 }
 
@@ -938,6 +944,53 @@ function renderTrendChart(historical, forecast) {
                                 label += Math.round(context.parsed.y) + ' crimes';
                             }
                             return label;
+                        },
+                        afterBody: function(context) {
+                            // Only show breakdown for "All Crimes" forecast points
+                            const crimeTypeFilter = document.getElementById('crimeTypeFilter').value;
+                            if (crimeTypeFilter) return []; // Don't show if already filtered by type
+
+                            const dataPoint = context[0]; // Active point
+                            
+                            // Check if hovering over forecast dataset (Dataset index 1 usually, but let's check label or index)
+                            // Index 0: Historical, 1: Forecast, 2/3: CI
+                            if (dataPoint.datasetIndex !== 1) return [];
+
+                            const totalForecast = dataPoint.parsed.y;
+                            if (!totalForecast || !crimeStats || !crimeStats.byType) return [];
+
+                            // Calculate total historical crimes from the distribution to get ratios
+                            // Note: We use the CURRENTLY LOADED historical distribution as a proxy for future distribution
+                            const totalHistorical = crimeStats.byType.reduce((sum, item) => sum + parseInt(item.count), 0);
+                            
+                            if (totalHistorical === 0) return [];
+
+                            // Calculate estimates
+                            const estimates = crimeStats.byType.map(item => {
+                                const ratio = parseInt(item.count) / totalHistorical;
+                                const estimatedCount = Math.round(totalForecast * ratio);
+                                return {
+                                    type: item.type,
+                                    count: estimatedCount
+                                };
+                            });
+
+                            // Sort by count desc and take top 5
+                            estimates.sort((a, b) => b.count - a.count);
+                            const topEstimates = estimates.slice(0, 5);
+                            
+                            const lines = [' ', 'Estimated Breakdown:']; // Spacer + Header
+                            topEstimates.forEach(est => {
+                                if (est.count > 0) {
+                                    lines.push(`• ${est.type}: ~${est.count}`);
+                                }
+                            });
+                            
+                            if (estimates.length > 5) {
+                                lines.push(`• Others: ~${Math.round(totalForecast - topEstimates.reduce((s, i) => s + i.count, 0))}`);
+                            }
+
+                            return lines;
                         }
                     }
                 }
@@ -1070,18 +1123,75 @@ function renderLocationChart(data) {
 
 // Export crime data
 function exportCrimeData() {
-    window.location.href = '/api/statistics/export';
+    showLoading('Exporting crime data...');
+    try {
+        const yearFilter = document.getElementById('yearFilter')?.value || '';
+        const monthFilter = document.getElementById('monthFilter')?.value || '';
+        const crimeType = document.getElementById('crimeTypeFilter')?.value || '';
+        
+        let url = '/api/statistics/export-crime-data';
+        const params = [];
+        
+        if (yearFilter) params.push(`year=${yearFilter}`);
+        if (monthFilter) params.push(`month=${monthFilter}`);
+        if (crimeType) params.push(`crime_type=${encodeURIComponent(crimeType)}`);
+        
+        if (params.length > 0) {
+            url += '?' + params.join('&');
+        }
+        
+        console.log('📥 Exporting crime data:', { year: yearFilter, month: monthFilter, crimeType });
+        window.location.href = url;
+    } finally {
+        hideLoading();
+    }
 }
 
 // Export forecast data
 function exportForecastData() {
-    const horizon = document.getElementById('forecastHorizon').value;
-    window.location.href = `/api/statistics/forecast?horizon=${horizon}`;
+    showLoading('Preparing forecast data for download...');
+    try {
+        if (!forecastData || forecastData.length === 0) {
+            alert('⚠️ No forecast data available. Please load a forecast first by selecting a crime type and clicking "Refresh Forecast".');
+            return;
+        }
+        
+        const horizon = document.getElementById('forecastHorizon')?.value || '12';
+        const crimeType = document.getElementById('crimeTypeFilter')?.value || '';
+        
+        const exportData = {
+            metadata: {
+                crime_type: crimeType || 'All Crimes',
+                forecast_horizon: `${horizon} months`,
+                model: 'SARIMA(1,1,1)(1,1,1)[12]',
+                forecast_period: `${forecastData[0]?.date} to ${forecastData[forecastData.length - 1]?.date}`,
+                exported_at: new Date().toISOString(),
+                total_forecast_points: forecastData.length
+            },
+            forecast: forecastData
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        const crimeTypeName = crimeType ? crimeType.toLowerCase().replace(/ /g, '_') : 'all_crimes';
+        link.download = `forecast_${crimeTypeName}_${horizon}months_${new Date().toISOString().split('T')[0]}.json`;
+        
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        console.log('📥 Exported forecast data:', link.download);
+    } finally {
+        hideLoading();
+    }
 }
 
 // Load barangay crime statistics
 async function loadBarangayStats() {
     console.log('Loading barangay statistics...');
+    showLoading('Loading barangay statistics...');
     try {
         // Build URL with filter parameters
         let url = '/api/statistics/barangay-stats';
@@ -1113,6 +1223,8 @@ async function loadBarangayStats() {
         }
     } catch (error) {
         console.error('Error loading barangay statistics:', error);
+    } finally {
+        hideLoading();
     }
 }
 

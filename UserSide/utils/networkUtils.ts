@@ -51,7 +51,7 @@ export async function getBackendUrl(): Promise<string> {
   }
 
   // Fallback: Try common router IPs
-  return `http://192.168.1.9:${BACKEND_PORT}`;
+  return `http://192.168.1.8:${BACKEND_PORT}`;
 }
 
 /**
@@ -84,7 +84,7 @@ export function getBackendUrlSync(): string {
   // For physical devices on local network
   // The server must be running with 0.0.0.0 binding (which it is in server.js)
   // Using your PC's actual IP address
-  return `http://192.168.1.9:${BACKEND_PORT}`;
+  return `http://192.168.1.8:${BACKEND_PORT}`;
 }
 
 /**
@@ -130,11 +130,11 @@ export async function findWorkingBackendUrl(): Promise<string> {
     // Platform.OS === 'ios' && !Constants.isDevice ? `http://localhost:${BACKEND_PORT}` : null,
 
     // Your PC's IP address (highest priority)
+    `http://192.168.1.8:${BACKEND_PORT}`,
     `http://192.168.1.9:${BACKEND_PORT}`,
 
     // Common local network IPs
     `http://192.168.0.42:${BACKEND_PORT}`,
-    `http://192.168.1.9:${BACKEND_PORT}`,
     `http://192.168.0.1:${BACKEND_PORT}`,
     `http://10.0.0.1:${BACKEND_PORT}`,
 

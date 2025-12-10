@@ -197,12 +197,12 @@ async function submitReport(req, res) {
 
     // Check if this is a cybercrime report - ONLY if explicitly contains "cybercrime"
     // Route to Cybercrime Division globally
+    // Check if this is a cybercrime report - Broad check for "cyber" keyword
+    // Route to Cybercrime Division globally
     const isCybercrime = crimeTypesArray.some(crime => {
       const normalized = crime.toLowerCase().trim();
-      return normalized === 'cybercrime' ||
-        normalized === 'cyber crime' ||
-        normalized.startsWith('cybercrime -') ||
-        normalized.startsWith('cyber crime -');
+      return normalized.includes('cybercrime') ||
+        normalized.includes('cyber crime');
     });
 
     if (isCybercrime) {

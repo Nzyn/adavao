@@ -30,7 +30,7 @@ function getBackendUrl(): string {
   if (PRODUCTION_API_URL && PRODUCTION_API_URL !== 'https://YOUR_NGROK_BACKEND_URL_HERE') {
     return PRODUCTION_API_URL;
   }
-  
+
   // Otherwise use auto-detection for development
   return getBackendUrlSync();
 }
@@ -66,7 +66,7 @@ export async function getOptimalBackendUrl(): Promise<string> {
   if (PRODUCTION_API_URL && PRODUCTION_API_URL !== 'https://YOUR_NGROK_BACKEND_URL_HERE') {
     return PRODUCTION_API_URL;
   }
-  
+
   // In development, use detected URL if available
   if (detectedBackendUrl) {
     return detectedBackendUrl;

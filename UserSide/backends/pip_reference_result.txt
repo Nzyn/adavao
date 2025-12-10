@@ -1,0 +1,6 @@
+Testing Coordinate: Lat 7.069615, Lng 125.598892
+Loaded GeoJSON features: 40
+
+Inspecting Feature: Barangay 2-A
+Details: {"@id":"relation/11311735","admin_level":"10","admin_type:PH":"barangay","boundary":"administrative","is_in:city":"Davao City","is_in:district":"Poblacion","name":"Barangay 2-A","population":"2935","population:date":"2020-05-01","postal_code":"8000","ref":"1130700135","short_name":"2-A","type":"boundary"}
+Is inside (Polygon): false
