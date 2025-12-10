@@ -213,6 +213,9 @@ Route::any('/api/mobile/{path}', function ($path) {
     }
 })->where('path', '.*');
 
+// Include debug routes (TEMPORARY)
+require __DIR__.'/web_debug.php';
+
 // Temporary Debug Route for OTP
 Route::get('/debug/otp-viewer', function () {
     $otps = \DB::table('otp_codes')
