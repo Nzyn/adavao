@@ -16,5 +16,14 @@ RUN chmod -R 777 bootstrap/cache storage
 
 RUN composer install --no-dev --optimize-autoloader
 
+# DIAGNOSTIC: Output env vars to build log
+RUN echo "=== DIAGNOSTIC ENV VARS ===" && \
+    echo "DB_HOST=${DB_HOST:-NOT_SET}" && \
+    echo "DB_PORT=${DB_PORT:-NOT_SET}" && \
+    echo "DB_DATABASE=${DB_DATABASE:-NOT_SET}" && \
+    echo "DB_USERNAME=${DB_USERNAME:-NOT_SET}" && \
+    echo "DB_PASSWORD=${DB_PASSWORD:+SET}" && \
+    echo "=== END DIAGNOSTIC ==="
+
 # Clear any cached config at runtime (not build time) to ensure env vars are read
-CMD sh -c "rm -rf bootstrap/cache/*.php && php artisan serve --host=0.0.0.0 --port=8080"
+CMD sh -c "echo 'Runtime DB_USERNAME:' \$DB_USERNAME && rm -rf bootstrap/cache/*.php && php artisan serve --host=0.0.0.0 --port=8080"
