@@ -1,4 +1,4 @@
-# Cache Bust: 2025-12-11-01:45 - Force rebuild to clear embedded config
+# Cache Bust: 2025-12-11-02:09 - FORCE COMPLETE REBUILD
 FROM php:8.2-fpm
 
 RUN apt-get update && apt-get install -y \
