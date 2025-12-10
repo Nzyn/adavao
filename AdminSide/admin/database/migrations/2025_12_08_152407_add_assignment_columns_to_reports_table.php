@@ -12,13 +12,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reports', function (Blueprint $table) {
-            $table->unsignedBigInteger('assigned_station_id')->nullable();
-            $table->unsignedBigInteger('assigned_by')->nullable();
-            $table->timestamp('assigned_at')->nullable();
-            
-            // Foreign keys
-            $table->foreign('assigned_station_id')->references('station_id')->on('police_stations')->onDelete('set null');
-            $table->foreign('assigned_by')->references('id')->on('user_admin')->onDelete('set null');
+            // Only add columns if they don't exist (prevents conflicts with earlier migrations)
+            if (!Schema::hasColumn('reports', 'assigned_station_id')) {
+                $table->unsignedBigInteger('assigned_station_id')->nullable();
+                // FK added by earlier migration or may not be needed
+            }
+            if (!Schema::hasColumn('reports', 'assigned_by')) {
+                $table->unsignedBigInteger('assigned_by')->nullable();
+                // Skip FK - user_admin table may not exist in all setups
+            }
+            if (!Schema::hasColumn('reports', 'assigned_at')) {
+                $table->timestamp('assigned_at')->nullable();
+            }
         });
     }
 

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,6 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if station_id column exists (only exists in upgraded databases, not fresh installs)
+        if (!Schema::hasColumn('reports', 'station_id')) {
+            \Log::info('Migration: Skipping station_id migration - column does not exist (fresh install)');
+            return;
+        }
+
         // Copy station_id to assigned_station_id for reports where assigned_station_id is NULL
         DB::statement('
             UPDATE reports 
