@@ -19,7 +19,7 @@ return new class extends Migration
                     $table->unsignedBigInteger('reported_by')->nullable()->after('user_id');
                 }
                 if (!Schema::hasColumn('user_flags', 'severity')) {
-                    $table->enum('severity', ['low', 'medium', 'high'])->default('medium')->after('description');
+                    $table->string('severity')->default('medium')->after('description');
                 }
                 if (!Schema::hasColumn('user_flags', 'reviewed_by')) {
                     $table->unsignedBigInteger('reviewed_by')->nullable()->after('status');

@@ -17,7 +17,7 @@ return new class extends Migration
                 $table->integer('total_flags')->default(0);
             }
             if (!Schema::hasColumn('users', 'restriction_level')) {
-                $table->enum('restriction_level', ['none', 'warning', 'suspended', 'banned'])->default('none');
+                $table->string('restriction_level')->default('none');
             }
         });
     }

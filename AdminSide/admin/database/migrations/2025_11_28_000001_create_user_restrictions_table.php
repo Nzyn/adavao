@@ -18,7 +18,7 @@ return new class extends Migration
         Schema::create('user_restrictions', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
-            $table->enum('restriction_type', ['warning', 'suspended', 'banned'])->default('warning');
+            $table->string('restriction_type')->default('warning');
             $table->text('reason')->nullable();
             $table->unsignedBigInteger('restricted_by')->nullable();
             $table->timestamp('expires_at')->nullable();

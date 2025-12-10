@@ -19,21 +19,10 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('reported_by')->nullable();
-            $table->enum('violation_type', [
-                'false_report',
-                'prank_spam',
-                'harassment',
-                'offensive_content',
-                'impersonation',
-                'multiple_accounts',
-                'system_abuse',
-                'inappropriate_media',
-                'misleading_info',
-                'other'
-            ]);
+            $table->string('violation_type');
             $table->text('description')->nullable();
-            $table->enum('status', ['confirmed', 'appealed', 'dismissed'])->default('confirmed');
-            $table->enum('severity', ['low', 'medium', 'high'])->default('medium');
+            $table->string('status')->default('confirmed');
+            $table->string('severity')->default('medium');
             $table->unsignedBigInteger('reviewed_by')->nullable();
             $table->timestamp('reviewed_at')->nullable();
             $table->timestamps();

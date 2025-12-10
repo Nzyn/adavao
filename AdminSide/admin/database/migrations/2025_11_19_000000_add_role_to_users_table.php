@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             // Add role field with default 'user' value
-            $table->enum('role', ['user', 'police', 'admin'])->default('user')->after('is_verified');
+            $table->string('role')->default('user')->after('is_verified');
         });
     }
 

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('current_station_id')->nullable();
             $table->unsignedBigInteger('requested_station_id');
             $table->string('reason', 500)->nullable();
-            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
+            $table->string('status')->default('pending');
             $table->unsignedBigInteger('reviewed_by_user_id')->nullable();
             $table->timestamp('reviewed_at')->nullable();
             $table->timestamps();
