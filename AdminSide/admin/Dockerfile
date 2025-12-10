@@ -9,6 +9,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
 
+# Create missing directories and fix permissions (Critical for Laravel)
+RUN mkdir -p bootstrap/cache storage/framework/views storage/framework/sessions storage/framework/cache storage/logs
+RUN chmod -R 777 bootstrap/cache storage
+
 RUN composer install --no-dev --optimize-autoloader
 RUN php artisan config:clear
 RUN php artisan route:clear
