@@ -14,7 +14,6 @@ RUN mkdir -p bootstrap/cache storage/framework/views storage/framework/sessions 
 RUN chmod -R 777 bootstrap/cache storage
 
 RUN composer install --no-dev --optimize-autoloader
-RUN php artisan config:clear
-RUN php artisan route:clear
 
-CMD php artisan serve --host=0.0.0.0 --port=8080
+# Clear any cached config at runtime (not build time) to ensure env vars are read
+CMD sh -c "rm -rf bootstrap/cache/*.php && php artisan serve --host=0.0.0.0 --port=8080"
