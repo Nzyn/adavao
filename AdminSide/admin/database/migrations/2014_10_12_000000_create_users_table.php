@@ -19,8 +19,7 @@ return new class extends Migration
             $table->string('contact', 15);
             $table->string('email', 100)->unique();
             $table->string('password', 255);
-            $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'));
-            $table->timestamp('updated_at')->default(DB::raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+            $table->timestamps();
         });
     }
 
