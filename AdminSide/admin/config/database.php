@@ -45,14 +45,14 @@ return [
 
         'mysql' => [
             'driver' => 'mysql',
-            'url' => env('DATABASE_URL'),
-            // TEMPORARY HARDCODE for Railway deployment - TODO: Fix env var issue
-            'host' => env('APP_ENV') === 'production' ? 'metro.proxy.rlwy.net' : env('DB_HOST', '127.0.0.1'),
-            'port' => env('APP_ENV') === 'production' ? '19582' : env('DB_PORT', '3306'),
-            'database' => env('APP_ENV') === 'production' ? 'railway' : env('DB_DATABASE', 'railway'),
-            'username' => env('APP_ENV') === 'production' ? 'root' : env('DB_USERNAME', 'root'),
-            'password' => env('APP_ENV') === 'production' ? 'EikUIXJjCtLtwsEoOwRUtPuWXWZUYiji' : env('DB_PASSWORD', ''),
-            'unix_socket' => env('DB_SOCKET', ''),
+            'url' => null, // FORCE null to prevent DATABASE_URL override
+            // NUCLEAR OPTION: ABSOLUTELY HARDCODED - NO ENV CALLS
+            'host' => 'metro.proxy.rlwy.net',
+            'port' => '19582',
+            'database' => 'railway',
+            'username' => 'root',
+            'password' => 'EikUIXJjCtLtwsEoOwRUtPuWXWZUYiji',
+            'unix_socket' => '',
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '',
