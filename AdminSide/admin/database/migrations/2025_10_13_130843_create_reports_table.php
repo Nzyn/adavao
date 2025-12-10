@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id('report_id');
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('location_id');
-            $table->string('report_type');
+            $table->json('report_type');
             $table->text('description');
             $table->datetime('date_reported');
             $table->string('status')->default('pending');
