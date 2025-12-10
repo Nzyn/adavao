@@ -10,6 +10,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
 
+# AGGRESSIVE: Delete ALL cache files immediately to prevent 'forge' persistence
+RUN rm -rf bootstrap/cache/* storage/framework/cache/* storage/framework/views/* || true
+
 # Create missing directories and fix permissions (Critical for Laravel)
 RUN mkdir -p bootstrap/cache storage/framework/views storage/framework/sessions storage/framework/cache storage/logs
 RUN chmod -R 777 bootstrap/cache storage
