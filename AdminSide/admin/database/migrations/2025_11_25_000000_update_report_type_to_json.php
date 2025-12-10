@@ -9,18 +9,22 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
-    {
-        // Only run this if column exists and needs changing
-        if (Schema::hasTable('reports') && Schema::hasColumn('reports', 'report_type')) {
-            // For PostgreSQL compatibility, skip the JSON_VALID check
-            // Just change the column type - PostgreSQL will handle JSON validation
-            Schema::table('reports', function (Blueprint $table) {
-                // Change report_type from string to JSON to support multiple crime types
-                $table->json('report_type')->change();
-            });
+        // Skip this migration for fresh installs (PostgreSQL compatibility)
+        // This migration is only needed when migrating existing MySQL data
+        // For fresh installs, the reports table will be created with json type from the start
+        if (!Schema::hasTable('reports')) {
+            return;
         }
-    }
+        
+        // Only run if there's existing data that needs migration
+        $hasData = \DB::table('reports')->exists();
+        if (!$hasData) {
+            return;
+        }
+        
+        // This migration is for existing MySQL databases only
+        // Skip for PostgreSQL fresh installs
+        return;
 
     /**
      * Reverse the migrations.
