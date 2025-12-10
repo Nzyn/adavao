@@ -29,4 +29,4 @@ RUN echo "=== DIAGNOSTIC ENV VARS ===" && \
     echo "=== END DIAGNOSTIC ==="
 
 # Clear any cached config at runtime (not build time) to ensure env vars are read
-CMD sh -c "rm -rf bootstrap/cache/*.php storage/framework/cache/data/* && php artisan config:clear && php artisan serve --host=0.0.0.0 --port=8080"
+CMD sh -c "rm -rf bootstrap/cache/*.php storage/framework/cache/data/* && php artisan config:clear && php artisan serve --host=0.0.0.0 --port=10000"
