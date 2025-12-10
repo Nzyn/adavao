@@ -9,6 +9,8 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
+    public function up(): void
+    {
         // Skip this migration for fresh installs (PostgreSQL compatibility)
         // This migration is only needed when migrating existing MySQL data
         // For fresh installs, the reports table will be created with json type from the start
@@ -25,6 +27,7 @@ return new class extends Migration
         // This migration is for existing MySQL databases only
         // Skip for PostgreSQL fresh installs
         return;
+    }
 
     /**
      * Reverse the migrations.
