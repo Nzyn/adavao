@@ -46,11 +46,12 @@ return [
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'railway'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
+            // TEMPORARY HARDCODE for Railway deployment - TODO: Fix env var issue
+            'host' => env('APP_ENV') === 'production' ? 'metro.proxy.rlwy.net' : env('DB_HOST', '127.0.0.1'),
+            'port' => env('APP_ENV') === 'production' ? '19582' : env('DB_PORT', '3306'),
+            'database' => env('APP_ENV') === 'production' ? 'railway' : env('DB_DATABASE', 'railway'),
+            'username' => env('APP_ENV') === 'production' ? 'root' : env('DB_USERNAME', 'root'),
+            'password' => env('APP_ENV') === 'production' ? 'EikUIXJjCtLtwsEoOwRUtPuWXWZUYiji' : env('DB_PASSWORD', ''),
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
