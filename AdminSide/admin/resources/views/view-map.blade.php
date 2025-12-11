@@ -1490,7 +1490,7 @@
             const firstCrime = group[0];
             
             // Get unique offense types
-            const offenseTypes = [...new Set(group.map(c => c.offense))];
+            const offenseTypes = [...new Set(group.map(c => c.crime_type))];
             
             // Create marker icon
             let icon;
