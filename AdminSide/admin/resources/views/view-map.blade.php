@@ -1447,10 +1447,13 @@
             .then(data => {
                 console.log('CSV crimes loaded:', data.total);
                 
-                if (data.status === 'success' && data.data) {
+                // Check for either status string or boolean success
+                if ((data.status === 'success' || data.success) && data.data) {
                     // Cache CSV data
                     setCachedData(csvCacheKey, data.data);
                     addCsvCrimesToMap(data.data);
+                } else {
+                    console.warn('CSV API returned metadata but no valid data payload', data);
                 }
             })
             .catch(error => {
