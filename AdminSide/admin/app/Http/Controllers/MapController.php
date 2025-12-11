@@ -338,7 +338,7 @@ class MapController extends Controller
     {
         try {
             // Cache CSV data for 30 minutes (limited to 2000 records)
-            $csvData = Cache::remember('csv_crime_data_v4', 1800, function() {
+            $csvData = Cache::remember('csv_crime_data_v5', 1800, function() {
                 $csvPath = storage_path('app/davao_crime_5years.csv');
                 
                 if (!file_exists($csvPath)) {
@@ -352,8 +352,18 @@ class MapController extends Controller
                 $handle = fopen($csvPath, 'r');
                 
                 // Read header
+                // Read header
                 $header = fgetcsv($handle);
+                
+                // Clean headers (remove BOM, spaces)
+                if ($header) {
+                     $header = array_map(function($h) {
+                         return trim(str_replace("\xEF\xBB\xBF", '', $h));
+                     }, $header);
+                }
+                
                 $headerMap = array_flip($header);
+                \Log::info('CSV Header Map:', $headerMap);
                 
                 // Determine indices
                 $idxDate = $headerMap['date'] ?? 0;
@@ -363,6 +373,8 @@ class MapController extends Controller
                 // Add indices for coordinates
                 $idxLat = $headerMap['latitude'] ?? 5;
                 $idxLng = $headerMap['longitude'] ?? 6;
+                
+                \Log::info("CSV Indices: Date=$idxDate, Brgy=$idxBarangay, Type=$idxType, Lat=$idxLat, Lng=$idxLng");
                 
                 // Read data rows
                 while (($row = fgetcsv($handle)) !== false) {

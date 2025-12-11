@@ -130,10 +130,11 @@ class EncryptionService
             }
             
             // Both formats failed, return original data
-            Log::warning('Decryption failed for both formats - returning original data', [
-                'data_preview' => substr($encryptedText, 0, 50)
-            ]);
-            return $encryptedText;
+             // This is expected for legacy plaintext data
+             Log::debug('Decryption failed for both formats - returning original data (likely plaintext)', [
+                 'data_preview' => substr($encryptedText, 0, 50)
+             ]);
+             return $encryptedText;
         } catch (\Exception $e) {
             Log::error('Unexpected error during decryption', [
                 'error' => $e->getMessage(),
