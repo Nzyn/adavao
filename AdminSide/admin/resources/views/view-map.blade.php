@@ -1468,74 +1468,8 @@
             })
             .catch(error => {
                 console.error('Error loading CSV crimes:', error);
-            });
-    }
-    
     // Function to add CSV crimes to map
     function addCsvCrimesToMap(crimes) {
-        // Group crimes by location (lat,lng)
-        const crimeGroups = {};
-        
-        crimes.forEach(crime => {
-            const key = `${crime.lat},${crime.lng}`;
-            if (!crimeGroups[key]) {
-                crimeGroups[key] = [];
-            }
-            crimeGroups[key].push(crime);
-        });
-        
-        // Add markers for each location
-        Object.keys(crimeGroups).forEach(key => {
-            const group = crimeGroups[key];
-            const firstCrime = group[0];
-            
-            // Get unique offense types
-            const offenseTypes = [...new Set(group.map(c => c.crime_type))];
-            
-            // Create marker icon
-            let icon;
-            if (offenseTypes.length === 1) {
-                icon = createCrimeMarker(offenseTypes[0], group.length);
-            } else {
-                icon = createMultiCrimeIcon(offenseTypes);
-            }
-            
-            // Create marker
-            const marker = L.marker([firstCrime.lat, firstCrime.lng], { icon: icon });
-            
-            // Create popup content
-            let popupContent = `
-                <div style="min-width: 250px;">
-                    <div style="font-weight: 700; font-size: 1.1rem; color: #1f2937; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb;">
-                        ${group.length} Crime${group.length > 1 ? 's' : ''} at this Location
-                    </div>
-                    <div style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.75rem;">
-                        <strong>Barangay:</strong> ${firstCrime.barangay}
-                    </div>
-            `;
-            
-            // Add crime details
-            group.forEach((crime, idx) => {
-                popupContent += `
-                    <div style="background: ${idx % 2 === 0 ? '#f9fafb' : '#ffffff'}; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid ${getCrimeColor(crime.offense)};">
-                        <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">${crime.offense}</div>
-                        <div style="font-size: 0.75rem; color: #6b7280;">
-                            📍 ${crime.type_of_place}<br>
-                            📅 ${crime.date_committed} at ${crime.time_committed}
-                        </div>
-                    </div>
-                `;
-            });
-            
-            popupContent += `</div>`;
-            
-            marker.bindPopup(popupContent, {
-                maxWidth: 350,
-                className: 'custom-popup'
-            });
-            
-            marker.addTo(map);
-            markers.push(marker);
         });
         
         console.log(`Added ${markers.length} markers from CSV data`);
