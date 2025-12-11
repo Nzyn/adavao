@@ -332,8 +332,8 @@ class MapController extends Controller
     public function getCsvCrimeData()
     {
         try {
-            // Cache CSV data for 30 minutes
-            $csvData = Cache::remember('csv_crime_data_v2', 1800, function() {
+            // Cache CSV data for 30 minutes (limited to 2000 records)
+            $csvData = Cache::remember('csv_crime_data_v3', 1800, function() {
                 $csvPath = storage_path('app/davao_crime_5years.csv');
                 
                 if (!file_exists($csvPath)) {
@@ -419,6 +419,12 @@ class MapController extends Controller
                 }
                 
                 fclose($handle);
+                
+                // Limit to 2000 records for performance
+                if (count($csvData) > 2000) {
+                    $csvData = array_slice($csvData, 0, 2000);
+                }
+                
                 return $csvData;
             });
             
