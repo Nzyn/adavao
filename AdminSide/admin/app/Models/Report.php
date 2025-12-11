@@ -24,10 +24,10 @@ class Report extends Model
         'date_reported',
     ];
 
+    protected $casts = [
         'is_anonymous' => 'boolean',
         'date_reported' => 'datetime',
-        // 'title' => 'encrypted',
-        // 'description' => 'encrypted', // Reverted: causes DecryptException
+        // encryption reverted to fix 500 error
     ];
 
     /**
@@ -88,8 +88,6 @@ class Report extends Model
 
         // AUTO-ASSIGNMENT UPDATE:
         // If not inside any polygon, return null (remain unassigned)
-        // Fallback to nearest barangay has been disabled per user request.
-
         return null;
     }
 

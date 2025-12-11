@@ -1,0 +1,10 @@
+1,view_reports,View crime reports,reports,2025-12-06 00:38:48
+2,create_report,Create new report,reports,2025-12-06 00:38:48
+3,update_report,Update report details,reports,2025-12-06 00:38:48
+4,delete_report,Delete report,reports,2025-12-06 00:38:48
+5,assign_report,Assign report to officer,reports,2025-12-06 00:38:48
+6,manage_users,Manage user accounts,users,2025-12-06 00:38:48
+7,view_analytics,View crime analytics,analytics,2025-12-06 00:38:48
+8,manage_officers,Manage police officers,officers,2025-12-06 00:38:48
+9,system_settings,Access system settings,system,2025-12-06 00:38:48
+10,view_audit_log,View audit logs,audit,2025-12-06 00:38:48

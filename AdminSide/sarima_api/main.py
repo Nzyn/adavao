@@ -105,7 +105,7 @@ def load_and_train():
 
     # 1) Path to CSV  --------------------------------------
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(base_dir, "..", "data", "davao_crime_5years.csv")
+    csv_path = os.path.join(base_dir, "..", "admin", "storage", "app", "davao_crime_5years.csv")
     csv_path = os.path.abspath(csv_path)
 
     if not os.path.exists(csv_path):
