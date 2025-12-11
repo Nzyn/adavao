@@ -1468,11 +1468,79 @@
             })
             .catch(error => {
                 console.error('Error loading CSV crimes:', error);
+            });
+    }
+    
     // Function to add CSV crimes to map
     function addCsvCrimesToMap(crimes) {
+        console.log(`Adding ${crimes.length} CSV markers to map (no clustering)`);
+        
+        crimes.forEach((crime, index) => {
+            // Validate coordinates
+            if (!crime.lat || !crime.lng || isNaN(crime.lat) || isNaN(crime.lng)) {
+                return;
+            }
+            
+            const marker = L.marker([crime.lat, crime.lng], { 
+                icon: createCrimeMarker(crime.crime_type, 1) 
+            });
+            
+            const dateStr = crime.date ? new Date(crime.date).toLocaleDateString() : 'N/A';
+            const popupContent = `
+                <div style="font-family: Arial, sans-serif; min-width: 200px;">
+                    <div style="background-color: #f3f4f6; padding: 8px; border-radius: 4px 4px 0 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 8px;">
+                        <strong style="color: #111827; font-size: 1.1em;">${crime.crime_type || 'Unknown Crime'}</strong>
+                    </div>
+                    <div style="padding: 0 8px 8px;">
+                        <div style="margin-bottom: 4px; color: #4b5563;">
+                            <span style="font-weight: 600;">Location:</span> ${crime.barangay || 'Unknown'}
+                        </div>
+                        <div style="margin-bottom: 4px; color: #4b5563;">
+                            <span style="font-weight: 600;">Date:</span> ${dateStr}
+                        </div>
+                        <div style="color: #6b7280; font-size: 0.9em; margin-top: 8px;">
+                            <i>Historical Data</i>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            csvLayer.addLayer(marker);
         });
         
-        console.log(`Added ${markers.length} markers from CSV data`);
+        // Add layer to map
+        if (map) {
+            csvLayer.addTo(map);
+            
+            // Log for debugging
+            console.log(`Added ${crimes.length} individual markers from CSV data`);
+            
+            // Add notification
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background-color: #10b981;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                z-index: 9999;
+                font-family: 'Inter', sans-serif;
+                animation: slideIn 0.3s ease-out;
+            `;
+            notification.textContent = `Added ${crimes.length} historical markers`;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateY(20px)';
+                notification.style.transition = 'all 0.3s ease-in';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
     }
     
     // Create icon for multiple crime types at one location
