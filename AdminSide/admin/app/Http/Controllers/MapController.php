@@ -276,8 +276,7 @@ class MapController extends Controller
                 ->whereNotNull('report_type')
                 ->whereNotNull('report_type')
                 // ->where('report_type', '!=', '') // Removed due to JSON type incompatibility
-                ->orderBy('report_type')
-                ->orderBy('report_type')
+                ->orderByRaw('CAST(report_type AS TEXT)')
                 ->pluck('report_type')
                 ->toArray();
         });
