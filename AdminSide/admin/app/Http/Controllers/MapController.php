@@ -328,6 +328,9 @@ class MapController extends Controller
                 }
 
                 $csvData = [];
+                // Load coordinates map
+                $coordinatesMap = $this->getBarangayCoordinates();
+                
                 $handle = fopen($csvPath, 'r');
                 
                 // Read header
@@ -343,13 +346,26 @@ class MapController extends Controller
                 // Read data rows
                 while (($row = fgetcsv($handle)) !== false) {
                     if (count($row) > max($idxDate, $idxBarangay, $idxType)) {
+                        $barangayName = strtoupper(trim($row[$idxBarangay]));
+                        
                         // Construct standardized row
                         $csvRow = [
                             'date' => $row[$idxDate],
-                            'barangay' => strtoupper(trim($row[$idxBarangay])),
+                            'barangay' => $barangayName,
                             'crime_type' => trim($row[$idxType]),
                             'crime_count' => isset($row[$idxCount]) ? $row[$idxCount] : 1
                         ];
+                        
+                        // Lookup coordinates
+                        $coords = $this->findBarangayCoordinates($barangayName, $coordinatesMap);
+                        if ($coords) {
+                            $csvRow['lat'] = $coords[0] + (mt_rand(-50, 50) / 100000); // Add jitter
+                            $csvRow['lng'] = $coords[1] + (mt_rand(-50, 50) / 100000);
+                        } else {
+                            // Skip records without coordinates or use a default
+                            // For now, skip to avoid "undefined" errors on frontend
+                            continue;
+                        }
                         
                         // Filter for Police Role
                         if (auth()->check() && auth()->user()->role === 'police') {
@@ -435,5 +451,113 @@ class MapController extends Controller
             'success' => true,
             'message' => 'All map caches cleared successfully'
         ]);
+    }
+    /**
+     * Get barangay coordinates from cached JSON file
+     */
+    private function getBarangayCoordinates()
+    {
+        $cacheFile = storage_path('app/barangay_coordinates.json');
+        
+        if (file_exists($cacheFile)) {
+            $cached = json_decode(file_get_contents($cacheFile), true);
+            if (!empty($cached['barangays'])) {
+                $coords = [];
+                
+                foreach ($cached['barangays'] as $brgy) {
+                    $simpleName = trim($brgy['name']);
+                    $lat = $brgy['latitude'];
+                    $lng = $brgy['longitude'];
+                    
+                    // Normalize the name for better matching
+                    $normalizedName = $this->normalizeBarangayName($simpleName);
+                    
+                    // Add entry for multiple name variations
+                    $coords[$simpleName] = [$lat, $lng];
+                    $coords[strtoupper($simpleName)] = [$lat, $lng];
+                    $coords[$normalizedName] = [$lat, $lng];
+                    
+                    // Add common suffixes
+                    $coords[$simpleName . ' (POB.)'] = [$lat, $lng];
+                    $coords[$simpleName . ' PROPER'] = [$lat, $lng];
+                    
+                    // Handle special barangay name patterns
+                    if (preg_match('/^(\d+)-([A-Z])/', $simpleName, $matches)) {
+                        // Handle numbered barangays like "19-B", "76-A BUCANA"
+                        $coords["BARANGAY $simpleName"] = [$lat, $lng];
+                    }
+                    
+                    // Remove parenthetical info for matching
+                    if (preg_match('/^([^(]+)/', $simpleName, $matches)) {
+                        $baseName = trim($matches[1]);
+                        $coords[$baseName] = [$lat, $lng];
+                    }
+                }
+                
+                return $coords;
+            }
+        }
+        
+        return [];
+    }
+    
+    /**
+     * Find coordinates for a barangay with fuzzy matching
+     */
+    private function findBarangayCoordinates($barangayName, $coordinatesMap)
+    {
+        // Try exact match first
+        if (isset($coordinatesMap[$barangayName])) {
+            return $coordinatesMap[$barangayName];
+        }
+        
+        // Try uppercase
+        $upperName = strtoupper($barangayName);
+        if (isset($coordinatesMap[$upperName])) {
+            return $coordinatesMap[$upperName];
+        }
+        
+        // Try normalized name
+        $normalizedName = $this->normalizeBarangayName($barangayName);
+        if (isset($coordinatesMap[$normalizedName])) {
+            return $coordinatesMap[$normalizedName];
+        }
+        
+        // Try fuzzy matching - find best match
+        $bestMatch = null;
+        $bestScore = 0;
+        
+        foreach ($coordinatesMap as $coordName => $coords) {
+            $normalizedCoordName = $this->normalizeBarangayName($coordName);
+            
+            // Calculate similarity
+            $similarity = 0;
+            similar_text($normalizedName, $normalizedCoordName, $similarity);
+            
+            if ($similarity > $bestScore && $similarity > 80) { // 80% similarity threshold
+                $bestScore = $similarity;
+                $bestMatch = $coords;
+            }
+        }
+        
+        return $bestMatch;
+    }
+    
+    /**
+     * Normalize barangay name for better matching
+     */
+    private function normalizeBarangayName($name)
+    {
+        $name = strtoupper(trim($name));
+        
+        // Remove common suffixes and patterns
+        $name = preg_replace('/\s*\(POB\.\)\s*/i', '', $name);
+        $name = preg_replace('/\s*\(BRGY.*?\)\s*/i', '', $name);
+        $name = preg_replace('/\s*PROPER\s*/i', '', $name);
+        
+        // Normalize numbered barangays
+        $name = preg_replace('/^BARANGAY\s+/', '', $name);
+        
+        return trim($name);
     }
 }
