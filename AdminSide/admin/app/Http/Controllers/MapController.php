@@ -283,13 +283,18 @@ class MapController extends Controller
     {
         // Cache crime types for 1 hour
         return Cache::remember('crime_types_list', 3600, function() {
-            $types = Report::select('report_type')
-                ->distinct()
+            $types = Report::query()
+                ->selectRaw('DISTINCT CAST(report_type AS TEXT) as report_type')
                 ->whereNotNull('report_type')
                 ->pluck('report_type')
                 ->toArray();
             
-            // Sort in PHP to avoid PostgreSQL DISTINCT/ORDER BY conflict
+            // Clean up JSON quotes if present (e.g. "Theft" -> Theft)
+            $types = array_map(function($type) {
+                return trim($type, '"');
+            }, $types);
+            
+            // Sort in PHP
             sort($types);
             return $types;
         });
