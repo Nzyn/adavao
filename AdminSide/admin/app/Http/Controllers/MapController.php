@@ -251,7 +251,9 @@ class MapController extends Controller
             $barangays = Location::select('barangay')
                 ->distinct()
                 ->whereNotNull('barangay')
-                ->where('barangay', '!=', '')
+                ->whereNotNull('barangay')
+                // ->where('barangay', '!=', '') // Removed due to JSON type incompatibility
+                ->orderBy('barangay')
                 ->orderBy('barangay')
                 ->pluck('barangay')
                 ->filter(function($barangay) {
@@ -272,7 +274,9 @@ class MapController extends Controller
             return Report::select('report_type')
                 ->distinct()
                 ->whereNotNull('report_type')
-                ->where('report_type', '!=', '')
+                ->whereNotNull('report_type')
+                // ->where('report_type', '!=', '') // Removed due to JSON type incompatibility
+                ->orderBy('report_type')
                 ->orderBy('report_type')
                 ->pluck('report_type')
                 ->toArray();
