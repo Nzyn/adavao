@@ -331,24 +331,19 @@ class AuthController extends Controller
     private function sendTwilioWhatsapp($phone, $otp, $email)
     {
         $message = "AlertDavao\n\nHi {$email} Your verification code is {$otp}. It is valid for 5 minutes. Do not share this code with anyone for your security.";
-        // Manually parse .env to avoid caching issues with artisan serve
-        $envPath = base_path('.env');
-        $env = [];
-        if (file_exists($envPath)) {
-            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            foreach ($lines as $line) {
-                if (strpos(trim($line), '#') === 0) continue;
-                if (strpos($line, '=') !== false) {
-                    list($key, $value) = explode('=', $line, 2);
-                    $env[trim($key)] = trim($value);
-                }
-            }
-        }
+        // Use config helper which works with cached config in production
+        $sid = config('services.twilio.sid');
+        $token = config('services.twilio.token');
+        $from = "whatsapp:" . config('services.twilio.whatsapp_from', '+14155238886');
 
-        $sid = $env['TWILIO_SID'] ?? env('TWILIO_SID');
-        $token = $env['TWILIO_TOKEN'] ?? env('TWILIO_TOKEN');
-        // Standard Twilio Sandbox Number
-        $from = "whatsapp:+14155238886"; 
+        if (empty($sid) || empty($token)) {
+             \Log::error('Twilio Credentials Missing', [
+                'sid_set' => !empty($sid),
+                'token_set' => !empty($token),
+                'env_sid' => empty(env('TWILIO_SID')) ? 'missing' : 'present (but maybe ignored if cached)',
+            ]);
+            return false;
+        }
 
         if ($sid && $token) {
             try {

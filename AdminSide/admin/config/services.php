@@ -35,4 +35,10 @@ return [
         'maps_api_key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    'twilio' => [
+        'sid' => env('TWILIO_SID'),
+        'token' => env('TWILIO_TOKEN'),
+        'whatsapp_from' => env('TWILIO_WHATSAPP_FROM', '+14155238886'),
+    ],
+
 ];

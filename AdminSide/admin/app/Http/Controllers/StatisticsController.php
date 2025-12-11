@@ -11,7 +11,11 @@ use App\Models\CrimeAnalytics;
 
 class StatisticsController extends Controller
 {
-    private $sarimaApiUrl = 'http://localhost:8001';
+    private $sarimaApiUrl;
+
+    public function __construct() {
+        $this->sarimaApiUrl = env('SARIMA_API_URL', 'http://sarima-api:8080');
+    }
 
     /**
      * Check if SARIMA API is running
@@ -188,7 +192,7 @@ class StatisticsController extends Controller
         $cacheKey = 'crime_stats_data_v2' . ($month ? "_$month" : "") . ($year ? "_$year" : "");
             
         return Cache::remember($cacheKey, 3600, function () use ($month, $year) {
-            $csvPath = base_path('../data/davao_crime_5years.csv');
+            $csvPath = storage_path('app/davao_crime_5years.csv');
             
             if (!file_exists($csvPath)) {
                 throw new \Exception('Data file not found at: ' . $csvPath);
@@ -362,7 +366,7 @@ class StatisticsController extends Controller
          $cacheKey = 'barangay_crime_stats' . ($month ? "_$month" : "") . ($year ? "_$year" : "");
             
          return Cache::remember($cacheKey, 3600, function () use ($month, $year) {
-             $csvPath = base_path('../data/davao_crime_5years.csv');
+             $csvPath = storage_path('app/davao_crime_5years.csv');
              if (!file_exists($csvPath)) throw new \Exception('Data file not found at: ' . $csvPath);
 
              $barangayData = [];
@@ -450,7 +454,7 @@ class StatisticsController extends Controller
      */
     private function getHistoricalByCrimeType($crimeType)
     {
-        $csvPath = base_path('../data/davao_crime_5years.csv');
+        $csvPath = storage_path('app/davao_crime_5years.csv');
         $monthlyData = [];
         
         if (!file_exists($csvPath)) {
@@ -505,7 +509,7 @@ class StatisticsController extends Controller
      */
     private function exportDCPOData($crimeType, $year = null, $month = null)
     {
-        $csvPath = base_path('../data/davao_crime_5years.csv');
+        $csvPath = storage_path('app/davao_crime_5years.csv');
         
         if (!file_exists($csvPath)) {
             return response()->json(['status' => 'error', 'message' => 'Data file not found'], 404);
