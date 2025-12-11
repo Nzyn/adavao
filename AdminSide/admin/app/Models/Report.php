@@ -24,11 +24,10 @@ class Report extends Model
         'date_reported',
     ];
 
-    protected $casts = [
         'is_anonymous' => 'boolean',
         'date_reported' => 'datetime',
-        // 'title' => 'encrypted', // Removed: db contains plaintext titles like 'break-in'
-        'description' => 'encrypted',
+        // 'title' => 'encrypted',
+        // 'description' => 'encrypted', // Reverted: causes DecryptException
     ];
 
     /**

@@ -19,7 +19,7 @@ class Location extends Model
     ];
 
     protected $casts = [
-        'reporters_address' => 'encrypted',
+        // 'reporters_address' => 'encrypted', // Reverted
     ];
     
     public function reports()
