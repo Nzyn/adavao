@@ -1587,6 +1587,11 @@
     
     // Get color for crime type
     function getCrimeColor(offense) {
+        // Null-safe check
+        if (!offense || typeof offense !== 'string') {
+            return '#6b7280'; // Default gray for unknown/missing type
+        }
+        
         const offenseLower = offense.toLowerCase();
         
         if (offenseLower.includes('physical injury') || offenseLower.includes('assault')) return '#dc2626';
