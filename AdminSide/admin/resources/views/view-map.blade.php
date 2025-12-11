@@ -1134,6 +1134,9 @@
                 maxZoom: 18,
             }).addTo(map);
             
+            // Initialize CSV Layer (Global)
+            window.csvLayer = L.layerGroup().addTo(map);
+            
             // Hide loading once tiles start loading or after a short delay
             map.on('load', function() {
                 hideLoading();
