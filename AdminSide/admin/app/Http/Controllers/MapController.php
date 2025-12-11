@@ -320,8 +320,8 @@ class MapController extends Controller
     {
         try {
             // Cache CSV data for 30 minutes
-            $csvData = Cache::remember('csv_crime_data', 1800, function() {
-                $csvPath = storage_path('app/CrimeDAta.csv');
+            $csvData = Cache::remember('csv_crime_data_v2', 1800, function() {
+                $csvPath = storage_path('app/davao_crime_5years.csv');
                 
                 if (!file_exists($csvPath)) {
                     return null;
@@ -332,17 +332,30 @@ class MapController extends Controller
                 
                 // Read header
                 $header = fgetcsv($handle);
+                $headerMap = array_flip($header);
+                
+                // Determine indices
+                $idxDate = $headerMap['date'] ?? 0;
+                $idxBarangay = $headerMap['barangay'] ?? 1;
+                $idxType = $headerMap['crime_type'] ?? 2;
+                $idxCount = $headerMap['crime_count'] ?? 3;
                 
                 // Read data rows
                 while (($row = fgetcsv($handle)) !== false) {
-                    if (count($header) === count($row)) {
-                        $csvRow = array_combine($header, $row);
+                    if (count($row) > max($idxDate, $idxBarangay, $idxType)) {
+                        // Construct standardized row
+                        $csvRow = [
+                            'date' => $row[$idxDate],
+                            'barangay' => strtoupper(trim($row[$idxBarangay])),
+                            'crime_type' => trim($row[$idxType]),
+                            'crime_count' => isset($row[$idxCount]) ? $row[$idxCount] : 1
+                        ];
                         
                         // Filter for Police Role
                         if (auth()->check() && auth()->user()->role === 'police') {
                             $stationId = auth()->user()->station_id;
                             if ($stationId) {
-                                // Lazy load allowed barangays if not already cached (could be optimized)
+                                // Lazy load allowed barangays if not already cached
                                 $allowedBarangays = Cache::remember("station_{$stationId}_barangays", 3600, function() use ($stationId) {
                                      try {
                                         return DB::table('barangays')
@@ -351,18 +364,11 @@ class MapController extends Controller
                                             ->map(function($name) { return strtoupper(trim($name)); })
                                             ->toArray();
                                      } catch (\Exception $e) {
-                                         return DB::table('barangays')
-                                            ->where('station_id', $stationId)
-                                            ->pluck('name')
-                                            ->map(function($name) { return strtoupper(trim($name)); })
-                                            ->toArray();
+                                         return [];
                                      }
                                 });
                                 
-                                // Check if row's barangay is in allowed list
-                                // Assuming CSV has 'barangay' column
-                                $rowBarangay = strtoupper(trim($csvRow['barangay'] ?? $csvRow['Barangay'] ?? ''));
-                                if (!in_array($rowBarangay, $allowedBarangays)) {
+                                if (!in_array($csvRow['barangay'], $allowedBarangays)) {
                                     continue; // Skip this row
                                 }
                             }
@@ -373,7 +379,6 @@ class MapController extends Controller
                 }
                 
                 fclose($handle);
-                
                 return $csvData;
             });
             

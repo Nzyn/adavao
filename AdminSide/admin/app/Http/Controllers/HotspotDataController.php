@@ -170,37 +170,68 @@ class HotspotDataController extends Controller
      * Load barangay data from database
      * Contains barangay names, total crimes, and population
      */
+    /**
+     * Load barangay data from CSV file (davao_crime_5years.csv)
+     * Aggregates total crimes per barangay
+     */
     private function loadBarangayDataFromCSV()
     {
         try {
-            // Query the database for crime statistics by barangay
-            $barangayStats = DB::table('locations')
-                ->select('barangay', DB::raw('COUNT(*) as total_crimes'))
-                ->whereNotNull('barangay')
-                ->where('barangay', '!=', '')
-                ->groupBy('barangay')
-                ->get();
+            $csvPath = storage_path('app/davao_crime_5years.csv');
             
-            \Log::info('Loaded ' . $barangayStats->count() . ' barangays from database');
+            if (!file_exists($csvPath)) {
+                \Log::warning('CSV file not found: ' . $csvPath);
+                return [];
+            }
+
+            $barangayStats = [];
+            $handle = fopen($csvPath, 'r');
+            
+            // Read header
+            $header = fgetcsv($handle);
+            $headerMap = array_flip($header);
+            
+            // Identify columns (flexible mapping)
+            $idxBarangay = $headerMap['barangay'] ?? $headerMap['Barangay'] ?? 1;
+            $idxCount = $headerMap['crime_count'] ?? $headerMap['Count'] ?? 3; // Default to column 3 if named differently
+            
+            while (($row = fgetcsv($handle)) !== false) {
+                // Ensure row has enough columns
+                if (count($row) <= $idxBarangay) continue;
+                
+                $barangay = strtoupper(trim($row[$idxBarangay]));
+                
+                // Skip invalid rows
+                if (empty($barangay) || $barangay === 'BARANGAY') continue;
+                
+                // Get count (default to 1 if not specified, or parse if present)
+                $count = isset($row[$idxCount]) ? (float)$row[$idxCount] : 1;
+                
+                if (!isset($barangayStats[$barangay])) {
+                    $barangayStats[$barangay] = 0;
+                }
+                $barangayStats[$barangay] += $count;
+            }
+            
+            fclose($handle);
+            
+            \Log::info('Aggregated stats for ' . count($barangayStats) . ' barangays from CSV');
             
             $barangays = [];
-            foreach ($barangayStats as $stat) {
+            foreach ($barangayStats as $name => $total) {
                 // Use default population of 50,000 for all barangays
-                // In production, this should come from actual census data
                 $population = 50000;
                 
                 $barangays[] = [
-                    'name' => trim($stat->barangay),
-                    'total_crimes' => (int)$stat->total_crimes,
+                    'name' => $name,
+                    'total_crimes' => (int)$total,
                     'population' => $population
                 ];
             }
             
-            \Log::info('Processed ' . count($barangays) . ' barangays with crime data');
-            
             return $barangays;
         } catch (\Exception $e) {
-            \Log::error('Error loading barangay data from database: ' . $e->getMessage());
+            \Log::error('Error loading barangay data from CSV: ' . $e->getMessage());
             return [];
         }
     }
