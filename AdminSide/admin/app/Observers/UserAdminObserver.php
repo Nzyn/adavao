@@ -23,17 +23,25 @@ class UserAdminObserver
                 ->exists();
             
             if (!$exists) {
-                DB::table('user_admin_roles')->insert([
-                    'user_admin_id' => $userAdmin->id,
-                    'role_id' => $policeRole->role_id,
-                    'assigned_at' => now(),
-                    'assigned_by' => auth()->id() ?? 1,
-                ]);
-                
-                \Log::info('Auto-assigned police role to new UserAdmin', [
-                    'user_id' => $userAdmin->id,
-                    'email' => $userAdmin->email
-                ]);
+                try {
+                    DB::table('user_admin_roles')->insert([
+                        'user_admin_id' => $userAdmin->id,
+                        'role_id' => $policeRole->role_id,
+                        'assigned_at' => now(),
+                        'assigned_by' => auth()->id() ?? 1,
+                    ]);
+                    
+                    \Log::info('Auto-assigned police role to new UserAdmin', [
+                        'user_id' => $userAdmin->id,
+                        'email' => $userAdmin->email
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to auto-assign police role', [
+                        'user_id' => $userAdmin->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Do not rethrow, allow user creation to proceed
+                }
             }
         }
     }

@@ -354,6 +354,9 @@ class MapController extends Controller
                 $idxBarangay = $headerMap['barangay'] ?? 1;
                 $idxType = $headerMap['crime_type'] ?? 2;
                 $idxCount = $headerMap['crime_count'] ?? 3;
+                // Add indices for coordinates
+                $idxLat = $headerMap['latitude'] ?? 5;
+                $idxLng = $headerMap['longitude'] ?? 6;
                 
                 // Read data rows
                 while (($row = fgetcsv($handle)) !== false) {
@@ -368,15 +371,23 @@ class MapController extends Controller
                             'crime_count' => isset($row[$idxCount]) ? $row[$idxCount] : 1
                         ];
                         
-                        // Lookup coordinates
-                        $coords = $this->findBarangayCoordinates($barangayName, $coordinatesMap);
-                        if ($coords) {
-                            $csvRow['lat'] = $coords[0] + (mt_rand(-50, 50) / 100000); // Add jitter
-                            $csvRow['lng'] = $coords[1] + (mt_rand(-50, 50) / 100000);
-                        } else {
-                            // Skip records without coordinates or use a default
-                            // For now, skip to avoid "undefined" errors on frontend
-                            continue;
+                        // 1. Try to get coordinates directly from CSV
+                        if (isset($row[$idxLat]) && isset($row[$idxLng]) && is_numeric($row[$idxLat]) && is_numeric($row[$idxLng])) {
+                            $csvRow['lat'] = (float)$row[$idxLat];
+                            $csvRow['lng'] = (float)$row[$idxLng];
+                        } 
+                        // 2. Fallback to lookup
+                        else {
+                            $coords = $this->findBarangayCoordinates($barangayName, $coordinatesMap);
+                            if ($coords) {
+                                $csvRow['lat'] = $coords[0] + (mt_rand(-50, 50) / 100000); // Add jitter
+                                $csvRow['lng'] = $coords[1] + (mt_rand(-50, 50) / 100000);
+                            }
+                        }
+                        
+                        // 3. Skip if NO coordinates found at all (to prevent "Invalid LatLng" error)
+                        if (!isset($csvRow['lat']) || !isset($csvRow['lng'])) {
+                             continue;
                         }
                         
                         // Filter for Police Role
