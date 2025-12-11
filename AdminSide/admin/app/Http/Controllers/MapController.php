@@ -158,6 +158,11 @@ class MapController extends Controller
         
         // Transform data for map display
         $mapData = $reports->map(function ($report) {
+            // Validate essential data
+            if (!$report->location || !$report->date_reported) {
+                return null;
+            }
+
             // Add slight random offset to coordinates (±0.0005 degrees ≈ ±50 meters)
             // This prevents exact overlaps while keeping markers in same general area
             $latOffset = (mt_rand(-50, 50) / 100000); // ±0.0005 degrees
@@ -170,6 +175,13 @@ class MapController extends Controller
                 $reporterName = trim($reporterName) ?: 'Unknown';
             }
             
+            try {
+                $dateFormatted = $report->date_reported->timezone('Asia/Manila')->format('Y-m-d H:i:s');
+            } catch (\Exception $e) {
+                // Fallback if date is invalid but not null
+                $dateFormatted = date('Y-m-d H:i:s');
+            }
+            
             return [
                 'id' => $report->report_id,
                 'title' => $report->report_type,
@@ -179,7 +191,7 @@ class MapController extends Controller
                 'longitude' => $report->location->longitude + $lngOffset,
                 'location_name' => $report->location->barangay,
                 'status' => $report->status,
-                'date_reported' => $report->date_reported->timezone('Asia/Manila')->format('Y-m-d H:i:s'),
+                'date_reported' => $dateFormatted,
                 'reporter' => $reporterName,
                 'station_id' => $report->assigned_station_id,
                 'station_name' => $report->policeStation ? $report->policeStation->station_name : 'Unassigned',
@@ -187,7 +199,7 @@ class MapController extends Controller
                 'is_cluster' => false,
                 'count' => 1
             ];
-        });
+        })->filter(); // Remove nulls from skipped reports
         
         // Return data array (not response) for caching
         return [
