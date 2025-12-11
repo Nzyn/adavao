@@ -17,6 +17,10 @@ class Location extends Model
         'latitude',
         'longitude'
     ];
+
+    protected $casts = [
+        'reporters_address' => 'encrypted',
+    ];
     
     public function reports()
     {

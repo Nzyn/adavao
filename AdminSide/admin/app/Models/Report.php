@@ -27,6 +27,8 @@ class Report extends Model
     protected $casts = [
         'is_anonymous' => 'boolean',
         'date_reported' => 'datetime',
+        'title' => 'encrypted',
+        'description' => 'encrypted',
     ];
 
     /**
