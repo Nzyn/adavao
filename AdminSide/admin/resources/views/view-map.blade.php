@@ -1060,12 +1060,22 @@
         'motornapping': '/legends/002-plus.png',
         'vehicle theft': '/legends/001-close.png',
         'motorcycle theft': '/legends/002-plus.png',
+        'vandalism': '/legends/moreOTHERS.png',
         
         // Financial & Cyber
         'fraud': '/legends/bookmarkFRAUD.png',
+        'cyber fraud': '/legends/bookmarkFRAUD.png',
         'cyber crime': '/legends/webCyberCRIME.png',
         'cybercrime': '/legends/webCyberCRIME.png',
         'hacking': '/legends/webCyberCRIME.png',
+        'phishing': '/legends/webCyberCRIME.png',
+        'online scam': '/legends/bookmarkFRAUD.png',
+        'cyberbullying': '/legends/quoteHARASSMENT.png',
+        'identity theft': '/legends/003-ellipse.png',
+        
+        // Drug-related
+        'illegal drugs': '/legends/moreOTHERS.png',
+        'dangerous drugs': '/legends/moreOTHERS.png',
         
         // Missing Person
         'missing person': '/legends/missingPerson.png',
