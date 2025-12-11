@@ -333,7 +333,7 @@ class MapController extends Controller
     {
         try {
             // Cache CSV data for 30 minutes (limited to 2000 records)
-            $csvData = Cache::remember('csv_crime_data_v3', 1800, function() {
+            $csvData = Cache::remember('csv_crime_data_v4', 1800, function() {
                 $csvPath = storage_path('app/davao_crime_5years.csv');
                 
                 if (!file_exists($csvPath)) {
