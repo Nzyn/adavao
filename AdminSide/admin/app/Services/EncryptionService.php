@@ -84,6 +84,9 @@ class EncryptionService
             );
             
             if ($decrypted === false) {
+                 while ($msg = openssl_error_string()) {
+                     Log::debug('OpenSSL Error: ' . $msg);
+                 }
                 return null;
             }
             
