@@ -319,25 +319,25 @@ class AuthController extends Controller
         }
 
         // Password is correct - INSTEAD of logging in, generate OTP and redirect
-        
+        return $this->initiateOtpLogin($userAdmin, $request);
+    }
+
+    // Helper to initiate OTP flow (used by Login and Google Auth)
+    private function initiateOtpLogin($userAdmin, $request)
+    {
         // 1. Generate OTP
         $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
         
-        // DEBUG: Log OTP so user can see it in debug view if SMS fails
+        // DEBUG: Log OTP
         \Log::info("🔐 [DEBUG] Generated OTP for {$userAdmin->email}: {$otp}");
         
         $otpHash = Hash::make($otp);
-        $expiresAt = Carbon::now()->addMinutes(5);
-        
-        // 2. Store OTP in database
-        // Use user's contact number
+        // Store OTP in database
         $phone = $userAdmin->contact; 
         
-        // Normalize phone if needed
-        // Normalize phone if needed
+        // Normalize phone
         $phone = trim($phone);
-        $phone = preg_replace('/[^\d\+]/', '', $phone); // Keep + and digits
-
+        $phone = preg_replace('/[^\d\+]/', '', $phone);
         if (str_starts_with($phone, '0')) {
             $phone = '+63' . substr($phone, 1);
         } elseif (str_starts_with($phone, '9') && strlen($phone) == 10) {
@@ -348,7 +348,7 @@ class AuthController extends Controller
              $phone = '+' . $phone;
         }
         
-        // Clear old OTPs for this purpose
+        // Clear old OTPs
         \DB::table('otp_codes')->where('phone', $phone)->where('purpose', 'admin_login')->delete();
         
         \DB::table('otp_codes')->insert([
@@ -356,26 +356,16 @@ class AuthController extends Controller
             'otp_hash' => $otpHash,
             'purpose' => 'admin_login',
             'user_id' => $userAdmin->id,
-            'expires_at' => $expiresAt,
+            'expires_at' => Carbon::now()->addMinutes(5),
             'created_at' => Carbon::now()
         ]);
         
-        // 3. Send OTP via Twilio WhatsApp (Free Sandbox)
-        \Log::info("Initiating Login OTP for {$userAdmin->email}. Target phone: {$phone}");
-        
-        // Reverted to WhatsApp: SMS failed (Error 21612 - Trial Account)
+        // Send OTP
         $sent = $this->sendTwilioWhatsapp($phone, $otp, $userAdmin->email);
         
-        // 4. Store partially authenticated user ID in session
+        // Store session
         $request->session()->put('auth.otp.admin_id', $userAdmin->id);
         $request->session()->put('auth.otp.phone', $phone);
-        
-        \Log::info('Admin login OTP generated', [
-            'admin_id' => $userAdmin->id,
-            'phone' => $phone,
-            'channel' => 'whatsapp',
-            'sent' => $sent
-        ]);
         
         return redirect()->route('otp.login.verify')->with('success', 'Credentials verified. Please check your WhatsApp for the code.');
     }
@@ -797,16 +787,20 @@ class AuthController extends Controller
                 // Assuming no role assigned initially, or manual assignment needed.
             }
             
-            // Login user directly (bypass OTP for Google Auth users as Google is trusted IDP)
-            Auth::guard('admin')->login($userAdmin, true);
+            // Check for valid phone number
+            $contact = $userAdmin->contact;
+            $isValidContact = $contact && 
+                              $contact !== '0000000000' && 
+                              strlen(preg_replace('/[^\d]/', '', $contact)) >= 10;
             
-            // Reset lockout/failures
-            $userAdmin->update([
-                'failed_login_attempts' => 0,
-                'lockout_until' => null
-            ]);
+            if (!$isValidContact) {
+                // Redirect to update phone number
+                session(['auth.google.pending_id' => $userAdmin->id]);
+                return redirect()->route('auth.google.phone');
+            }
             
-            return redirect()->intended(route('dashboard'));
+            // Proceed to OTP
+            return $this->initiateOtpLogin($userAdmin, request());
             
         } catch (\Exception $e) {
             \Log::error('Google Auth Failed: ' . $e->getMessage());
@@ -814,5 +808,42 @@ class AuthController extends Controller
                 'email' => 'Google Sign-In failed. Please try again or use password.'
             ]);
         }
+    }
+
+    // Show Google Phone Update Form
+    public function showGooglePhoneUpdate()
+    {
+        if (!session()->has('auth.google.pending_id')) {
+            return redirect()->route('login');
+        }
+        return view('auth.google-phone');
+    }
+
+    // Update Phone and Proceed to OTP
+    public function updateGooglePhone(Request $request)
+    {
+        if (!session()->has('auth.google.pending_id')) {
+            return redirect()->route('login');
+        }
+        
+        $request->validate([
+            'contact' => 'required|string|min:10|max:15'
+        ]);
+        
+        $userAdmin = UserAdmin::find(session('auth.google.pending_id'));
+        if (!$userAdmin) {
+            return redirect()->route('login')->with('error', 'User not found.');
+        }
+        
+        $userAdmin->contact = $request->contact;
+        $userAdmin->save();
+        
+        // Clear pending session
+        session()->forget('auth.google.pending_id');
+        
+        // Proceed to OTP
+        return $this->initiateOtpLogin($userAdmin, $request);
+            
+
     }
 }

@@ -237,3 +237,7 @@ Route::get('/debug/otp-viewer', function () {
         
     return view('debug.otp-viewer', compact('otps'));
 });
+
+// Google Auth Phone Update
+Route::get('auth/google/phone', [App\Http\Controllers\AuthController::class, 'showGooglePhoneUpdate'])->name('auth.google.phone');
+Route::post('auth/google/phone', [App\Http\Controllers\AuthController::class, 'updateGooglePhone']);
