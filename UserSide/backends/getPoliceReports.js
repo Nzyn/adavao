@@ -27,7 +27,7 @@ async function getReportsByStation(req, res) {
       `SELECT 
         r.report_id,
         r.title,
-        r.report_type,
+        r.report_type::text,
         r.description,
         r.status,
         r.is_anonymous,
@@ -58,7 +58,7 @@ async function getReportsByStation(req, res) {
         AND l.longitude IS NOT NULL
         AND l.latitude != 0
         AND l.longitude != 0
-      GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, r.user_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, ps.station_name, ps.address, ps.contact_number
+      GROUP BY r.report_id, r.title, r.report_type::text, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, r.user_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, ps.station_name, ps.address, ps.contact_number
       ORDER BY r.created_at DESC`,
       [stationId]
     );
@@ -170,7 +170,7 @@ async function getReportsByStationAndStatus(req, res) {
       `SELECT 
         r.report_id,
         r.title,
-        r.report_type,
+        r.report_type::text,
         r.description,
         r.status,
         r.is_anonymous,
@@ -201,7 +201,7 @@ async function getReportsByStationAndStatus(req, res) {
         AND l.longitude IS NOT NULL
         AND l.latitude != 0
         AND l.longitude != 0
-      GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, r.user_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, ps.station_name, ps.address, ps.contact_number
+      GROUP BY r.report_id, r.title, r.report_type::text, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, r.user_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, ps.station_name, ps.address, ps.contact_number
       ORDER BY r.created_at DESC`,
       [stationId, status]
     );
