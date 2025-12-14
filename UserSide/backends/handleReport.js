@@ -223,6 +223,10 @@ async function submitReport(req, res) {
       }
     } else {
       // Location-based routing for non-cybercrime reports
+      // POLICY UPDATE: Strict Polygon Verification
+      // We ignore the frontend provided barangay_id for assignment to ensure
+      // the report is physically inside our defined jurisdiction polygons.
+      /*
       if (barangay_id) {
         // Use provided barangay_id to get station_id
         try {
@@ -238,6 +242,7 @@ async function submitReport(req, res) {
           console.log("⚠️  Could not get station from barangay_id:", err.message);
         }
       }
+      */
 
       // Fallback: Use point-in-polygon to find barangay by GPS coordinates
       // ONLY assign if point falls within a barangay's polygon boundary
