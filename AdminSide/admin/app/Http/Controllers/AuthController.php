@@ -42,25 +42,46 @@ class AuthController extends Controller
                 'regex:/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/'
             ],
             'password_confirmation' => 'required|same:password',
-            'captcha_input' => 'required|string|size:6',
-            'captcha_word' => 'required|string|size:6'
+            'recaptcha_token' => 'required'
         ], [
             'email.regex' => 'Please enter a valid email address with @ and domain (e.g., user@gmail.com, admin@yahoo.com)',
             'email.email' => 'Email must be a valid email format',
             'email.unique' => 'This email is already registered in the system',
             'password.regex' => 'Password must contain at least one letter, one number, and one symbol (@$!%*?&)',
             'password.min' => 'Password must be at least 8 characters long',
-            'captcha_input.required' => 'Please enter the security code',
-            'captcha_input.size' => 'Security code must be 6 characters'
+            'recaptcha_token.required' => 'Unable to verify security token. Please refresh the page.'
         ]);
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
 
-        // Verify captcha
-        if (strtoupper($request->captcha_input) !== strtoupper($request->captcha_word)) {
-            return back()->withErrors(['captcha_input' => 'Invalid security code. Please try again.'])->withInput();
+        // Verify reCAPTCHA
+        $recaptchaSecret = config('services.recaptcha.secret_key');
+        if ($recaptchaSecret) {
+            $client = new \GuzzleHttp\Client();
+            try {
+                $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
+                    'form_params' => [
+                        'secret' => $recaptchaSecret,
+                        'response' => $request->recaptcha_token,
+                        'remoteip' => $request->ip()
+                    ]
+                ]);
+                $body = json_decode((string)$response->getBody());
+                
+                if (!$body->success || $body->score < 0.5) {
+                    \Log::warning('Registration reCAPTCHA failed', [
+                        'success' => $body->success, 
+                        'score' => $body->score ?? 'null', 
+                        'email' => $request->email
+                    ]);
+                    return back()->withErrors(['email' => 'Security verification failed. Please try again.'])->withInput();
+                }
+            } catch (\Exception $e) {
+                \Log::error('reCAPTCHA connection error: ' . $e->getMessage());
+                return back()->withErrors(['email' => 'Unable to connect to security service.'])->withInput();
+            }
         }
 
         // Generate verification token
@@ -753,9 +774,27 @@ class AuthController extends Controller
             $userAdmin = UserAdmin::where('email', $googleUser->getEmail())->first();
             
             if (!$userAdmin) {
-                return redirect()->route('login')->withErrors([
-                    'email' => 'Access Denied. NO ADMIN/POLICE ACCOUNT FOUND for ' . $googleUser->getEmail(),
+                // Create new user from Google Data
+                // Split name
+                $fullName = $googleUser->getName();
+                $parts = explode(' ', $fullName);
+                $lastname = array_pop($parts);
+                $firstname = implode(' ', $parts);
+                if (empty($firstname)) $firstname = $lastname; // Fallback
+
+                $userAdmin = UserAdmin::create([
+                    'firstname' => $firstname,
+                    'lastname' => $lastname,
+                    'email' => $googleUser->getEmail(),
+                    'contact' => '0000000000', // Placeholder contact
+                    'password' => Hash::make(Str::random(16)), // Random password
+                    'email_verified_at' => Carbon::now(), // Auto-verify
+                    'verification_token' => null,
+                    'token_expires_at' => null,
                 ]);
+
+                // Assign default role (e.g., admin or police? Default to police or no role?)
+                // Assuming no role assigned initially, or manual assignment needed.
             }
             
             // Login user directly (bypass OTP for Google Auth users as Google is trusted IDP)
