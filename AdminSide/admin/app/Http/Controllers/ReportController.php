@@ -220,11 +220,9 @@ class ReportController extends Controller
                     'station_id' => $userStationId
                 ]);
             } else {
-                // If admin has NO station (NULL), show only UNASSIGNED reports
-                // As requested: "means that all unassigned station will be viewed by this admin"
-                $query->whereNull('reports.assigned_station_id');
-                
-                \Log::info('Admin (Unassigned/Super) viewing UNASSIGNED reports only', [
+                // If admin has NO station (NULL), show ALL reports (Assigned + Unassigned)
+                // This allows Super Admins to oversee everything
+                \Log::info('Admin (Super) viewing ALL reports', [
                     'user_id' => $user->id
                 ]);
             }

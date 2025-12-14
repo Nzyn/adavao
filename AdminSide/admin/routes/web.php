@@ -181,6 +181,13 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // TEMPORARY DEBUG ROUTE - Must be BEFORE catch-all route
+Route::get('/refresh-app', function () {
+    Artisan::call('config:clear');
+    Artisan::call('cache:clear');
+    Artisan::call('view:clear');
+    return 'Config, Cache, and View Cleared! <br> <a href="/reports">Go back to Reports</a>';
+});
+
 Route::get('/debug-env', function () {
     return response()->json([
         'DB_HOST' => env('DB_HOST', 'NOT SET'),
