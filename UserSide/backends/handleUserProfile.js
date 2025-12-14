@@ -13,28 +13,69 @@ const testConnection = async (req, res) => {
   }
 };
 
-// Get user by ID
+// Get user by ID (handles both public users and admin/officer users)
 const getUserById = async (req, res) => {
   const { id } = req.params;
 
   try {
     console.log(`📊 Fetching user profile for ID: ${id}`);
 
-    const [rows] = await db.query(
-      "SELECT * FROM users_public WHERE id = $1",
+    // 1. Try to find in users_public first
+    const [publicRows] = await db.query(
+      `SELECT u.*, 
+              ps.station_name, ps.address as station_address, ps.contact_number as station_contact 
+       FROM users_public u
+       LEFT JOIN police_stations ps ON u.station_id = ps.station_id
+       WHERE u.id = $1`,
       [id]
     );
 
-    if (rows.length === 0) {
+    let user = null;
+    let isOfficer = false;
+
+    if (publicRows.length > 0) {
+      user = publicRows[0];
+    } else {
+      // 2. If not found, try user_admin (officers)
+      console.log(`   User ${id} not found in users_public, checking user_admin...`);
+      const [adminRows] = await db.query(
+        `SELECT u.id, u.firstname, u.lastname, u.email, u.contact, u.station_id,
+                ps.station_name, ps.address as station_address, ps.contact_number as station_contact,
+                r.role_name as role
+         FROM user_admin u
+         LEFT JOIN user_admin_roles uar ON u.id = uar.user_admin_id
+         LEFT JOIN roles r ON uar.role_id = r.role_id
+         LEFT JOIN police_stations ps ON u.station_id = ps.station_id
+         WHERE u.id = $1`,
+        [id]
+      );
+
+      if (adminRows.length > 0) {
+        user = adminRows[0];
+        isOfficer = true;
+      }
+    }
+
+    if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const user = rows[0];
-    console.log("✅ User profile fetched:", user);
+    console.log("✅ User profile fetched:", { id: user.id, name: `${user.firstname} ${user.lastname}`, role: user.role || 'user' });
+
+    // 3. Structure the response to include 'station' object if applicable
+    const responseData = {
+      ...user,
+      station: user.station_id ? {
+        station_id: user.station_id,
+        station_name: user.station_name,
+        address: user.station_address,
+        contact_number: user.station_contact
+      } : null
+    };
 
     res.json({
       success: true,
-      data: user
+      data: responseData
     });
   } catch (error) {
     console.error("❌ Error fetching user:", error);
