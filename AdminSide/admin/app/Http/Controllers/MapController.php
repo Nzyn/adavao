@@ -156,7 +156,15 @@ class MapController extends Controller
             });
         }
         
+        // Log the final query for debugging
+        \Log::info('Map Query SQL', [
+            'sql' => $query->toSql(),
+            'bindings' => $query->getBindings()
+        ]);
+        
         $reports = $query->inRandomOrder()->limit(8000)->get();
+        
+        \Log::info('Map Query Result Count: ' . $reports->count());
         
         // Transform data for map display
         $mapData = $reports->map(function ($report) {

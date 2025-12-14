@@ -1268,8 +1268,6 @@
             .then(data => {
                 console.log('Received data:', data);
                 console.log('Reports count:', data.reports ? data.reports.length : 0);
-                console.log('Database count:', data.database_count);
-                console.log('DCPO clusters:', data.dcpo_clusters);
                 console.log('Total count:', data.total_count);
                 
                 if (data.is_limited) {
