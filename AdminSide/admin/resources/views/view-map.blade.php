@@ -1026,10 +1026,10 @@
 
     function toggleMappingOverlay() {
         if (document.getElementById('mapping-overlay-toggle').checked) {
-            map.addLayer(markerClusterGroup);
+            map.addLayer(csvLayer);
             mappingOverlayVisible = true;
         } else {
-            map.removeLayer(markerClusterGroup);
+            map.removeLayer(csvLayer);
             mappingOverlayVisible = false;
         }
     }
