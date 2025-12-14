@@ -19,6 +19,7 @@ export interface Notification {
     reason?: string;
     total_flags?: number;
     restriction_applied?: string;
+    expires_at?: string; // ISO string
   };
 }
 

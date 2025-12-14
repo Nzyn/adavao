@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
   },
-   subheadingCenter: {
+  subheadingCenter: {
     fontSize: 20,
     marginTop: 15,
     marginBottom: 15,
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   },
 
   cardText: {
-   marginTop: 10,
+    marginTop: 10,
     fontSize: 16,
     color: "#1D3557",
     fontWeight: "500",
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-   normalTxtJustify: {
+  normalTxtJustify: {
     margin: 5,
     color: 'gray',
     paddingBottom: 5,
@@ -275,13 +275,24 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  locationButtonText: { 
+  locationButtonText: {
     fontSize: 16,
     color: '#fff',
     fontWeight: '600',
   },
   imagePreview: { width: "100%", height: 200, marginTop: 8, borderRadius: 8 },
   submitButton: { marginTop: 20 },
+  submitButtonDisabled: { opacity: 0.6 },
+  submitButtonText: {
+    backgroundColor: "#1D3557",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    textAlign: "center",
+    color: "#fff",
+    fontWeight: "bold",
+    overflow: 'hidden',
+  },
   reportButton: {
     backgroundColor: "#1D3557",
     paddingVertical: 15,
@@ -289,7 +300,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginVertical: 20,
   },
-  
+
   reportButtonPressed: {
     backgroundColor: "#1a2e4d", // Darkened background color
     paddingVertical: 15,
@@ -335,7 +346,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 5,
   },
-  
+
   chatBadgeText: {
     color: 'white',
     fontSize: 12,
@@ -443,17 +454,17 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 14,
   },
-   chatItem: {
+  chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-   chatInfo: {
+  chatInfo: {
     flex: 1,
   },
-   avatar: {
+  avatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -480,7 +491,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-    message: {
+  message: {
     fontSize: 14,
     color: '#666',
   },
@@ -488,8 +499,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginLeft: 10,
-  },  
-   title: {
+  },
+  title: {
     fontSize: 20,
     fontWeight: '600',
     textAlign: 'center',
@@ -742,7 +753,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  checkboxText: {
+  termsCheckboxText: {
     fontSize: 12,
     color: "#555",
     marginLeft: 8,

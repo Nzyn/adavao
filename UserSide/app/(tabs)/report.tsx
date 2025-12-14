@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -121,38 +121,55 @@ export default function ReportCrime() {
     const [userId, setUserId] = useState<string>('');
 
     // Load user ID and check flag status when component mounts or comes into focus
+    // Polling for real-time restriction status
     useFocusEffect(
         React.useCallback(() => {
-            const loadUserAndCheckFlags = async () => {
+            let isActive = true;
+            let pollInterval: any;
+
+            const checkRestrictions = async () => {
+                if (!userId) return;
+
                 try {
-                    const userData = await AsyncStorage.getItem('userData');
-                    if (userData) {
-                        const parsedUser = JSON.parse(userData);
-                        const currentUserId = parsedUser.id || parsedUser.user_id || '';
-                        setUserId(currentUserId);
+                    // Use the specific endpoint for restrictions check
+                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/users/${userId}/restrictions`);
+                    const data = await response.json();
 
-                        // Load notifications to check if user is flagged
-                        const notifications = await notificationService.getUserNotifications(currentUserId);
+                    if (isActive && data) {
+                        const isRestricted = data.isRestricted && (!data.expiresAt || new Date(data.expiresAt) > new Date());
 
-                        // Find the latest user_flagged notification
-                        const flaggedNotification = notifications.find(n => n.type === 'user_flagged');
-
-                        if (flaggedNotification) {
-                            setFlagNotification(flaggedNotification);
-                            setIsFlagged(true);
-                            console.log('User is flagged:', flaggedNotification);
-                        } else {
-                            setIsFlagged(false);
-                            setFlagNotification(null);
+                        // Only update state if it changed to avoid re-renders
+                        if (isRestricted !== isFlagged) {
+                            setIsFlagged(isRestricted);
+                            if (isRestricted) {
+                                // If newly restricted, verify if we need to show notification
+                                const notifications = await notificationService.getUserNotifications(userId);
+                                const flaggedNotification = notifications.find(n => n.type === 'user_flagged');
+                                if (flaggedNotification) {
+                                    setFlagNotification(flaggedNotification);
+                                }
+                            } else {
+                                // If restriction lifted, clear notification
+                                setFlagNotification(null);
+                            }
                         }
                     }
                 } catch (error) {
-                    console.error('Error loading user flag status:', error);
+                    console.error('Error polling restrictions:', error);
                 }
             };
 
-            loadUserAndCheckFlags();
-        }, [])
+            // Initial check
+            checkRestrictions();
+
+            // Poll every 5 seconds
+            pollInterval = setInterval(checkRestrictions, 5000);
+
+            return () => {
+                isActive = false;
+                clearInterval(pollInterval);
+            };
+        }, [userId, isFlagged])
     );
 
     // Listen for messages from web iframe minimap
@@ -597,7 +614,7 @@ export default function ReportCrime() {
                     </Link>
                     <Text style={styles.subheading}> *</Text>
                 </View>
-                <View style={styles.card}>
+                <View style={[styles.card, isFlagged && { opacity: 0.6, pointerEvents: 'none' }]}>
                     {/* Render each opened category */}
                     {openedCategories.map((category, index) => (
                         <View key={category} style={{ marginBottom: 16 }}>
@@ -772,7 +789,7 @@ export default function ReportCrime() {
                 />
 
                 <Text style={styles.label}>Photo/Video Evidence (optional)</Text>
-                <TouchableOpacity style={styles.mediaButton} onPress={pickMedia}>
+                <TouchableOpacity style={[styles.mediaButton, isFlagged && { opacity: 0.6 }]} onPress={isFlagged ? undefined : pickMedia}>
                     <Ionicons name="camera-outline" size={24} color="#1D3557" />
                     <Text style={styles.mediaButtonText}>Select Photo/Video</Text>
                 </TouchableOpacity>
@@ -911,13 +928,20 @@ export default function ReportCrime() {
 
                             <View style={confirmStyles.buttonContainer}>
                                 <TouchableOpacity
-                                    style={[confirmStyles.button, confirmStyles.cancelButton]}
-                                    onPress={() => {
-                                        console.log('Report submission cancelled by user');
-                                        setShowConfirmDialog(false);
-                                    }}
+                                    style={[
+                                        styles.submitButton,
+                                        (isSubmitting || isFlagged) && styles.submitButtonDisabled
+                                    ]}
+                                    onPress={handleSubmit}
+                                    disabled={isSubmitting || isFlagged}
                                 >
-                                    <Text style={confirmStyles.cancelButtonText}>Cancel</Text>
+                                    {isSubmitting ? (
+                                        <ActivityIndicator color="#fff" />
+                                    ) : (
+                                        <Text style={styles.submitButtonText}>
+                                            {isFlagged ? 'Account Flagged' : 'Submit Report'}
+                                        </Text>
+                                    )}
                                 </TouchableOpacity>
 
                                 <TouchableOpacity

@@ -594,12 +594,34 @@ const getUserConversations = async (req, res) => {
       const otherUserId = partner.other_user_id;
 
       // Get user details
-      const [users] = await db.query(
+      let users = await db.query(
         'SELECT id, firstname, lastname, role FROM users_public WHERE id = $1',
         [otherUserId]
       );
+      users = users[0]; // Extract rows from result
 
-      if (users.length === 0) continue;
+      // If not found in users_public, check user_admin
+      if (users.length === 0) {
+        console.log(`   ⚠️ User ${otherUserId} not found in users_public, checking user_admin...`);
+        const [adminUsers] = await db.query(`
+            SELECT u.id, u.firstname, u.lastname, r.role_name as role
+            FROM user_admin u
+            JOIN user_admin_roles uar ON u.id = uar.user_admin_id
+            JOIN roles r ON uar.role_id = r.role_id
+            WHERE u.id = $1
+            LIMIT 1
+          `, [otherUserId]);
+
+        if (adminUsers.length > 0) {
+          users = adminUsers;
+          console.log(`   ✅ Found ${otherUserId} in user_admin as ${users[0].role}`);
+        }
+      }
+
+      if (users.length === 0) {
+        console.log(`   ❌ User ${otherUserId} not found in either table`);
+        continue;
+      }
 
       const user = users[0];
       const isOfficerOrAdmin = user.role === 'admin' || user.role === 'police';

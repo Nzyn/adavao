@@ -21,17 +21,17 @@ const Guidelines = () => {
     const scrollToElementWeb = () => {
         try {
             console.log('🌐 Attempting web scroll...');
-            
+
             // Get the actual DOM element
             const crimeTypesElement = Array.from(document.querySelectorAll('*')).find(el => {
                 const text = el.textContent || '';
-                return text.includes('6. Crime Types for Reporting') && 
-                       !text.includes('Prohibited Submissions'); // Make sure it's the right section
+                return text.includes('6. Crime Types for Reporting') &&
+                    !text.includes('Prohibited Submissions'); // Make sure it's the right section
             });
 
             if (crimeTypesElement) {
                 console.log('✅ Found crime types element on web');
-                
+
                 // Find the scrollable container (ScrollView on web renders as a div)
                 let scrollContainer = crimeTypesElement.closest('[class*="ScrollView"]');
                 if (!scrollContainer) {
@@ -73,7 +73,7 @@ const Guidelines = () => {
     const scrollToElementNative = () => {
         try {
             console.log('📱 Attempting native scroll...');
-            
+
             if (!crimeTypesSectionRef.current || !scrollViewRef.current) {
                 console.warn('❌ Refs not available');
                 return false;
@@ -84,9 +84,9 @@ const Guidelines = () => {
                 (x, y) => {
                     console.log('📍 Measured Y position:', y);
                     const offset = y - 20; // Small offset for better UX
-                    scrollViewRef.current?.scrollTo({ 
-                        y: Math.max(0, offset), 
-                        animated: true 
+                    scrollViewRef.current?.scrollTo({
+                        y: Math.max(0, offset),
+                        animated: true
                     });
                 },
                 (error) => {
@@ -106,7 +106,7 @@ const Guidelines = () => {
         if (scrollToSection === 'crime-types') {
             console.log('🎯 Scroll parameter detected:', scrollToSection);
             console.log('📱 Platform:', Platform.OS);
-            
+
             setTimeout(() => {
                 if (Platform.OS === 'web') {
                     scrollToElementWeb();
@@ -254,7 +254,7 @@ const Guidelines = () => {
                 {/* Checkbox + Agree */}
                 <View style={styles.checkboxRow}>
                     <Checkbox value={isChecked} onValueChange={setChecked} color={isChecked ? "#1D3557" : undefined} />
-                    <Text style={styles.checkboxText}>I have read and agreed to the Guidelines</Text>
+                    <Text style={styles.termsCheckboxText}>I have read and agreed to the Guidelines</Text>
                 </View>
 
                 {/* Button (disabled until checked) */}

@@ -172,6 +172,19 @@ const getUserNotifications = async (req, res) => {
     // 5. Check for user flags (account flagged notifications)
     try {
       console.log("Checking for user flags...");
+
+      // First get active restriction for the user to include expiry info
+      // This ensures the notification shows the correct countdown
+      const [activeRestriction] = await db.query(
+        `SELECT restriction_type, expires_at 
+         FROM user_restrictions 
+         WHERE user_id = $1 AND is_active = TRUE 
+         ORDER BY created_at DESC LIMIT 1`,
+        [userId]
+      );
+
+      const currentRestriction = activeRestriction.length > 0 ? activeRestriction[0] : null;
+
       const [userFlags] = await db.query(
         `SELECT 
           uf.id as flag_id,
@@ -213,7 +226,8 @@ const getUserNotifications = async (req, res) => {
             violation_type: formattedViolationType,
             reason: flag.reason,
             total_flags: 1,
-            restriction_applied: 'flagged'
+            restriction_applied: currentRestriction ? currentRestriction.restriction_type : 'flagged',
+            expires_at: currentRestriction ? currentRestriction.expires_at : null
           }
         });
       });
