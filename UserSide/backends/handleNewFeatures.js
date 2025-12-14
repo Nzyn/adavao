@@ -692,13 +692,15 @@ const getMessagesBetweenUsers = async (req, res) => {
   try {
     const [messages] = await db.query(`
       SELECT m.*, 
-             sender.firstname as sender_firstname, 
-             sender.lastname as sender_lastname,
-             receiver.firstname as receiver_firstname,
-             receiver.lastname as receiver_lastname
+             COALESCE(sender.firstname, sender_admin.firstname) as sender_firstname, 
+             COALESCE(sender.lastname, sender_admin.lastname) as sender_lastname,
+             COALESCE(receiver.firstname, receiver_admin.firstname) as receiver_firstname,
+             COALESCE(receiver.lastname, receiver_admin.lastname) as receiver_lastname
       FROM messages m
-      JOIN users_public sender ON m.sender_id = sender.id
-      JOIN users_public receiver ON m.receiver_id = receiver.id
+      LEFT JOIN users_public sender ON m.sender_id = sender.id
+      LEFT JOIN user_admin sender_admin ON m.sender_id = sender_admin.id
+      LEFT JOIN users_public receiver ON m.receiver_id = receiver.id
+      LEFT JOIN user_admin receiver_admin ON m.receiver_id = receiver_admin.id
       WHERE 
         (m.sender_id = $1 AND m.receiver_id = $2) OR
         (m.sender_id = $3 AND m.receiver_id = $4)
@@ -728,13 +730,15 @@ const getUserMessages = async (req, res) => {
   try {
     const [messages] = await db.query(`
       SELECT m.*, 
-             sender.firstname as sender_firstname, 
-             sender.lastname as sender_lastname,
-             receiver.firstname as receiver_firstname,
-             receiver.lastname as receiver_lastname
+             COALESCE(sender.firstname, sender_admin.firstname) as sender_firstname, 
+             COALESCE(sender.lastname, sender_admin.lastname) as sender_lastname,
+             COALESCE(receiver.firstname, receiver_admin.firstname) as receiver_firstname,
+             COALESCE(receiver.lastname, receiver_admin.lastname) as receiver_lastname
       FROM messages m
-      JOIN users_public sender ON m.sender_id = sender.id
-      JOIN users_public receiver ON m.receiver_id = receiver.id
+      LEFT JOIN users_public sender ON m.sender_id = sender.id
+      LEFT JOIN user_admin sender_admin ON m.sender_id = sender_admin.id
+      LEFT JOIN users_public receiver ON m.receiver_id = receiver.id
+      LEFT JOIN user_admin receiver_admin ON m.receiver_id = receiver_admin.id
       WHERE m.sender_id = $1 OR m.receiver_id = $2
       ORDER BY m.sent_at DESC
     `, [userId, userId]);
