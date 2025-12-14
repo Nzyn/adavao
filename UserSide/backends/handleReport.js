@@ -460,7 +460,8 @@ async function getUserReports(req, res) {
         r.is_anonymous,
         r.date_reported,
         r.created_at,
-        r.station_id,
+        r.created_at,
+        r.assigned_station_id as station_id,
         l.latitude,
         l.longitude,
         l.barangay,
@@ -471,7 +472,7 @@ async function getUserReports(req, res) {
         STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
-      LEFT JOIN police_stations ps ON r.station_id = ps.station_id
+      LEFT JOIN police_stations ps ON r.assigned_station_id = ps.station_id
       LEFT JOIN report_media rm ON r.report_id = rm.report_id
       WHERE r.user_id = $1 
         AND r.location_id IS NOT NULL 
@@ -480,7 +481,7 @@ async function getUserReports(req, res) {
         AND l.longitude IS NOT NULL
         AND l.latitude != 0
         AND l.longitude != 0
-      GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, ps.station_name, ps.address, ps.contact_number
+      GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, ps.station_name, ps.address, ps.contact_number
       ORDER BY r.created_at DESC`,
       [userId]
     );

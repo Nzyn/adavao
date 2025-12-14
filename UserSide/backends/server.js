@@ -190,11 +190,11 @@ app.get('/evidence/:filename', async (req, res) => {
   const requestingUserId = req.query.userId || req.headers['x-user-id'];
   const userRole = await getVerifiedUserRole(requestingUserId);
 
-  if (userRole !== 'admin' && userRole !== 'police') {
+  if (userRole !== 'admin' && userRole !== 'police' && userRole !== 'user') {
     console.log(`🚫 Unauthorized access attempt to evidence by user ${requestingUserId} with role: ${userRole}`);
     return res.status(403).json({
       success: false,
-      message: 'Unauthorized: Only admin and police can access evidence files'
+      message: 'Unauthorized: Access denied'
     });
   }
 
