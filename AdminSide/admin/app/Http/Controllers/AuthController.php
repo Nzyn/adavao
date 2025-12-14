@@ -108,8 +108,40 @@ class AuthController extends Controller
     {
         $credentials = $request->validate([
             'email' => 'required|email',
-            'password' => 'required'
+            'password' => 'required',
+            'recaptcha_token' => 'required'
+        ], [
+            'recaptcha_token.required' => 'Unable to verify security token. Please refresh the page.'
         ]);
+
+        // Verify reCAPTCHA
+        $recaptchaSecret = config('services.recaptcha.secret_key');
+        if ($recaptchaSecret) {
+            $client = new \GuzzleHttp\Client();
+            try {
+                $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
+                    'form_params' => [
+                        'secret' => $recaptchaSecret,
+                        'response' => $request->recaptcha_token,
+                        'remoteip' => $request->ip()
+                    ]
+                ]);
+                $body = json_decode((string)$response->getBody());
+                
+                if (!$body->success || $body->score < 0.5) {
+                    \Log::warning('reCAPTCHA failed', [
+                        'success' => $body->success, 
+                        'score' => $body->score ?? 'null', 
+                        'email' => $request->email
+                    ]);
+                    return back()->withErrors(['email' => 'Security verification failed. Please try again.']); // Generic error to avoid bot feedback
+                }
+            } catch (\Exception $e) {
+                \Log::error('reCAPTCHA connection error: ' . $e->getMessage());
+                // Optional: fail open or closed? Failing closed for security on admin side.
+                return back()->withErrors(['email' => 'Unable to connect to security service.']);
+            }
+        }
 
         // Check if user exists in user_admin table (AdminSide users only)
         $userAdmin = UserAdmin::where('email', $credentials['email'])->first();

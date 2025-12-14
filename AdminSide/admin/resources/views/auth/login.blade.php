@@ -298,7 +298,35 @@
                        <a href="{{ route('password.request') }}" style="color: #3b82f6; text-decoration: none; font-size: 0.875rem; font-weight: 500;">Forgot Password?</a>
                    </div>
 
-                   @include('components.captcha')
+                   <input type="hidden" name="recaptcha_token" id="recaptcha_token">
+                   
+                   @if(config('services.recaptcha.site_key'))
+                   <script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}"></script>
+                   <script>
+                       // Refresh token every 90 seconds to prevent expiration
+                       function refreshRecaptcha() {
+                           grecaptcha.ready(function() {
+                               grecaptcha.execute('{{ config('services.recaptcha.site_key') }}', {action: 'login'})
+                               .then(function(token) {
+                                   document.getElementById('recaptcha_token').value = token;
+                               });
+                           });
+                       }
+                       
+                       // Initial load
+                       refreshRecaptcha();
+                       
+                       // Refresh interval
+                       setInterval(refreshRecaptcha, 90000);
+                   </script>
+                   <div style="font-size: 11px; color: #6b7280; margin: 10px 0; text-align: center;">
+                       This site is protected by reCAPTCHA and the Google 
+                       <a href="https://policies.google.com/privacy" style="color:#3b82f6;">Privacy Policy</a> and 
+                       <a href="https://policies.google.com/terms" style="color:#3b82f6;">Terms of Service</a> apply.
+                   </div>
+                   @else
+                       <div style="color: red; font-size: 12px;">ReCAPTCHA Configuration Missing</div>
+                   @endif
 
                    <button type="submit" class="submit-btn" id="proceedBtn">Login</button>
                </div>
@@ -419,10 +447,7 @@
         loginForm.addEventListener('submit', function(e) {
             const email = sanitizeEmail(emailInput.value);
             const password = passwordInput.value;
-            const captchaInputEl = document.getElementById('captchaInput');
-            const captchaInput = captchaInputEl ? captchaInputEl.value.toUpperCase() : '';
-            const captchaWordEl = document.getElementById('captchaWord');
-            const captchaWord = captchaWordEl ? captchaWordEl.value : '';
+            /* vars removed */
 
             let hasError = false;
 
@@ -458,17 +483,7 @@
                 hasError = true;
             }
 
-            // Validate captcha
-            if (captchaInput !== captchaWord) {
-                e.preventDefault();
-                const captchaError = document.getElementById('captchaError');
-                if (captchaError) {
-                    captchaError.style.display = 'block';
-                }
-                if (captchaInputEl && !hasError) captchaInputEl.focus();
-                alert('Invalid Security Code\n\nPlease enter the correct code shown in the image.');
-                hasError = true;
-            }
+            /* Custom captcha validation removed for reCAPTCHA v3 */
 
             if (hasError) {
                 // Re-enable button if validation failed
