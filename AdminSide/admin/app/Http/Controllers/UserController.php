@@ -176,8 +176,7 @@ class UserController extends Controller
             ]);
             
             // Check if user_flags table exists
-            $tableExists = DB::select("SHOW TABLES LIKE 'user_flags'");
-            if (empty($tableExists)) {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('user_flags')) {
                 return response()->json([
                     'success' => false,
                     'message' => 'User flags system is not set up. Please run migration.'

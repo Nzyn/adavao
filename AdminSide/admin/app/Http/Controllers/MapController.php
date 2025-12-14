@@ -58,6 +58,8 @@ class MapController extends Controller
     
     private function fetchReportsData(Request $request)
     {
+        \Log::info('MapController: Fetching reports with filters', $request->all());
+        
         $query = Report::with(['location', 'user', 'policeStation']);
         
         // ROLE CHECK: Police role takes precedence over admin
