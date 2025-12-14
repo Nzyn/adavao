@@ -68,7 +68,7 @@ class MessageController extends Controller
     public function sendMessage(Request $request)
     {
         $request->validate([
-            'receiver_id' => 'required|exists:users,id',
+            'receiver_id' => 'required|exists:users_public,id',
             'message' => 'required|string|max:5000',
         ]);
 
@@ -175,7 +175,7 @@ class MessageController extends Controller
     public function updateTypingStatus(Request $request)
     {
         $request->validate([
-            'receiver_id' => 'required|exists:users,id',
+            'receiver_id' => 'required|exists:users_public,id',
             'is_typing' => 'required|boolean'
         ]);
 

@@ -1,17 +1,17 @@
 {
   "expo": {
-    "jsEngine": "hermes",
     "name": "AlertDavao",
-    "slug": "UserSide",
+    "slug": "alertdavao",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/alertdavao-logo.png",
-    "scheme": "userside",
+    "scheme": "alertdavao",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "owner": "imiyataox",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.imiyataox.alertdavao",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "AlertDavao needs your location to help you report crimes in the right area.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "AlertDavao needs your location to help you report crimes in the right area."
@@ -23,15 +23,13 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
       ],
-      "package": "com.alertdavao.app",
-      "versionCode": 13
+      "package": "com.imiyataox.alertdavao"
     },
     "web": {
       "bundler": "metro",
@@ -62,7 +60,7 @@
       "apiBaseUrl": "https://node-server-gk1u.onrender.com",
       "router": {},
       "eas": {
-        "projectId": "c8a44159-9039-49f2-abec-c046849b3883"
+        "projectId": "57deaf16-b346-4358-a5d6-45dbf0bdc160"
       }
     }
   }
