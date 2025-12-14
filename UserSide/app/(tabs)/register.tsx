@@ -1,8 +1,9 @@
-import React, { useState } from "react";
-import { View, Text, Button, TextInput, ScrollView, Platform, TouchableOpacity, Alert, Modal, Pressable } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, Button, TextInput, ScrollView, Platform, TouchableOpacity, Alert, Modal, Pressable, StyleSheet } from "react-native";
 import Checkbox from "expo-checkbox";
-import CaptchaObfuscated, { generateCaptchaWord } from '../../components/CaptchaObfuscated';
-import styles from "./styles";
+// import CaptchaObfuscated from '../../components/CaptchaObfuscated'; // Removed
+import Recaptcha from 'react-native-recaptcha-that-works';
+import styles from "./styles"; // Assuming this exists and is compatible
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { PhoneInput, validatePhoneNumber } from '../../components/PhoneInput';
@@ -10,9 +11,8 @@ import { BACKEND_URL } from '../../config/backend';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from '../../contexts/UserContext';
 import TermsAndConditionsModal from '../../components/TermsAndConditionsModal';
-// import CaptchaWebView from '../../components/CaptchaWebView';
-import Constants from 'expo-constants';
-// OTP package is installed; we'll use a simple TextInput for the code entry here.
+import { useGoogleAuth, getGoogleUserInfo } from '../../config/googleAuth';
+import * as Google from 'expo-auth-session/providers/google';
 
 // Sanitization helpers
 const sanitizeEmail = (email: string): string => {
@@ -20,11 +20,7 @@ const sanitizeEmail = (email: string): string => {
 };
 
 const sanitizeText = (text: string): string => {
-  // Remove invisible characters, zero-width spaces, and trim whitespace
-  return text
-    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width chars
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim();
+  return text.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
 };
 
 const Register = () => {
@@ -34,9 +30,11 @@ const Register = () => {
   const [firstname, setFirstname] = useState("");
   const [lastname, setLastname] = useState("");
   const [contact, setContact] = useState("");
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
+
+  // Recaptcha State
   const [captchaValid, setCaptchaValid] = useState(false);
-  const [captchaWord, setCaptchaWord] = useState(generateCaptchaWord(6));
+  const recaptchaRef = React.useRef<any>(null);
+
   const [isChecked, setChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [passwordMatchError, setPasswordMatchError] = useState("");
@@ -45,40 +43,202 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+
+  // Google Auth State
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [googleInfo, setGoogleInfo] = useState<any>(null);
+  const [phoneForGoogle, setPhoneForGoogle] = useState("");
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [userIdForOtp, setUserIdForOtp] = useState<string | null>(null);
+
   const router = useRouter();
   const { setUser } = useUser();
+  const { request, response, promptAsync } = useGoogleAuth();
 
-  // Reset loading state whenever screen comes into focus (especially after logout)
   useFocusEffect(
     React.useCallback(() => {
-      console.log('🔄 Register screen focused - resetting loading state');
+      console.log('🔄 Register screen focused - resetting state');
       setIsLoading(false);
 
-      // Clear all form fields when switching back to register screen (no drafts)
-      setFirstname('');
-      setLastname('');
-      setEmail('');
-      setContact('');
-      setPassword('');
-      setConfirmPassword('');
-      setIsChecked(false);
-      setCaptchaAnswer('');
+      // Clear fields
+      // setFirstname(''); setLastname(''); setEmail(''); setContact(''); 
+      // setPassword(''); setConfirmPassword(''); setIsChecked(false);
       setCaptchaValid(false);
       setRegistrationError('');
       setPasswordMatchError('');
-
-      // Generate new captcha
-      const newWord = generateCaptchaWord(6);
-      setCaptchaWord(newWord);
 
       return () => { };
     }, [])
   );
 
-  const handleRegister = async () => {
-    console.log('🚀 Register button clicked!');
-    console.log('📋 Validation state:', { isChecked, captchaValid, captchaAnswer, captchaWord });
+  // Google Auth Effect
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      if (authentication?.accessToken) {
+        handleGoogleSignIn(authentication.accessToken);
+      }
+    }
+  }, [response]);
 
+  const handleGoogleSignIn = async (accessToken: string) => {
+    setIsLoading(true);
+    try {
+      const userInfo = await getGoogleUserInfo(accessToken);
+      if (!userInfo) {
+        Alert.alert('Error', 'Failed to get user information from Google');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('🌐 Google User Info (Register Page):', userInfo.email);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch(`${BACKEND_URL}/google-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({
+          googleId: userInfo.id,
+          email: userInfo.email,
+          firstName: userInfo.given_name,
+          lastName: userInfo.family_name,
+          profilePicture: userInfo.picture,
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.requiresPhone) {
+          console.log('📱 New Google User - Phone Number Required');
+          setGoogleInfo(data.googleInfo);
+          setShowPhoneModal(true);
+          setIsLoading(false);
+          return;
+        }
+
+        if (data.requireOtp) {
+          console.log('🔐 OTP Required');
+          setUserIdForOtp(data.userId);
+          setShowOtpModal(true);
+          setIsLoading(false);
+          return;
+        }
+
+        const user = data.user || data;
+        await processLoginSuccess(user);
+      } else {
+        Alert.alert('Login Failed', data.message || 'Google login failed');
+        setIsLoading(false);
+      }
+    } catch (err: any) {
+      console.error('Google Sign-In Error:', err);
+      Alert.alert('Error', 'Google Sign-In failed: ' + (err.message || 'Unknown error'));
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleRegisterWithPhone = async () => {
+    if (!googleInfo) return;
+
+    if (!validatePhoneNumber(phoneForGoogle)) {
+      Alert.alert('Invalid Phone', 'Please enter a valid Philippine mobile number starting with 9 (10 digits total).');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/google-register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...googleInfo,
+          contact: phoneForGoogle
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setShowPhoneModal(false);
+
+        // Check for OTP
+        if (data.requireOtp) {
+          setUserIdForOtp(data.userId);
+          setShowOtpModal(true);
+          setIsLoading(false);
+          return;
+        }
+
+        await processLoginSuccess(data.user);
+      } else {
+        Alert.alert('Registration Failed', data.message || 'Failed to register with Google');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to complete registration');
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      Alert.alert('Invalid OTP', 'Please enter a valid 6-digit code.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/google-verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userIdForOtp,
+          otp: otpCode
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setShowOtpModal(false);
+        await processLoginSuccess(data.user);
+      } else {
+        Alert.alert('Verification Failed', data.message || 'Invalid OTP');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to verify OTP');
+      setIsLoading(false);
+    }
+  };
+
+  const processLoginSuccess = async (user: any) => {
+    await AsyncStorage.setItem('userData', JSON.stringify(user));
+    setUser({
+      id: user.id?.toString() || user.userId?.toString() || '0',
+      firstName: user.firstname || user.firstName || '',
+      lastName: user.lastname || user.lastName || '',
+      email: user.email || '',
+      phone: user.contact || user.phone || '',
+      address: user.address || '',
+      isVerified: Boolean(user.is_verified || user.isVerified),
+      profileImage: user.profile_image || user.profileImage || '',
+      createdAt: user.createdAt || user.created_at || '',
+      updatedAt: user.updatedAt || user.updated_at || '',
+    });
+    router.replace('/(tabs)');
+  };
+
+
+  const handleRegister = async () => {
     setRegistrationError("");
 
     if (!isChecked) {
@@ -86,74 +246,56 @@ const Register = () => {
       return;
     }
 
-    // Sanitize inputs
     const sanitizedFirstname = sanitizeText(firstname);
     const sanitizedLastname = sanitizeText(lastname);
     const sanitizedEmail = sanitizeEmail(email);
     const sanitizedContact = contact.trim().replace(/\s+/g, '');
 
-    // Validate required fields
+    // Basic Validation
     if (!sanitizedFirstname || !sanitizedLastname || !sanitizedEmail || !sanitizedContact || !password || !confirmpassword) {
       Alert.alert('Missing Fields', 'Please fill in all required fields marked with *');
       return;
     }
-
-    // Validate email format
-    if (!sanitizedEmail.includes('@') || !sanitizedEmail.includes('.')) {
+    if (!sanitizedEmail.includes('@')) {
       Alert.alert('Invalid Email', 'Please enter a valid email address');
       return;
     }
-
-    // Validate email domain - block disposable/fake email providers
-    const emailDomain = sanitizedEmail.toLowerCase().split('@')[1];
-    const disposableEmailDomains = [
-      'anymail.com', '10minutemail.com', 'guerrillamail.com', 'mailinator.com',
-      'tempmail.com', 'throwaway.email', 'getnada.com', 'trashmail.com',
-      'fakeinbox.com', 'temp-mail.org', 'dispostable.com', 'yopmail.com',
-      'maildrop.cc', 'emailondeck.com', 'sharklasers.com'
-    ];
-    if (emailDomain && disposableEmailDomains.includes(emailDomain)) {
-      Alert.alert('Invalid Email', 'Please use a valid email address. Temporary or disposable email addresses are not allowed.');
-      return;
-    }
-
-    // Validate password length
     if (password.length < 6) {
       Alert.alert('Invalid Password', 'Password must be at least 6 characters long');
       return;
     }
-
     if (password !== confirmpassword) {
       setPasswordMatchError("Passwords do not match");
       return;
     }
 
-    if (!passwordsMatch) {
-      setPasswordMatchError("Passwords do not match");
+    // Captcha Validation
+    if (!captchaValid) {
+      Alert.alert('Security Check', 'Please complete the captcha verification.');
+      recaptchaRef.current?.open();
       return;
     }
 
     try {
-      // Validate phone number
       if (!validatePhoneNumber(sanitizedContact)) {
-        Alert.alert('Invalid Phone', 'Please enter a valid Philippine mobile number (e.g., +639123456789)');
-        return;
-      }
-
-      if (!captchaValid) {
-        Alert.alert('Captcha Required', 'Please type the word shown in the captcha.');
+        Alert.alert('Invalid Phone', 'Please enter a valid Philippine mobile number (e.g., 9123456789)');
         return;
       }
 
       setIsLoading(true);
 
-      // Normalize phone number to match backend format
+      // Normalize phone
       let normalizedPhone = sanitizedContact;
-      if (normalizedPhone.startsWith('0')) {
-        normalizedPhone = '+63' + normalizedPhone.slice(1);
+      // If user entered 9xx..., backend might expect +639... depending on your logic.
+      // Assuming backend handles raw or we standardize. Let's standarize if it starts with 9.
+      // Actually PhoneInput usually returns pure digits.
+      // If it starts with 9 and length 10, let's prepend 0 or +63? 
+      // The backend 'handleGoogleRegister' expected raw digits or handled it.
+      // Let's stick to what standard register expected:
+      if (normalizedPhone.length === 10 && normalizedPhone.startsWith('9')) {
+        normalizedPhone = '0' + normalizedPhone; // Convert 912... to 0912...
       }
 
-      // Submit registration directly without OTP
       const regResp = await fetch(`${BACKEND_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -166,97 +308,34 @@ const Register = () => {
         }),
       });
       const regData = await regResp.json();
-      console.log('📥 Registration response:', regData);
 
       setIsLoading(false);
 
       if (regResp.ok) {
-        // Check if the user needs email verification or can login directly
         if (regData.user) {
-          // Auto-login after successful registration
-          const user = regData.user;
-          console.log('✅ Auto-login after registration for:', user.email);
-
-          // Store user data in AsyncStorage
-          await AsyncStorage.setItem('userData', JSON.stringify(user));
-
-          // Set user in context
-          setUser({
-            id: user.id?.toString() || '0',
-            firstName: user.firstname || user.firstName || '',
-            lastName: user.lastname || user.lastName || '',
-            email: user.email || '',
-            phone: user.contact || user.phone || '',
-            address: user.address || '',
-            isVerified: Boolean(user.is_verified || user.isVerified),
-            profileImage: user.profile_image || user.profileImage || '',
-            createdAt: user.createdAt || user.created_at || '',
-            updatedAt: user.updatedAt || user.updated_at || '',
-          });
-
-          Alert.alert(
-            'Registration Successful!',
-            'Welcome to AlertDavao! You are now logged in.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  console.log('🚀 Auto-redirecting to main app...');
-                  router.replace('/(tabs)');
-                }
-              }
-            ]
-          );
+          await processLoginSuccess(regData.user);
+          Alert.alert('Success', 'Welcome to AlertDavao!');
         } else {
-          // Email verification required
-          Alert.alert(
-            'Registration Successful!',
-            `Please check your email (${sanitizedEmail}) for a verification link to activate your account. The link will expire in 24 hours.`,
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  console.log('🚀 Navigating to login...');
-                  router.replace('/(tabs)/login');
-                }
-              }
-            ]
-          );
+          Alert.alert('Success', 'Please check your email to verify your account.', [{ text: 'OK', onPress: () => router.replace('/(tabs)/login') }]);
         }
       } else {
-        const errorMessage = regData.message || 'Failed to register';
-        setRegistrationError(errorMessage);
-        Alert.alert('Registration Failed', errorMessage);
+        setRegistrationError(regData.message || 'Failed to register');
+        Alert.alert('Registration Failed', regData.message || 'Failed to register');
       }
     } catch (error: any) {
-      console.error('Register flow error:', error);
-      const errorMessage = error.message || 'Unknown error';
-      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network request failed')) {
-        Alert.alert(
-          'Connection Error',
-          'Cannot connect to server. Please check:\n\n1. Your internet connection\n2. Backend server is running on localhost:3000\n3. Server URL is correct in config',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert('Error', 'Failed to register: ' + errorMessage);
-      }
+      console.error('Register Error:', error);
+      Alert.alert('Error', 'Failed to register: ' + (error.message || 'Network Error'));
       setIsLoading(false);
     }
   };
-
-
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: '#fff' }}
       contentContainerStyle={{ paddingTop: 20, paddingBottom: 150, paddingHorizontal: 20, alignItems: 'center' }}
       keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={true}
-      bounces={true}
-      scrollEnabled={true}
-      nestedScrollEnabled={true}
     >
-      <View style={{ width: '100%', maxWidth: 440 }} pointerEvents="box-none">
+      <View style={{ width: '100%', maxWidth: 440 }}>
         {/* Title */}
         <Text style={styles.textTitle}>
           <Text style={styles.alertWelcome}>Alert</Text>
@@ -264,37 +343,31 @@ const Register = () => {
         </Text>
 
         <Text style={styles.subheadingCenter}>Welcome to AlertDavao!</Text>
-        <Text style={styles.normalTxtCentered}>
-          Register and Create an Account
-        </Text>
+        <Text style={styles.normalTxtCentered}>Register and Create an Account</Text>
 
         {registrationError ? (
-          <Text style={{ color: '#E63946', fontSize: 12, marginBottom: 15, paddingHorizontal: 10, textAlign: 'center' }}>
+          <Text style={{ color: '#E63946', fontSize: 12, marginBottom: 15, textAlign: 'center' }}>
             {registrationError}
           </Text>
         ) : null}
 
-        {/* Firstname */}
+        {/* Form Fields */}
         <Text style={styles.subheading2}>Firstname <Text style={{ color: 'red' }}>*</Text></Text>
         <TextInput
           style={styles.input}
           placeholder="Enter your first name"
           value={firstname}
-          onChangeText={(text) => setFirstname(sanitizeText(text).replace(/[^a-zA-Z\s]/g, ''))}
-          maxLength={50}
+          onChangeText={(text) => setFirstname(sanitizeText(text))}
         />
 
-        {/* Lastname */}
         <Text style={styles.subheading2}>Lastname <Text style={{ color: 'red' }}>*</Text></Text>
         <TextInput
           style={styles.input}
           placeholder="Enter your last name"
           value={lastname}
-          onChangeText={(text) => setLastname(sanitizeText(text).replace(/[^a-zA-Z\s]/g, ''))}
-          maxLength={50}
+          onChangeText={(text) => setLastname(sanitizeText(text))}
         />
 
-        {/* Email */}
         <Text style={styles.subheading2}>Email <Text style={{ color: 'red' }}>*</Text></Text>
         <TextInput
           style={styles.input}
@@ -303,10 +376,8 @@ const Register = () => {
           onChangeText={(text) => setEmail(sanitizeEmail(text))}
           keyboardType="email-address"
           autoCapitalize="none"
-          maxLength={100}
         />
 
-        {/* Contact */}
         <Text style={styles.subheading2}>Contact Number <Text style={{ color: 'red' }}>*</Text></Text>
         <PhoneInput
           value={contact}
@@ -314,49 +385,23 @@ const Register = () => {
           placeholder="9XX XXX XXXX"
         />
 
-        {/* Password */}
         <Text style={styles.subheading2}>Password <Text style={{ color: 'red' }}>*</Text></Text>
-        <Text style={{ fontSize: 11, color: '#6b7280', marginBottom: 6 }}>
-          Must be at least 6 characters long
-        </Text>
         <View style={{ position: 'relative' }}>
           <TextInput
             style={[styles.input, { paddingRight: 50 }]}
             placeholder="Enter your password"
             value={password}
             onChangeText={(text) => {
-              // Sanitize password - remove invisible characters
-              const sanitized = text.replace(/[\u200B-\u200D\uFEFF]/g, '');
-              setPassword(sanitized);
-              setPasswordMatchError("");
-              // Check if passwords match when typing
-              if (confirmpassword) {
-                if (sanitized === confirmpassword) {
-                  setPasswordsMatch(true);
-                } else {
-                  setPasswordsMatch(false);
-                }
-              }
+              setPassword(text);
+              if (confirmpassword) setPasswordsMatch(text === confirmpassword);
             }}
             secureTextEntry={!showPassword}
-            minLength={6}
           />
-          <Pressable
-            onPress={() => setShowPassword(!showPassword)}
-            style={{
-              position: 'absolute',
-              right: 10,
-              top: 13,
-              paddingHorizontal: 8,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: '#1D3557', fontWeight: '600' }}>
-              {showPassword ? 'HIDE' : 'SHOW'}
-            </Text>
+          <Pressable onPress={() => setShowPassword(!showPassword)} style={localStyles.eyeIcon}>
+            <Text style={{ fontSize: 12, color: '#1D3557', fontWeight: '600' }}>{showPassword ? 'HIDE' : 'SHOW'}</Text>
           </Pressable>
         </View>
 
-        {/* Confirm Password */}
         <Text style={styles.subheading2}>Confirm Password <Text style={{ color: 'red' }}>*</Text></Text>
         <View style={{ position: 'relative' }}>
           <TextInput
@@ -364,152 +409,285 @@ const Register = () => {
             placeholder="Re-enter your password"
             value={confirmpassword}
             onChangeText={(text) => {
-              // Sanitize confirm password - remove invisible characters
-              const sanitized = text.replace(/[\u200B-\u200D\uFEFF]/g, '');
-              setConfirmPassword(sanitized);
-              setPasswordMatchError("");
-              // Check if passwords match when typing
-              if (password) {
-                if (sanitized === password) {
-                  setPasswordsMatch(true);
-                } else {
-                  setPasswordsMatch(false);
-                }
-              }
+              setConfirmPassword(text);
+              if (password) setPasswordsMatch(text === password);
             }}
             secureTextEntry={!showConfirmPassword}
           />
-          <Pressable
-            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            style={{
-              position: 'absolute',
-              right: 10,
-              top: 13,
-              paddingHorizontal: 8,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: '#1D3557', fontWeight: '600' }}>
-              {showConfirmPassword ? 'HIDE' : 'SHOW'}
-            </Text>
+          <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={localStyles.eyeIcon}>
+            <Text style={{ fontSize: 12, color: '#1D3557', fontWeight: '600' }}>{showConfirmPassword ? 'HIDE' : 'SHOW'}</Text>
           </Pressable>
         </View>
-        {confirmpassword ? (
-          <View style={{ marginTop: -10, marginBottom: 15 }}>
-            {passwordsMatch ? (
-              <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '500' }}>
-                ✓ Passwords match
-              </Text>
-            ) : (
-              <Text style={{ color: '#E63946', fontSize: 12 }}>
-                ✗ Passwords do not match
-              </Text>
-            )}
-          </View>
-        ) : null}
 
-        {/* Checkbox with disclaimer */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            marginTop: 10,
-          }}
-        >
-          <Checkbox
-            value={isChecked}
-            onValueChange={setChecked}
-            color={isChecked ? "#1D3557" : undefined}
-          />
-          <Text
-            style={{
-              fontSize: 12,
-              color: "#555",
-              marginLeft: 8,
-              marginBottom: 15,
-              flex: 1,
-            }}
-          >
+        {confirmpassword && (
+          <Text style={{ color: passwordsMatch ? '#10B981' : '#E63946', fontSize: 12, marginTop: -10, marginBottom: 10 }}>
+            {passwordsMatch ? '✓ Passwords match' : '✗ Passwords do not match'}
+          </Text>
+        )}
+
+        {/* Terms */}
+        <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
+          <Checkbox value={isChecked} onValueChange={setChecked} color={isChecked ? "#1D3557" : undefined} />
+          <Text style={{ fontSize: 12, color: "#555", marginLeft: 8, marginBottom: 15, flex: 1 }}>
             By clicking you agree to accept our{" "}
-            <Text
-              style={{ color: "#1D3557", fontWeight: "bold", textDecorationLine: "underline" }}
-              onPress={() => setShowTermsModal(true)}
-            >
-              Terms & Conditions
-            </Text>
-            {", that you are over 18 and aware of our reporting policies!"}
+            <Text style={{ color: "#1D3557", fontWeight: "bold", textDecorationLine: "underline" }} onPress={() => setShowTermsModal(true)}>Terms & Conditions</Text>
           </Text>
         </View>
 
-        {/* Terms and Conditions Modal */}
-        <TermsAndConditionsModal
-          visible={showTermsModal}
-          onClose={() => setShowTermsModal(false)}
-        />
-
-        {/* Obfuscated text captcha */}
-        <View style={{ marginTop: 12, marginBottom: 12 }}>
-          <Text style={{ fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 8 }}>
-            Security Check <Text style={{ color: 'red' }}>*</Text>
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <CaptchaObfuscated word={captchaWord} />
-            <Pressable
-              onPress={() => {
-                const newWord = generateCaptchaWord(6);
-                setCaptchaWord(newWord);
-                setCaptchaAnswer('');
-                setCaptchaValid(false);
-                console.log('🔄 Captcha refreshed:', newWord);
-              }}
-              style={{
-                backgroundColor: '#3b82f6',
-                paddingVertical: 10,
-                paddingHorizontal: 12,
-                borderRadius: 8,
-                height: 44,
-                minWidth: 44,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '600' }}>↻</Text>
-            </Pressable>
-          </View>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter the code above"
-            value={captchaAnswer}
-            onChangeText={text => {
-              const limited = text.replace(/[^A-Z0-9]/gi, '').slice(0, 6);
-              setCaptchaAnswer(limited);
-              setCaptchaValid(limited.trim().toUpperCase() === captchaWord);
-            }}
-            autoCapitalize="characters"
-            maxLength={6}
+        {/* Captcha Section */}
+        <View style={localStyles.captchaSection}>
+          <Recaptcha
+            ref={recaptchaRef}
+            siteKey="6Lc-kyMqAAAAAL_QW9-qFwT2su-3sylJgeuXqFq8"
+            baseUrl="http://localhost"
+            onVerify={() => setCaptchaValid(true)}
+            onExpire={() => setCaptchaValid(false)}
+            size="normal"
           />
-        </View>
-
-
-
-        <Button
-          title="Register"
-          onPress={handleRegister}
-          disabled={!isChecked || !captchaValid}
-          color={isChecked && captchaValid ? "#1D3557" : "#999"}
-        />
-
-        {/* Link for users who already have an account */}
-        <View style={{ marginTop: 20, alignItems: 'center' }}>
-          <Text style={{ color: '#555' }}>I already have an account? </Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/login')}>
-            <Text style={{ color: '#1D3557', fontWeight: 'bold', textDecorationLine: 'underline' }}>
-              Login here
+          <TouchableOpacity
+            style={[localStyles.captchaTrigger, captchaValid && localStyles.captchaTriggerValid]}
+            onPress={() => recaptchaRef.current?.open()}
+            disabled={captchaValid}
+          >
+            <Text style={[localStyles.captchaText, captchaValid && { color: '#fff' }]}>
+              {captchaValid ? '✓ Verified' : 'Click to Verify (I am not a robot)'}
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Register Button */}
+        <Button
+          title={isLoading ? "Registering..." : "Register"}
+          onPress={handleRegister}
+          disabled={!isChecked || !captchaValid || isLoading}
+          color={isChecked && captchaValid ? "#1D3557" : "#999"}
+        />
+
+        {/* Google Sign In Option */}
+        <View style={localStyles.divider}>
+          <View style={localStyles.dividerLine} />
+          <Text style={localStyles.dividerText}>or continue with</Text>
+          <View style={localStyles.dividerLine} />
+        </View>
+
+        <Pressable
+          onPress={() => promptAsync()}
+          disabled={isLoading || !request}
+          style={[localStyles.googleButton, (isLoading || !request) && { opacity: 0.5 }]}
+        >
+          <Text style={localStyles.googleButtonText}>
+            🔐 {isLoading ? 'Signing in...' : 'Sign in with Google'}
+          </Text>
+        </Pressable>
+
+
+        <View style={{ marginTop: 20, alignItems: 'center' }}>
+          <Text style={{ color: '#555' }}>I already have an account? </Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/login')}>
+            <Text style={{ color: '#1D3557', fontWeight: 'bold', textDecorationLine: 'underline' }}>Login here</Text>
+          </TouchableOpacity>
+        </View>
+
       </View>
+
+      {/* Terms Modal */}
+      <TermsAndConditionsModal visible={showTermsModal} onClose={() => setShowTermsModal(false)} />
+
+      {/* Phone Number Modal for Google */}
+      <Modal
+        visible={showPhoneModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPhoneModal(false)}
+      >
+        <View style={localStyles.modalContainer}>
+          <View style={localStyles.modalContent}>
+            <Text style={localStyles.modalTitle}>Complete Registration</Text>
+            <Text style={localStyles.modalSubtitle}>Please enter your mobile number to continue.</Text>
+
+            <PhoneInput
+              value={phoneForGoogle}
+              onChangeText={setPhoneForGoogle}
+              placeholder="9XX XXX XXXX"
+            />
+
+            <TouchableOpacity
+              style={localStyles.modalButton}
+              onPress={handleGoogleRegisterWithPhone}
+              disabled={isLoading}
+            >
+              <Text style={localStyles.modalButtonText}>
+                {isLoading ? 'Saving...' : 'Save & Continue'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { backgroundColor: '#ccc', marginTop: 10 }]}
+              onPress={() => setShowPhoneModal(false)}
+            >
+              <Text style={localStyles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* OTP Modal */}
+      <Modal
+        visible={showOtpModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowOtpModal(false)}
+      >
+        <View style={localStyles.modalContainer}>
+          <View style={localStyles.modalContent}>
+            <Text style={localStyles.modalTitle}>Verify OTP</Text>
+            <Text style={localStyles.modalSubtitle}>
+              A verification code has been sent to your phone.
+            </Text>
+
+            <TextInput
+              style={[localStyles.input, { textAlign: 'center', fontSize: 24, letterSpacing: 5 }]}
+              value={otpCode}
+              onChangeText={setOtpCode}
+              placeholder="000000"
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { marginTop: 20 }]}
+              onPress={handleVerifyOtp}
+              disabled={isLoading}
+            >
+              <Text style={localStyles.modalButtonText}>
+                {isLoading ? 'Verifying...' : 'Verify & Login'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { backgroundColor: '#ccc', marginTop: 10 }]}
+              onPress={() => setShowOtpModal(false)}
+            >
+              <Text style={localStyles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 };
+
+// Local styles to supplement imported styles
+const localStyles = StyleSheet.create({
+  eyeIcon: {
+    position: 'absolute',
+    right: 10,
+    top: 13,
+    paddingHorizontal: 8,
+  },
+  captchaSection: { marginBottom: 20, marginTop: 10 },
+  captchaTrigger: {
+    width: '100%',
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+    backgroundColor: '#f9fafb'
+  },
+  captchaTriggerValid: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981'
+  },
+  captchaText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500'
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    paddingHorizontal: 12,
+    color: '#9ca3af',
+    fontSize: 13,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  googleButtonText: {
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center'
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#1D3557'
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  modalButton: {
+    width: '100%',
+    backgroundColor: '#1D3557',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16
+  },
+  input: {
+    width: '100%',
+    height: 48,
+    borderWidth: 1.5,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 24, // Optimized for OTP
+    backgroundColor: '#fff',
+    color: '#1f2937',
+  }
+});
 
 export default Register;

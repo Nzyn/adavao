@@ -16,7 +16,7 @@ import { getBackendUrlSync, findWorkingBackendUrl } from '../utils/networkUtils'
  * 5. Falls back to safe defaults if needed
  */
 
-const BACKEND_PORT = 3000;
+const BACKEND_PORT = 3001;
 
 // Check if we have a production API URL configured
 const PRODUCTION_API_URL = Constants.expoConfig?.extra?.apiBaseUrl;

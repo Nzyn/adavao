@@ -85,6 +85,7 @@ const sendSms = async (phone, otp, email = null, purpose = null) => {
   if (purpose === 'change_password') actionText = 'change your password';
   if (purpose === 'forgot_password') actionText = 'reset your password';
   if (purpose === 'change_phone') actionText = 'change your phone number';
+  if (purpose === 'login') actionText = 'log in'; // Added login purpose
 
   const message = `AlertDavao\n\n${emailPart}Your verification code is ${otp} to ${actionText}. It is valid for 5 minutes. Do not share this code with anyone for your security.`;
 
@@ -268,6 +269,58 @@ const sendOtp = async (req, res) => {
 };
 
 /**
+ * Internal helper to send OTP from other modules
+ * Returns { success: boolean, message: string, otp: string (debug) }
+ */
+const sendOtpInternal = async (phone, purpose, email = null) => {
+  try {
+    // Allowed purposes including 'login'
+    const allowedPurposes = ['register', 'change_phone', 'change_password', 'forgot_password', 'login'];
+
+    if (!allowedPurposes.includes(purpose)) {
+      return { success: false, message: 'Invalid OTP purpose' };
+    }
+
+    if (!phone) return { success: false, message: 'Phone required' };
+
+    // Normalize
+    phone = phone.trim().replace(/\s+/g, '');
+    if (phone.startsWith('0')) {
+      phone = '+63' + phone.slice(1);
+    }
+
+    await ensureTables();
+
+    const otp = generateOtp();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await db.query(
+      'INSERT INTO otp_codes (phone, otp_hash, purpose, expires_at) VALUES (?, ?, ?, ?)',
+      [phone, otpHash, purpose, expiresAt]
+    );
+
+    // Try to find email if not provided (for notification text)
+    if (!email) {
+      try {
+        const [userRows] = await db.query('SELECT email FROM users_public WHERE contact = ?', [phone]);
+        if (userRows.length > 0) email = userRows[0].email;
+      } catch (e) { }
+    }
+
+    const sent = await sendSms(phone, otp, email, purpose);
+
+    // Log
+    console.log(`📨 Internal OTP Sent to ${phone} for ${purpose}`);
+
+    return { success: true, otp }; // Return OTP for debug if needed
+  } catch (error) {
+    console.error('Internal OTP Send Error:', error);
+    return { success: false, message: error.message };
+  }
+};
+
+/**
  * Verify OTP code during registration (signup only)
  * @param {string} phone - Phone number in international format
  * @param {string} code - 6-digit OTP code
@@ -426,4 +479,4 @@ const verifyOtpInternal = async (phone, code, purpose) => {
   }
 };
 
-module.exports = { sendOtp, verifyOtp, verifyOtpInternal };
+module.exports = { sendOtp, verifyOtp, verifyOtpInternal, sendOtpInternal };

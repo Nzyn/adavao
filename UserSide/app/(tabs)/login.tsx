@@ -10,7 +10,8 @@ import {
   Platform,
   Dimensions,
   StyleSheet,
-  TouchableOpacity
+  TouchableOpacity,
+  Modal
 } from "react-native";
 import Checkbox from 'expo-checkbox';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,7 +19,9 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from '@react-navigation/native';
 import { useUser } from '../../contexts/UserContext';
 import { BACKEND_URL } from '../../config/backend';
-import CaptchaObfuscated, { generateCaptchaWord } from '../../components/CaptchaObfuscated';
+// import CaptchaObfuscated, { generateCaptchaWord } from '../../components/CaptchaObfuscated'; // Removed
+import Recaptcha from 'react-native-recaptcha-that-works';
+import { PhoneInput, validatePhoneNumber } from '../../components/PhoneInput';
 import { useGoogleAuth, getGoogleUserInfo } from '../../config/googleAuth';
 import * as Google from 'expo-auth-session/providers/google';
 import PoliceStationLookup from '../../components/PoliceStationLookup';
@@ -33,26 +36,28 @@ const sanitizeEmail = (email: string): string => {
   return email.trim().toLowerCase().replace(/\s+/g, '').slice(0, 100);
 };
 
-const sanitizeText = (text: string): string => {
-  // Remove invisible characters, zero-width spaces, and trim whitespace
-  return text
-    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width chars
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim()
-    .slice(0, 100);
-};
-
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [captchaWord, setCaptchaWord] = useState("");
-  const [captchaInput, setCaptchaInput] = useState("");
+
+  // Recaptcha State
+  const [captchaValid, setCaptchaValid] = useState(false);
+  const recaptchaRef = React.useRef<any>(null);
+
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [captchaError, setCaptchaError] = useState("");
-  const [captchaValid, setCaptchaValid] = useState(false);
+
+  // Google Phone Modal State
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [googleInfo, setGoogleInfo] = useState<any>(null);
+  const [phoneForGoogle, setPhoneForGoogle] = useState("");
+  // OTP State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [userIdForOtp, setUserIdForOtp] = useState<string | null>(null);
+
   const [showPoliceStationLookup, setShowPoliceStationLookup] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const { setUser } = useUser();
@@ -65,19 +70,17 @@ const Login = () => {
       console.log('🔄 Login screen focused - resetting loading state');
       setIsLoading(false);
 
-      // Clear password and captcha fields when returning to login
+      // Clear password 
       setPassword("");
-      setCaptchaInput("");
       setCaptchaValid(false);
-      refreshCaptcha();
+      // Ensure captcha is closed if validation expired
+      // recaptchaRef.current?.close();
 
       return () => { };
     }, [])
   );
 
   useEffect(() => {
-    setCaptchaWord(generateCaptchaWord(6));
-
     // Load saved email if remember me was checked
     const loadSavedEmail = async () => {
       try {
@@ -136,6 +139,8 @@ const Login = () => {
         return;
       }
 
+      console.log('🌐 Google User Info:', userInfo.email);
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
@@ -157,30 +162,20 @@ const Login = () => {
       clearTimeout(timeoutId);
 
       const data = await response.json();
+
       if (response.ok) {
+
+        // CHECK FOR REQUIRED OTP
+        if (data.requireOtp) {
+          console.log('� OTP Required for Google Login');
+          setUserIdForOtp(data.userId);
+          setShowOtpModal(true);
+          setIsLoading(false);
+          return;
+        }
+
         const user = data.user || data;
-
-        console.log('✅ Google login successful for:', user.email);
-        console.log('📦 Full user data received:', user);
-
-        // Store complete user data in AsyncStorage
-        await AsyncStorage.setItem('userData', JSON.stringify(user));
-
-        // Set user in context with all available fields
-        setUser({
-          id: user.id?.toString() || '0',
-          firstName: user.firstname || user.firstName || '',
-          lastName: user.lastname || user.lastName || '',
-          email: user.email || '',
-          phone: user.contact || user.phone || '',
-          address: user.address || '',
-          isVerified: Boolean(user.is_verified || user.isVerified),
-          profileImage: user.profile_image || user.profileImage || '',
-          createdAt: user.createdAt || user.created_at || '',
-          updatedAt: user.updatedAt || user.updated_at || '',
-        });
-
-        router.replace('/(tabs)');
+        await processLoginSuccess(user);
       } else {
         Alert.alert('Login Failed', data.message || 'Google login failed');
         setIsLoading(false);
@@ -203,17 +198,119 @@ const Login = () => {
     }
   };
 
-  const refreshCaptcha = () => {
-    const newWord = generateCaptchaWord(6);
-    setCaptchaWord(newWord);
-    setCaptchaInput("");
-    setCaptchaValid(false);
+  // [NEW] Handle OTP Verification
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      Alert.alert('Invalid OTP', 'Please enter a valid 6-digit code.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/google-verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userIdForOtp,
+          otp: otpCode
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setShowOtpModal(false);
+        await processLoginSuccess(data.user);
+      } else {
+        Alert.alert('Verification Failed', data.message || 'Invalid OTP');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to verify OTP');
+      setIsLoading(false);
+    }
+  };
+
+  // [NEW] Handle Google Registration with Phone
+  const handleGoogleRegisterWithPhone = async () => {
+    if (!googleInfo) return;
+
+    // Validate phone
+    if (!validatePhoneNumber(phoneForGoogle)) {
+      Alert.alert('Invalid Phone', 'Please enter a valid Philippine mobile number (e.g., +639...)');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/google-register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...googleInfo,
+          contact: phoneForGoogle
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setShowPhoneModal(false);
+
+        // Check if OTP is now required (it should be)
+        if (data.requireOtp) {
+          setUserIdForOtp(data.userId);
+          setShowOtpModal(true);
+          setIsLoading(false);
+          return;
+        }
+
+        await processLoginSuccess(data.user);
+      } else {
+        Alert.alert('Registration Failed', data.message || 'Failed to register with Google');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to complete registration');
+      setIsLoading(false);
+    }
+  };
+
+  const processLoginSuccess = async (user: any) => {
+    console.log('✅ Login successful for:', user.email);
+    console.log('📦 Full user data received:', user);
+
+    // Store complete user data in AsyncStorage
+    await AsyncStorage.setItem('userData', JSON.stringify(user));
+
+    // Set user in context with all available fields
+    setUser({
+      id: user.id?.toString() || user.userId?.toString() || '0',
+      firstName: user.firstname || user.firstName || '',
+      lastName: user.lastname || user.lastName || '',
+      email: user.email || '',
+      phone: user.contact || user.phone || '',
+      address: user.address || '',
+      isVerified: Boolean(user.is_verified || user.isVerified),
+      profileImage: user.profile_image || user.profileImage || '',
+      createdAt: user.createdAt || user.created_at || '',
+      updatedAt: user.updatedAt || user.updated_at || '',
+    });
+
+    if (rememberMe) {
+      await AsyncStorage.setItem('rememberedEmail', user.email);
+    } else {
+      await AsyncStorage.removeItem('rememberedEmail');
+    }
+
+    setTimeout(() => {
+      console.log('🚀 Navigating to /(tabs) (home)...');
+      router.replace('/(tabs)');
+    }, 100);
   };
 
   const handleLogin = async () => {
     setEmailError("");
     setPasswordError("");
-    setCaptchaError("");
 
     // Sanitize email
     const sanitizedEmail = sanitizeEmail(email);
@@ -231,15 +328,14 @@ const Login = () => {
 
     // Verify captcha
     if (!captchaValid) {
-      setCaptchaError('Incorrect captcha. Please try again.');
-      refreshCaptcha();
+      Alert.alert('Security Check', 'Please verify that you are not a robot.');
+      recaptchaRef.current?.open();
       return;
     }
 
     setIsLoading(true);
     console.log('🔑 Starting login for:', sanitizedEmail);
     const loginUrl = `${BACKEND_URL}/login`;
-    console.log('🌐 Fetching URL:', loginUrl);
 
     try {
       const controller = new AbortController();
@@ -257,9 +353,8 @@ const Login = () => {
       clearTimeout(timeoutId);
 
       const data = await response.json();
-      console.log('📥 Login response:', data);
+
       if (response.ok) {
-        // Login successful - get full user data
         const user = data.user || data;
 
         // Check user role restrictions
@@ -269,45 +364,9 @@ const Login = () => {
           return;
         }
 
-        console.log('✅ Login successful for:', user.email);
-        console.log('📦 Full user data received:', user);
-
-        // Handle remember me
-        if (rememberMe) {
-          await AsyncStorage.setItem('rememberedEmail', sanitizedEmail);
-        } else {
-          await AsyncStorage.removeItem('rememberedEmail');
-        }
-
-        // Store complete user data in AsyncStorage
-        const jsonUser = JSON.stringify(user);
-        await AsyncStorage.setItem('userData', jsonUser);
-
-        // Verify persistence
-        const storedCheck = await AsyncStorage.getItem('userData');
-        console.log('💾 AsyncStorage check immediately after write:', storedCheck ? 'EXISTS' : 'NULL');
-
-        // Set user in context with all available fields
-        setUser({
-          id: user.id?.toString() || user.userId?.toString() || '0',
-          firstName: user.firstname || user.firstName || '',
-          lastName: user.lastName || user.lastname || user.lastName || '',
-          email: user.email || '',
-          phone: user.contact || user.phone || '',
-          address: user.address || '',
-          isVerified: Boolean(user.is_verified || user.isVerified),
-          profileImage: user.profile_image || user.profileImage || '',
-          createdAt: user.createdAt || user.created_at || '',
-          updatedAt: user.updatedAt || user.updated_at || '',
-        });
-
-        // Reset navigation stack and go to home
-        setTimeout(() => {
-          console.log('🚀 Navigating to /(tabs) (home)...');
-          router.replace('/(tabs)');
-        }, 100);
+        await processLoginSuccess(user);
       } else {
-        // Display error messages under relevant input fields
+        // Display error messages
         const errorMessage = data.message || 'Login failed';
         const lowerError = errorMessage.toLowerCase();
 
@@ -315,33 +374,8 @@ const Login = () => {
         if (data.emailNotVerified) {
           Alert.alert(
             'Email Not Verified',
-            'Please verify your email address before logging in. Check your inbox for the verification link.',
-            [
-              { text: 'OK', style: 'default' },
-              {
-                text: 'Resend Email',
-                onPress: async () => {
-                  try {
-                    const resendResponse = await fetch(`${BACKEND_URL}/resend-verification`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'ngrok-skip-browser-warning': 'true'
-                      },
-                      body: JSON.stringify({ email: sanitizedEmail }),
-                    });
-                    const resendData = await resendResponse.json();
-                    if (resendResponse.ok) {
-                      Alert.alert('Success', 'Verification email has been sent! Please check your inbox.');
-                    } else {
-                      Alert.alert('Error', resendData.message || 'Failed to resend verification email');
-                    }
-                  } catch (err: any) {
-                    Alert.alert('Error', 'Failed to resend verification email');
-                  }
-                },
-              },
-            ]
+            'Please verify your email address before logging in.',
+            [{ text: 'OK' }]
           );
         } else if (lowerError.includes('user') || lowerError.includes('email') || lowerError.includes('not found')) {
           setEmailError(errorMessage);
@@ -355,15 +389,8 @@ const Login = () => {
     } catch (err: any) {
       console.error('Login Error:', err);
       const errorMessage = err.message || 'Unknown error';
-      // Check for timeout/abort error first
       if (err.name === 'AbortError' || errorMessage.includes('aborted')) {
-        Alert.alert('Connection Timeout', 'The server is taking too long to respond. Please check your connection or try again later.', [{ text: 'OK' }]);
-      } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network request failed')) {
-        Alert.alert(
-          'Connection Error',
-          `Cannot connect to server at ${BACKEND_URL}.\nPlease check:\n1. Your internet connection\n2. Backend server is running\n3. Your device is on the same Wi-Fi as server\n4. Firewall is allowing port 3000`,
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Connection Timeout', 'The server is taking too long to respond.', [{ text: 'OK' }]);
       } else {
         Alert.alert('Network Error', errorMessage);
       }
@@ -372,7 +399,6 @@ const Login = () => {
   };
 
   const handleForgotPassword = () => {
-    console.log("Forgot Password clicked!");
     router.push('/(tabs)/forgot-password');
   };
 
@@ -384,24 +410,19 @@ const Login = () => {
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#fff' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingTop: Platform.OS === 'ios' ? 60 : 40,
           paddingBottom: 100,
-          paddingHorizontal: 20,
+          paddingHorizontal: isSmallScreen ? 16 : 20,
           alignItems: 'center',
         }}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={true}
-        bounces={true}
-        scrollEnabled={true}
-        nestedScrollEnabled={true}
       >
-        <View style={{ width: '100%', maxWidth: 420 }} pointerEvents="box-none">
-          {/* Police Station Lookup Icon - Positioned at top right */}
+        <View style={{ width: '100%', maxWidth: 420 }}>
+          {/* Police Station Lookup Icon */}
           <TouchableOpacity
             style={localStyles.policeIconButton}
             onPress={() => setShowPoliceStationLookup(true)}
@@ -409,7 +430,6 @@ const Login = () => {
             <Ionicons name="ellipsis-horizontal-circle" size={28} color="#1D3557" />
           </TouchableOpacity>
 
-          {/* Title */}
           <Text style={localStyles.title}>
             <Text style={localStyles.alertText}>Alert</Text>
             <Text style={localStyles.davaoText}>Davao</Text>
@@ -427,17 +447,12 @@ const Login = () => {
               placeholderTextColor="#9ca3af"
               value={email}
               onChangeText={(text) => {
-                try {
-                  setEmail(sanitizeEmail(text));
-                  setEmailError("");
-                } catch (error) {
-                  console.error('Error sanitizing email:', error);
-                }
+                setEmail(sanitizeEmail(text));
+                setEmailError("");
               }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
-              maxLength={100}
             />
             {emailError ? (
               <Text style={localStyles.errorText}>⚠️ {emailError}</Text>
@@ -454,14 +469,8 @@ const Login = () => {
                 placeholderTextColor="#9ca3af"
                 value={password}
                 onChangeText={(text) => {
-                  try {
-                    // Sanitize password - remove invisible characters
-                    const sanitized = text.replace(/[\u200B-\u200D\uFEFF]/g, '');
-                    setPassword(sanitized);
-                    setPasswordError("");
-                  } catch (error) {
-                    console.error('Error setting password:', error);
-                  }
+                  setPassword(text);
+                  setPasswordError("");
                 }}
                 secureTextEntry={!showPassword}
               />
@@ -479,47 +488,34 @@ const Login = () => {
             ) : null}
           </View>
 
-          {/* Captcha Section */}
+          {/* Recaptcha Section */}
           <View style={localStyles.captchaSection}>
-            <Text style={localStyles.label}>Captcha Verification <Text style={{ color: 'red' }}>*</Text></Text>
-            <View style={localStyles.captchaRow}>
-              <View style={localStyles.captchaDisplay}>
-                <CaptchaObfuscated word={captchaWord} />
-              </View>
-              <Pressable onPress={refreshCaptcha} style={localStyles.refreshButton}>
-                <Text style={localStyles.refreshIcon}>↻</Text>
-              </Pressable>
-            </View>
-            <TextInput
-              style={[
-                localStyles.input,
-                localStyles.captchaInput,
-                captchaInput && (captchaValid ? localStyles.inputValid : localStyles.inputError)
-              ]}
-              placeholder="Enter captcha above"
-              placeholderTextColor="#9ca3af"
-              value={captchaInput}
-              onChangeText={(text) => {
-                try {
-                  const limited = text.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
-                  setCaptchaInput(limited);
-                  setCaptchaValid(limited === captchaWord.toUpperCase());
-                  setCaptchaError("");
-                } catch (error) {
-                  console.error('Error processing captcha input:', error);
-                }
+            <Recaptcha
+              ref={recaptchaRef}
+              siteKey="6Lc-kyMqAAAAAL_QW9-qFwT2su-3sylJgeuXqFq8"
+              baseUrl="http://localhost"
+              onVerify={(token) => {
+                console.log('✅ Captcha Verified');
+                setCaptchaValid(true);
               }}
-              autoCapitalize="characters"
-              maxLength={6}
+              onExpire={() => {
+                setCaptchaValid(false);
+              }}
+              size="normal"
             />
-            {captchaInput && (
-              <Text style={[localStyles.captchaStatus, { color: captchaValid ? '#22c55e' : '#ef4444' }]}>
-                {captchaValid ? '✓ Correct' : '✗ Incorrect code'}
+
+            <TouchableOpacity
+              style={[
+                localStyles.captchaTrigger,
+                captchaValid && localStyles.captchaTriggerValid
+              ]}
+              onPress={() => recaptchaRef.current?.open()}
+              disabled={captchaValid}
+            >
+              <Text style={[localStyles.captchaText, captchaValid && { color: '#fff' }]}>
+                {captchaValid ? '✓ Verified' : 'Click to Verify (I am not a robot)'}
               </Text>
-            )}
-            {captchaError ? (
-              <Text style={localStyles.errorText}>⚠️ {captchaError}</Text>
-            ) : null}
+            </TouchableOpacity>
           </View>
 
           {/* Remember Me Checkbox */}
@@ -589,6 +585,87 @@ const Login = () => {
         </View>
       </ScrollView>
 
+      {/* Phone Number Modal */}
+      <Modal
+        visible={showPhoneModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPhoneModal(false)}
+      >
+        <View style={localStyles.modalContainer}>
+          <View style={localStyles.modalContent}>
+            <Text style={localStyles.modalTitle}>Complete Registration</Text>
+            <Text style={localStyles.modalSubtitle}>Please enter your mobile number to continue.</Text>
+
+            <PhoneInput
+              value={phoneForGoogle}
+              onChangeText={setPhoneForGoogle}
+              placeholder="9XX XXX XXXX"
+            />
+
+            <TouchableOpacity
+              style={localStyles.modalButton}
+              onPress={handleGoogleRegisterWithPhone}
+              disabled={isLoading}
+            >
+              <Text style={localStyles.modalButtonText}>
+                {isLoading ? 'Saving...' : 'Save & Continue'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { backgroundColor: '#ccc', marginTop: 10 }]}
+              onPress={() => setShowPhoneModal(false)}
+            >
+              <Text style={localStyles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* OTP Modal */}
+      <Modal
+        visible={showOtpModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowOtpModal(false)}
+      >
+        <View style={localStyles.modalContainer}>
+          <View style={localStyles.modalContent}>
+            <Text style={localStyles.modalTitle}>Verify OTP</Text>
+            <Text style={localStyles.modalSubtitle}>
+              A verification code has been sent to your phone.
+            </Text>
+
+            <TextInput
+              style={[localStyles.input, { textAlign: 'center', fontSize: 24, letterSpacing: 5 }]}
+              value={otpCode}
+              onChangeText={setOtpCode}
+              placeholder="000000"
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { marginTop: 20 }]}
+              onPress={handleVerifyOtp}
+              disabled={isLoading}
+            >
+              <Text style={localStyles.modalButtonText}>
+                {isLoading ? 'Verifying...' : 'Verify & Login'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { backgroundColor: '#ccc', marginTop: 10 }]}
+              onPress={() => setShowOtpModal(false)}
+            >
+              <Text style={localStyles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Police Station Lookup Modal */}
       <PoliceStationLookup
         visible={showPoliceStationLookup}
@@ -598,28 +675,7 @@ const Login = () => {
   );
 };
 
-// Responsive styles
 const localStyles = StyleSheet.create({
-  keyboardAvoid: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 100,
-    paddingHorizontal: isSmallScreen ? 16 : 20,
-    alignItems: 'center',
-  },
-  formContainer: {
-    width: '100%',
-    maxWidth: 420,
-    position: 'relative',
-  },
   policeIconButton: {
     position: 'absolute',
     top: -10,
@@ -633,10 +689,7 @@ const localStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
@@ -648,12 +701,8 @@ const localStyles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
-  alertText: {
-    color: '#1D3557',
-  },
-  davaoText: {
-    color: '#000',
-  },
+  alertText: { color: '#1D3557' },
+  davaoText: { color: '#000' },
   subtitle: {
     fontSize: Math.min(18, SCREEN_WIDTH * 0.045),
     fontWeight: '600',
@@ -667,9 +716,7 @@ const localStyles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 24,
   },
-  fieldContainer: {
-    marginBottom: 16,
-  },
+  fieldContainer: { marginBottom: 16 },
   label: {
     fontSize: 14,
     fontWeight: '600',
@@ -682,7 +729,7 @@ const localStyles = StyleSheet.create({
     position: 'relative',
   },
   input: {
-    flex: 1,
+    width: '100%',
     height: 48,
     borderWidth: 1.5,
     borderColor: '#d1d5db',
@@ -693,15 +740,9 @@ const localStyles = StyleSheet.create({
     backgroundColor: '#fff',
     color: '#1f2937',
   },
-  passwordInput: {
-    paddingRight: 60,
-  },
-  inputValid: {
-    borderColor: '#22c55e',
-  },
-  inputError: {
-    borderColor: '#ef4444',
-  },
+  passwordInput: { paddingRight: 60 },
+  inputValid: { borderColor: '#22c55e' },
+  inputError: { borderColor: '#ef4444' },
   toggleButton: {
     position: 'absolute',
     right: 12,
@@ -718,53 +759,33 @@ const localStyles = StyleSheet.create({
     color: '#ef4444',
     marginTop: 4,
   },
-  captchaSection: {
-    marginBottom: 20,
-  },
-  captchaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  captchaDisplay: {
-    flex: 1,
-  },
-  refreshButton: {
-    backgroundColor: '#3b82f6',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+  captchaSection: { marginBottom: 20 },
+  captchaTrigger: {
+    width: '100%',
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
     borderRadius: 8,
-    height: 40,
-    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20,
+    backgroundColor: '#f9fafb'
   },
-  refreshIcon: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  captchaTriggerValid: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981'
   },
-  captchaInput: {
-    height: 40,
-    paddingVertical: 8,
-  },
-  captchaStatus: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '500',
+  captchaText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500'
   },
   rememberMeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
   },
-  checkbox: {
-    marginRight: 8,
-  },
-  rememberMeText: {
-    fontSize: 14,
-    color: '#374151',
-  },
+  checkbox: { marginRight: 8 },
+  rememberMeText: { fontSize: 14, color: '#374151' },
   loginButton: {
     backgroundColor: '#1D3557',
     paddingVertical: 14,
@@ -772,9 +793,7 @@ const localStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  loginButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
+  loginButtonDisabled: { backgroundColor: '#9ca3af' },
   loginButtonText: {
     color: '#fff',
     fontSize: 16,
@@ -792,10 +811,7 @@ const localStyles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 20,
   },
-  signUpLink: {
-    color: '#1D3557',
-    fontWeight: '600',
-  },
+  signUpLink: { color: '#1D3557', fontWeight: '600' },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -837,13 +853,8 @@ const localStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fbbf24',
   },
-  emergencyIcon: {
-    fontSize: 22,
-    marginTop: 2,
-  },
-  emergencyContent: {
-    flex: 1,
-  },
+  emergencyIcon: { fontSize: 22, marginTop: 2 },
+  emergencyContent: { flex: 1 },
   emergencyTitle: {
     fontSize: 14,
     fontWeight: '700',
@@ -855,6 +866,46 @@ const localStyles = StyleSheet.create({
     color: '#78350f',
     lineHeight: 18,
   },
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center'
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#1D3557'
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  modalButton: {
+    width: '100%',
+    backgroundColor: '#1D3557',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16
+  }
 });
 
 export default Login;

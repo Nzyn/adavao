@@ -293,7 +293,15 @@ app.use((req, res, next) => {
 });
 
 // Authentication Routes
+const handleRegister = require("./handleRegister");
+const handleGoogleRegister = require("./handleGoogleRegister"); // Import
+const { handleGoogleLogin, handleGoogleLoginWithToken, handleGoogleOtpVerify } = require("./handleGoogleAuth");
+
+// ...
+
+// Authentication Routes
 app.post("/register", handleRegister); // Registration with email verification
+app.post("/google-register", handleGoogleRegister); // Google Registration with Phone
 app.post("/login", handleLogin);
 
 // Email Verification Routes
@@ -313,7 +321,10 @@ app.post('/api/verify-otp', verifyOtp);
 
 app.post("/google-login", handleGoogleLogin); // Google Sign-In (legacy)
 app.post("/google-login-token", handleGoogleLoginWithToken); // Google Sign-In with ID token verification (more secure)
+app.post("/google-login", handleGoogleLogin); // Google Sign-In (legacy)
+app.post("/google-login-token", handleGoogleLoginWithToken); // Google Sign-In with ID token verification (more secure)
 app.post("/api/auth/google", handleGoogleLoginWithToken); // ID token verification endpoint
+app.post("/google-verify-otp", handleGoogleOtpVerify); // [NEW] Verify OTP for Google Login
 
 // User Profile API Routes
 app.get("/api/test-connection", testConnection);

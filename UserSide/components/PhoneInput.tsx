@@ -1,125 +1,95 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, TextInput, Text, StyleSheet } from 'react-native';
 
 interface PhoneInputProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
-  style?: any;
+  error?: string;
 }
 
 export const PhoneInput: React.FC<PhoneInputProps> = ({
   value,
   onChangeText,
-  placeholder = "Enter mobile number",
-  style
+  placeholder = "9XX XXX XXXX",
+  error
 }) => {
-  const [focused, setFocused] = useState(false);
-
-  const formatPhoneNumber = (text: string) => {
-    // Remove all non-digit characters
-    const cleaned = text.replace(/\D/g, '');
-    
-    // Handle different input formats
-    let formatted = cleaned;
-    
-    // If starts with 63, keep it
-    if (cleaned.startsWith('63')) {
-      formatted = cleaned;
-    }
-    // If starts with 0, replace with 63
-    else if (cleaned.startsWith('0')) {
-      formatted = '63' + cleaned.substring(1);
-    }
-    // If starts with 9 (user might skip the 0), add 63
-    else if (cleaned.startsWith('9')) {
-      formatted = '63' + cleaned;
-    }
-    
-    // Limit to 12 digits (63 + 10 digits)
-    formatted = formatted.substring(0, 12);
-    
-    return formatted;
-  };
-
-  const handleChange = (text: string) => {
-    const formatted = formatPhoneNumber(text);
-    onChangeText('+' + formatted);
-  };
-
-  const displayValue = value.startsWith('+') ? value : '+' + value;
-
   return (
-    <View style={[styles.container, style]}>
-      <View style={styles.inputContainer}>
-        <Text style={styles.prefix}>🇵🇭 +63</Text>
+    <View style={styles.container}>
+      <Text style={localStyles.label}>Mobile Number <Text style={{ color: 'red' }}>*</Text></Text>
+      <View style={localStyles.inputContainer}>
+        <View style={localStyles.prefixContainer}>
+          <Text style={localStyles.prefixText}>+63</Text>
+        </View>
         <TextInput
-          style={[styles.input, focused && styles.inputFocused]}
-          value={displayValue.replace('+63', '')}
-          onChangeText={handleChange}
+          style={localStyles.input}
+          value={value}
+          onChangeText={(text) => {
+            // Allow only numbers and limit length
+            const numeric = text.replace(/[^0-9]/g, '');
+            if (numeric.length <= 10) {
+              onChangeText(numeric);
+            }
+          }}
           placeholder={placeholder}
-          placeholderTextColor="#999"
-          keyboardType="phone-pad"
+          keyboardType="number-pad"
           maxLength={10}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
         />
       </View>
-      <Text style={styles.hint}>Format: 9XX XXX XXXX (10 digits)</Text>
+      {error ? <Text style={localStyles.errorText}>{error}</Text> : null}
     </View>
   );
 };
 
 export const validatePhoneNumber = (phone: string): boolean => {
-  // Remove + and spaces
-  const cleaned = phone.replace(/[\s+]/g, '');
-  
-  // Should be 12 digits starting with 63
-  if (!/^63\d{10}$/.test(cleaned)) {
-    return false;
-  }
-  
-  // Philippine mobile numbers start with 63 + 9
-  if (!cleaned.startsWith('639')) {
-    return false;
-  }
-  
-  return true;
+  // Must be 10 digits and start with 9
+  return phone.length === 10 && phone.startsWith('9');
 };
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: 16,
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 6,
+    alignSelf: 'flex-start'
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#d1d5db',
     borderRadius: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#fff',
+    overflow: 'hidden',
+    height: 48,
   },
-  prefix: {
-    fontSize: 16,
-    color: '#333',
-    marginRight: 8,
+  prefixContainer: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#d1d5db',
+  },
+  prefixText: {
+    color: '#374151',
     fontWeight: '600',
+    fontSize: 15,
   },
   input: {
     flex: 1,
-    height: 50,
+    paddingHorizontal: 12,
     fontSize: 16,
-    color: '#333',
+    color: '#1f2937',
+    backgroundColor: '#fff'
   },
-  inputFocused: {
-    borderColor: '#1D3557',
-  },
-  hint: {
-    fontSize: 11,
-    color: '#666',
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
     marginTop: 4,
-    marginLeft: 4,
-  },
+  }
 });
+
+const styles = { container: {} }; // Dummy for compatibility if needed
