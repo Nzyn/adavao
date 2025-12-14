@@ -41,23 +41,22 @@ class DashboardController extends Controller
         
         $stats = Cache::remember($cacheKey, 300, function() use ($isSuperAdmin, $userRole, $user) {
             if ($isSuperAdmin) {
-                // Super Admin Visibility: ONLY Unassigned Reports
+                // Super Admin Visibility: ALL Reports (Assigned + Unassigned)
                 return [
-                    'totalReports' => DB::table('reports')->whereNull('assigned_station_id')->count(),
+                    'totalReports' => DB::table('reports')->count(),
                     'pendingReports' => DB::table('reports')
-                        ->whereNull('assigned_station_id')
                         ->where('status', 'pending')
                         ->count(),
                     'investigatingReports' => DB::table('reports')
-                        ->whereNull('assigned_station_id')
                         ->where('status', 'investigating')
                         ->count(),
                     'resolvedReports' => DB::table('reports')
-                        ->whereNull('assigned_station_id')
                         ->where('status', 'resolved')
                         ->count(),
-                    'reportsToday' => 0, // Not needed for super admin
-                    'unreadMessages' => 0 // Not needed for super admin
+                    'reportsToday' => DB::table('reports')
+                        ->whereDate('date_reported', \Carbon\Carbon::today())
+                        ->count(),
+                    'unreadMessages' => 0 // Message count logic can be added if needed
                 ];
             } elseif ($userRole === 'police') {
                 // Police Visibility: ONLY Assigned to their Station
