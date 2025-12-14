@@ -454,12 +454,11 @@ async function getUserReports(req, res) {
       `SELECT 
         r.report_id,
         r.title,
-        r.report_type,
+        r.report_type::text,
         r.description,
         r.status,
         r.is_anonymous,
         r.date_reported,
-        r.created_at,
         r.created_at,
         r.assigned_station_id as station_id,
         l.latitude,
@@ -481,7 +480,7 @@ async function getUserReports(req, res) {
         AND l.longitude IS NOT NULL
         AND l.latitude != 0
         AND l.longitude != 0
-      GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, ps.station_name, ps.address, ps.contact_number
+      GROUP BY r.report_id, r.title, r.report_type::text, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, ps.station_name, ps.address, ps.contact_number
       ORDER BY r.created_at DESC`,
       [userId]
     );
@@ -574,7 +573,7 @@ async function getAllReports(req, res) {
     let query = `SELECT 
         r.report_id,
         r.title,
-        r.report_type,
+        r.report_type::text,
         r.description,
         r.status,
         r.is_anonymous,
@@ -623,7 +622,7 @@ async function getAllReports(req, res) {
       console.log(`👤 Regular user requesting reports - filtering by user_id: ${requestingUserId}`);
     }
 
-    query += ` GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.user_id, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, u.role, ps.station_name, ps.address, ps.contact_number ORDER BY r.created_at DESC`;
+    query += ` GROUP BY r.report_id, r.title, r.report_type::text, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.user_id, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, u.role, ps.station_name, ps.address, ps.contact_number ORDER BY r.created_at DESC`;
 
     const [reports] = await db.query(query, queryParams);
 
