@@ -13,7 +13,7 @@ const checkUserRestrictions = async (userId) => {
     // Check for active restrictions
     const [restrictions] = await db.query(
       `SELECT * FROM user_restrictions 
-       WHERE user_id = ? 
+       WHERE user_id = $1 
        AND is_active = TRUE 
        AND (expires_at IS NULL OR expires_at > NOW())
        ORDER BY created_at DESC
@@ -68,7 +68,7 @@ const getUserFlagHistory = async (userId) => {
         inappropriate_content_count,
         last_flag_date,
         restriction_level
-       FROM users_public WHERE id = ?`,
+       FROM users_public WHERE id = $1`,
       [userId]
     );
 
@@ -81,8 +81,8 @@ const getUserFlagHistory = async (userId) => {
         created_at,
         status
        FROM user_flags 
-       WHERE user_id = ? 
-       AND created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
+       WHERE user_id = $1 
+       AND created_at > (NOW() - INTERVAL '30 days')
        ORDER BY created_at DESC
        LIMIT 10`,
       [userId]
@@ -125,38 +125,46 @@ const createUserFlag = async (flagData) => {
     const [result] = await db.query(
       `INSERT INTO user_flags 
        (user_id, violation_type, severity, description, reported_by, related_report_id, evidence)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
       [userId, violationType, severity, description, reportedBy, relatedReportId, JSON.stringify(evidence)]
     );
 
     // Update user's flag counts based on violation type
     let updateQuery = 'UPDATE users_public SET total_flags = total_flags + 1, last_flag_date = NOW()';
+    let params = [];
+
+    // NOTE: This switch builds the query string, which is fine, but we need to supply params carefully in Postgres if using $n based on position.
+    // However, here we only append simple strings. 
+    // BUT we have `WHERE id = ?` at the end.
+    // Let's rewrite this to be cleaner and safer.
+
+    const updateColumns = ['total_flags = total_flags + 1', 'last_flag_date = NOW()'];
 
     switch (violationType) {
       case 'false_report':
-        updateQuery += ', false_report_count = false_report_count + 1';
+        updateColumns.push('false_report_count = false_report_count + 1');
         break;
       case 'prank_spam':
-        updateQuery += ', spam_count = spam_count + 1';
+        updateColumns.push('spam_count = spam_count + 1');
         break;
       case 'harassment':
-        updateQuery += ', harassment_count = harassment_count + 1';
+        updateColumns.push('harassment_count = harassment_count + 1');
         break;
       case 'inappropriate_content':
       case 'inappropriate_upload':
-        updateQuery += ', inappropriate_content_count = inappropriate_content_count + 1';
+        updateColumns.push('inappropriate_content_count = inappropriate_content_count + 1');
         break;
     }
 
-    updateQuery += ' WHERE id = ?';
-    await db.query(updateQuery, [userId]);
+    const finalUpdateQuery = `UPDATE users_public SET ${updateColumns.join(', ')} WHERE id = $1`;
+    await db.query(finalUpdateQuery, [userId]);
 
     // Check if auto-restriction should be applied
     await checkAndApplyAutoRestriction(userId);
 
     return {
       success: true,
-      flagId: result.insertId,
+      flagId: result[0].id,
       message: 'Flag created successfully'
     };
   } catch (error) {
@@ -173,7 +181,7 @@ const checkAndApplyAutoRestriction = async (userId) => {
   try {
     // Get user's current flag counts
     const [user] = await db.query(
-      'SELECT total_flags, restriction_level FROM users_public WHERE id = ?',
+      'SELECT total_flags, restriction_level FROM users_public WHERE id = $1',
       [userId]
     );
 
@@ -232,13 +240,13 @@ const checkAndApplyAutoRestriction = async (userId) => {
     if (restrictionType && newRestrictionLevel !== restriction_level) {
       // Update user's restriction level
       await db.query(
-        'UPDATE users_public SET restriction_level = ? WHERE id = ?',
+        'UPDATE users_public SET restriction_level = $1 WHERE id = $2',
         [newRestrictionLevel, userId]
       );
 
       // Deactivate previous restrictions
       await db.query(
-        'UPDATE user_restrictions SET is_active = FALSE WHERE user_id = ?',
+        'UPDATE user_restrictions SET is_active = FALSE WHERE user_id = $1',
         [userId]
       );
 
@@ -246,7 +254,7 @@ const checkAndApplyAutoRestriction = async (userId) => {
       await db.query(
         `INSERT INTO user_restrictions 
          (user_id, restriction_type, reason, expires_at, can_report, can_comment, can_upload, can_message, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           userId,
           restrictionType,

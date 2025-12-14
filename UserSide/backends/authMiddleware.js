@@ -24,7 +24,7 @@ const verifyUserRole = async (req, res, next) => {
 
     // Query database to get actual user role
     const [users] = await db.query(
-      "SELECT role FROM users_public WHERE id = ?",
+      "SELECT role FROM users_public WHERE id = $1",
       [userId]
     );
 
@@ -97,7 +97,7 @@ const getVerifiedUserRole = async (userId) => {
     }
 
     const [users] = await db.query(
-      "SELECT role FROM users_public WHERE id = ?",
+      "SELECT role FROM users_public WHERE id = $1",
       [userId]
     );
 

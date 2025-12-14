@@ -5,7 +5,7 @@ const { encrypt, decrypt, canDecrypt } = require("./encryptionService");
 // Initialize default roles (admin, police, user)
 const initDefaultRoles = async () => {
   try {
-    await db.query(`INSERT IGNORE INTO Roles (role_id, role_name) VALUES (1, 'admin'), (2, 'police'), (3, 'user')`);
+    await db.query(`INSERT INTO Roles (role_id, role_name) VALUES (1, 'admin'), (2, 'police'), (3, 'user') ON CONFLICT DO NOTHING`);
   } catch (error) {
     console.error("Error initializing default roles:", error);
   }
@@ -42,7 +42,7 @@ const getPoliceStationById = async (req, res) => {
 
   try {
     const [stations] = await db.query(
-      "SELECT * FROM police_stations WHERE station_id = ?",
+      "SELECT * FROM police_stations WHERE station_id = $1",
       [id]
     );
 
@@ -149,7 +149,7 @@ const getUserRoles = async (req, res) => {
       SELECT r.role_id, r.role_name
       FROM user_role ur
       JOIN roles r ON ur.role_id = r.role_id
-      WHERE ur.user_id = ?
+      WHERE ur.user_id = $1
     `, [userId]);
 
     res.json({
@@ -172,7 +172,7 @@ const assignUserRole = async (req, res) => {
 
   try {
     await db.query(
-      "INSERT IGNORE INTO user_role (user_id, role_id) VALUES (?, ?)",
+      "INSERT INTO user_role (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
       [userId, roleId]
     );
 
@@ -215,7 +215,7 @@ const submitVerification = async (req, res) => {
 
     // Check if user already has a verification record
     const [existingVerifications] = await db.query(
-      "SELECT * FROM verifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
       [userId]
     );
 
@@ -243,8 +243,8 @@ const submitVerification = async (req, res) => {
       if (existingVerification.status === 'rejected') {
         const [result] = await db.query(`
           UPDATE verifications 
-          SET id_picture = ?, id_selfie = ?, billing_document = ?, status = 'pending', is_verified = FALSE, expiration = ?, updated_at = ?
-          WHERE verification_id = ?
+          SET id_picture = $1, id_selfie = $2, billing_document = $3, status = 'pending', is_verified = FALSE, expiration = $4, updated_at = $5
+          WHERE verification_id = $6 RETURNING verification_id
         `, [encryptedIdPicture, encryptedIdSelfie, encryptedBillingDoc, expiration, currentTime, existingVerification.verification_id]);
 
         verificationId = existingVerification.verification_id;
@@ -252,25 +252,25 @@ const submitVerification = async (req, res) => {
         // For other statuses, insert new verification
         const [result] = await db.query(`
           INSERT INTO verifications (user_id, otp_code, expiration, status, id_picture, id_selfie, billing_document, is_verified, created_at, updated_at)
-          VALUES (?, ?, ?, 'pending', ?, ?, ?, FALSE, ?, ?)
+          VALUES ($1, $2, $3, 'pending', $4, $5, $6, FALSE, $7, $8) RETURNING verification_id
         `, [userId, Math.floor(100000 + Math.random() * 900000).toString(), expiration, encryptedIdPicture, encryptedIdSelfie, encryptedBillingDoc, currentTime, currentTime]);
 
-        verificationId = result.insertId;
+        verificationId = result[0].verification_id;
       }
     } else {
       // Insert new verification for users with no previous verification attempts
       const [result] = await db.query(`
         INSERT INTO verifications (user_id, otp_code, expiration, status, id_picture, id_selfie, billing_document, is_verified, created_at, updated_at)
-        VALUES (?, ?, ?, 'pending', ?, ?, ?, FALSE, ?, ?)
+        VALUES ($1, $2, $3, 'pending', $4, $5, $6, FALSE, $7, $8) RETURNING verification_id
       `, [userId, Math.floor(100000 + Math.random() * 900000).toString(), expiration, encryptedIdPicture, encryptedIdSelfie, encryptedBillingDoc, currentTime, currentTime]);
 
-      verificationId = result.insertId;
+      verificationId = result[0].verification_id;
     }
 
     // Create notification for admin
     await db.query(`
-      INSERT INTO notifications (user_id, type, message, \`read\`)
-      VALUES (?, 'verification', 'New verification request submitted', FALSE)
+      INSERT INTO notifications (user_id, type, message, "read")
+      VALUES ($1, 'verification', 'New verification request submitted', FALSE)
     `, [userId]);
 
     console.log("✅ Verification documents encrypted and stored");
@@ -348,7 +348,7 @@ const getVerificationStatus = async (req, res) => {
     let userRole = 'user';
     if (requestingUserId) {
       const [requestingUsers] = await db.query(
-        "SELECT role FROM users_public WHERE id = ?",
+        "SELECT role FROM users_public WHERE id = $1",
         [requestingUserId]
       );
       if (requestingUsers.length > 0) {
@@ -357,7 +357,7 @@ const getVerificationStatus = async (req, res) => {
     }
 
     const [verifications] = await db.query(
-      "SELECT * FROM verifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
       [userId]
     );
 
@@ -411,7 +411,7 @@ const updateVerification = async (req, res) => {
   try {
     // First check if the verification exists and its status
     const [existingVerifications] = await db.query(
-      "SELECT * FROM verifications WHERE verification_id = ?",
+      "SELECT * FROM verifications WHERE verification_id = $1",
       [verificationId]
     );
 
@@ -452,11 +452,11 @@ const updateVerification = async (req, res) => {
 
     const [result] = await db.query(`
       UPDATE verifications 
-      SET id_picture = ?, id_selfie = ?, billing_document = ?, status = 'pending', is_verified = FALSE, updated_at = ?
-      WHERE verification_id = ?
+      SET id_picture = $1, id_selfie = $2, billing_document = $3, status = 'pending', is_verified = FALSE, updated_at = $4
+      WHERE verification_id = $5 RETURNING verification_id
     `, [encryptedIdPicture, encryptedIdSelfie, encryptedBillingDoc, currentTime, verificationId]);
 
-    if (result.affectedRows === 0) {
+    if (result.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Verification not found"
@@ -486,20 +486,20 @@ const approveVerification = async (req, res) => {
     await db.query(`
       UPDATE verifications 
       SET status = 'verified', is_verified = TRUE
-      WHERE verification_id = ?
+      WHERE verification_id = $1 RETURNING verification_id
     `, [verificationId]);
 
     // Update user's is_verified status
     await db.query(`
       UPDATE users_public
       SET is_verified = TRUE
-      WHERE id = ?
+      WHERE id = $1 RETURNING id
     `, [userId]);
 
     // Create notification for user
     await db.query(`
-      INSERT INTO notifications (user_id, type, message, \`read\`)
-      VALUES (?, 'verification', 'Your verification request has been approved', FALSE)
+      INSERT INTO notifications (user_id, type, message, "read")
+      VALUES ($1, 'verification', 'Your verification request has been approved', FALSE)
     `, [userId]);
 
     res.json({
@@ -525,15 +525,15 @@ const rejectVerification = async (req, res) => {
     await db.query(`
       UPDATE verifications 
       SET status = 'rejected', is_verified = FALSE
-      WHERE verification_id = ?
+      WHERE verification_id = $1 RETURNING verification_id
     `, [verificationId]);
 
     // Note: We don't update the user's is_verified status here because they should be able to resubmit
 
     // Create notification for user
     await db.query(`
-      INSERT INTO notifications (user_id, type, message, \`read\`)
-      VALUES (?, 'verification', 'Your verification request has been rejected. Please submit new documents.', FALSE)
+      INSERT INTO notifications (user_id, type, message, "read")
+      VALUES ($1, 'verification', 'Your verification request has been rejected. Please submit new documents.', FALSE)
     `, [userId]);
 
     res.json({
@@ -565,9 +565,9 @@ const getUserConversations = async (req, res) => {
     // STEP 1: Get all unique other_user_ids involved in messages with this user
     const [allMessagePartners] = await db.query(`
       SELECT DISTINCT 
-        CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END as other_user_id
+        CASE WHEN sender_id = $1 THEN receiver_id ELSE sender_id END as other_user_id
       FROM messages
-      WHERE sender_id = ? OR receiver_id = ?
+      WHERE sender_id = $2 OR receiver_id = $3
     `, [userId, userId, userId]);
 
     console.log('📨 Found', allMessagePartners.length, 'message partners');
@@ -595,7 +595,7 @@ const getUserConversations = async (req, res) => {
 
       // Get user details
       const [users] = await db.query(
-        'SELECT id, firstname, lastname, role FROM users_public WHERE id = ?',
+        'SELECT id, firstname, lastname, role FROM users_public WHERE id = $1',
         [otherUserId]
       );
 
@@ -614,7 +614,7 @@ const getUserConversations = async (req, res) => {
       const [lastMessageResult] = await db.query(`
         SELECT message, sent_at
         FROM messages
-        WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+        WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $3 AND receiver_id = $4)
         ORDER BY sent_at DESC
         LIMIT 1
       `, [userId, otherUserId, otherUserId, userId]);
@@ -622,7 +622,7 @@ const getUserConversations = async (req, res) => {
       const [unreadResult] = await db.query(`
         SELECT COUNT(*) as count
         FROM messages
-        WHERE sender_id = ? AND receiver_id = ? AND status = FALSE
+        WHERE sender_id = $1 AND receiver_id = $2 AND status = FALSE
       `, [otherUserId, userId]);
 
       if (lastMessageResult.length > 0) {
@@ -678,8 +678,8 @@ const getMessagesBetweenUsers = async (req, res) => {
       JOIN users_public sender ON m.sender_id = sender.id
       JOIN users_public receiver ON m.receiver_id = receiver.id
       WHERE 
-        (m.sender_id = ? AND m.receiver_id = ?) OR
-        (m.sender_id = ? AND m.receiver_id = ?)
+        (m.sender_id = $1 AND m.receiver_id = $2) OR
+        (m.sender_id = $3 AND m.receiver_id = $4)
       ORDER BY m.sent_at ASC
     `, [userId, otherUserId, otherUserId, userId]);
 
@@ -713,7 +713,7 @@ const getUserMessages = async (req, res) => {
       FROM messages m
       JOIN users_public sender ON m.sender_id = sender.id
       JOIN users_public receiver ON m.receiver_id = receiver.id
-      WHERE m.sender_id = ? OR m.receiver_id = ?
+      WHERE m.sender_id = $1 OR m.receiver_id = $2
       ORDER BY m.sent_at DESC
     `, [userId, userId]);
 
@@ -752,14 +752,14 @@ const sendMessage = async (req, res) => {
     console.log('💾 [sendMessage] Inserting message into database...');
     const [result] = await db.query(`
       INSERT INTO messages (sender_id, receiver_id, report_id, message, sent_at, status)
-      VALUES (?, ?, ?, ?, ?, FALSE)
+      VALUES ($1, $2, $3, $4, $5, FALSE) RETURNING message_id
     `, [senderId, receiverId, reportId || null, message, sentAt]);
 
-    console.log('✅ [sendMessage] Message inserted successfully:', { messageId: result.insertId });
+    console.log('✅ [sendMessage] Message inserted successfully:', { messageId: result[0].message_id });
 
     res.json({
       success: true,
-      messageId: result.insertId,
+      messageId: result[0].message_id,
       message: "Message sent successfully"
     });
   } catch (error) {
@@ -778,7 +778,7 @@ const markMessageAsRead = async (req, res) => {
 
   try {
     await db.query(
-      "UPDATE messages SET status = TRUE WHERE message_id = ?",
+      "UPDATE messages SET status = TRUE WHERE message_id = $1",
       [messageId]
     );
 
@@ -802,7 +802,7 @@ const markConversationAsRead = async (req, res) => {
 
   try {
     await db.query(
-      "UPDATE messages SET status = TRUE WHERE receiver_id = ? AND sender_id = ? AND status = FALSE",
+      "UPDATE messages SET status = TRUE WHERE receiver_id = $1 AND sender_id = $2 AND status = FALSE",
       [userId, otherUserId]
     );
 
@@ -826,7 +826,7 @@ const getUnreadCount = async (req, res) => {
 
   try {
     const [result] = await db.query(
-      "SELECT COUNT(*) as count FROM messages WHERE receiver_id = ? AND status = FALSE",
+      "SELECT COUNT(*) as count FROM messages WHERE receiver_id = $1 AND status = FALSE",
       [userId]
     );
 
@@ -855,7 +855,7 @@ const getCrimeAnalytics = async (req, res) => {
 
   try {
     const [analytics] = await db.query(
-      "SELECT * FROM crime_analytics WHERE location_id = ?",
+      "SELECT * FROM crime_analytics WHERE location_id = $1",
       [locationId]
     );
 
@@ -907,7 +907,7 @@ const getCrimeForecasts = async (req, res) => {
 
   try {
     const [forecasts] = await db.query(
-      "SELECT * FROM crime_forecasts WHERE location_id = ? ORDER BY forecast_date",
+      "SELECT * FROM crime_forecasts WHERE location_id = $1 ORDER BY forecast_date",
       [locationId]
     );
 

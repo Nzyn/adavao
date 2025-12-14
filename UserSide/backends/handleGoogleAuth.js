@@ -1,4 +1,3 @@
-```javascript
 const db = require("./db");
 const { OAuth2Client } = require('google-auth-library');
 
@@ -19,7 +18,7 @@ const handleGoogleLogin = async (req, res) => {
   try {
     // Check if user already exists
     const [existingUsers] = await db.query(
-      "SELECT * FROM users_public WHERE email = ?",
+      "SELECT * FROM users_public WHERE email = $1",
       [email]
     );
 
@@ -30,7 +29,7 @@ const handleGoogleLogin = async (req, res) => {
       // Update google_id if not set
       if (!user.google_id) {
         await db.query(
-          "UPDATE users_public SET google_id = ? WHERE id = ?",
+          "UPDATE users_public SET google_id = $1 WHERE id = $2",
           [googleId, user.id]
         );
       }
@@ -108,7 +107,7 @@ const handleGoogleLoginWithToken = async (req, res) => {
     const { googleId, email, firstName, lastName, profilePicture } = googleUser;
 
     const [existingUsers] = await db.query(
-      "SELECT * FROM users_public WHERE email = ?",
+      "SELECT * FROM users_public WHERE email = $1",
       [email]
     );
 
@@ -118,7 +117,7 @@ const handleGoogleLoginWithToken = async (req, res) => {
       // Update google_id if not set
       if (!existingUser.google_id) {
         await db.query(
-          "UPDATE users_public SET google_id = ? WHERE id = ?",
+          "UPDATE users_public SET google_id = $1 WHERE id = $2",
           [googleId, existingUser.id]
         );
       }
@@ -163,17 +162,6 @@ const handleGoogleLoginWithToken = async (req, res) => {
         return res.status(500).json({ message: 'Failed to send verification OTP: ' + otpResult.message });
       }
 
-      /* PREVIOUS DIRECT LOGIN CODE COMMENTED OUT
-      // Update last login
-      await db.query('UPDATE users_public SET last_login = NOW() WHERE id = ?', [existingUser.id]);
-
-      res.json({
-        message: 'Google login successful',
-        user: existingUser,
-        token: 'dummy-token-jwt-implementation-todo' // TODO: Implement JWT if needed
-      });
-      */
-
     } else {
       // NEW USER - REQUIRE PHONE NUMBER
       return res.status(200).json({
@@ -206,7 +194,7 @@ const handleGoogleOtpVerify = async (req, res) => {
       return res.status(400).json({ message: 'User ID and OTP required' });
     }
 
-    const [users] = await db.query('SELECT * FROM users_public WHERE id = ?', [userId]);
+    const [users] = await db.query('SELECT * FROM users_public WHERE id = $1', [userId]);
     if (users.length === 0) return res.status(404).json({ message: 'User not found' });
     const user = users[0];
 
@@ -226,7 +214,7 @@ const handleGoogleOtpVerify = async (req, res) => {
     }
 
     // Success - Log them in
-    await db.query('UPDATE users_public SET last_login = NOW() WHERE id = ?', [user.id]);
+    await db.query('UPDATE users_public SET last_login = NOW() WHERE id = $1', [user.id]);
 
     res.json({
       message: 'Login successful',
@@ -246,4 +234,3 @@ module.exports = {
   handleGoogleOtpVerify,
   verifyGoogleToken
 };
-```

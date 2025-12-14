@@ -21,7 +21,7 @@ const getUserById = async (req, res) => {
     console.log(`📊 Fetching user profile for ID: ${id}`);
 
     const [rows] = await db.query(
-      "SELECT * FROM users_public WHERE id = ?",
+      "SELECT * FROM users_public WHERE id = $1",
       [id]
     );
 
@@ -56,12 +56,12 @@ const upsertUser = async (req, res) => {
     console.log(`🌍 Coordinates: lat=${latitude}, lng=${longitude}`);
 
     // Check if user exists in users_public table (UserSide app users only)
-    const [existing] = await db.query("SELECT id FROM users_public WHERE id = ?", [id]);
+    const [existing] = await db.query("SELECT id FROM users_public WHERE id = $1", [id]);
 
     if (existing.length > 0) {
       // Update existing user - Check for sensitive changes (Phone Number)
       const userId = id;
-      const [currentUserRows] = await db.query("SELECT contact FROM users_public WHERE id = ?", [userId]);
+      const [currentUserRows] = await db.query("SELECT contact FROM users_public WHERE id = $1", [userId]);
       const currentContact = currentUserRows[0]?.contact;
 
       // Normalize new contact for comparison
@@ -93,17 +93,17 @@ const upsertUser = async (req, res) => {
       // Update existing user
       const query = `
         UPDATE users_public 
-        SET firstname = ?, 
-            lastname = ?, 
-            email = ?, 
-            contact = ?, 
-            address = ?, 
-            latitude = ?,
-            longitude = ?,
-            station_id = ?,
-            is_verified = ?,
+        SET firstname = $1, 
+            lastname = $2, 
+            email = $3, 
+            contact = $4, 
+            address = $5, 
+            latitude = $6,
+            longitude = $7,
+            station_id = $8,
+            is_verified = $9,
             updated_at = NOW()
-        WHERE id = ?
+        WHERE id = $10
       `;
 
       await db.query(query, [
@@ -125,7 +125,7 @@ const upsertUser = async (req, res) => {
       // Insert new user
       const query = `
         INSERT INTO users_public (id, firstname, lastname, email, contact, address, latitude, longitude, station_id, is_verified, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
       `;
 
       await db.query(query, [
@@ -169,14 +169,14 @@ const updateUserStation = async (req, res) => {
 
     const query = `
       UPDATE users_public 
-      SET station_id = ?,
+      SET station_id = $1,
           updated_at = NOW()
-      WHERE id = ?
+      WHERE id = $2 RETURNING id
     `;
 
     const [result] = await db.query(query, [station_id, id]);
 
-    if (result.affectedRows === 0) {
+    if (result.length === 0) {
       return res.status(404).json({
         success: false,
         message: "User not found"
@@ -209,14 +209,14 @@ const updateUserAddress = async (req, res) => {
 
     const query = `
       UPDATE users_public 
-      SET address = ?, 
+      SET address = $1, 
           updated_at = NOW()
-      WHERE id = ?
+      WHERE id = $2 RETURNING id
     `;
 
     const [result] = await db.query(query, [address, id]);
 
-    if (result.affectedRows === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
 
@@ -248,7 +248,7 @@ const getUserStation = async (req, res) => {
               ps.station_id, ps.station_name, ps.address, ps.contact_number
        FROM users_public u
        LEFT JOIN police_stations ps ON u.station_id = ps.station_id
-       WHERE u.id = ?`,
+       WHERE u.id = $1`,
       [userId]
     );
 

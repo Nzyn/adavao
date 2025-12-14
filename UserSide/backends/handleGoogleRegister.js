@@ -19,7 +19,7 @@ const handleGoogleRegister = async (req, res) => {
     try {
         // Check if email already exists
         const [existingUsers] = await db.query(
-            "SELECT * FROM users_public WHERE email = ?",
+            "SELECT * FROM users_public WHERE email = $1",
             [email]
         );
 
@@ -27,7 +27,7 @@ const handleGoogleRegister = async (req, res) => {
             // Edge case: User already exists but tried to register again
             const user = existingUsers[0];
             if (!user.google_id) {
-                await db.query("UPDATE users_public SET google_id = ? WHERE id = ?", [googleId, user.id]);
+                await db.query("UPDATE users_public SET google_id = $1 WHERE id = $2", [googleId, user.id]);
             }
 
             // Send OTP even if they exist in this flow as a security verification suitable for "registration attempt"
@@ -55,7 +55,7 @@ const handleGoogleRegister = async (req, res) => {
         const sql = `
             INSERT INTO users_public(
                 firstname, lastname, email, google_id, profile_picture, password, contact, created_at, email_verified_at, is_verified
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 1)
+            ) VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), 1) RETURNING id
         `;
 
         const [result] = await db.query(sql, [
@@ -69,7 +69,7 @@ const handleGoogleRegister = async (req, res) => {
         ]);
 
         // Fetch new user
-        const [newUser] = await db.query('SELECT * FROM users_public WHERE id = ?', [result.insertId]);
+        const [newUser] = await db.query('SELECT * FROM users_public WHERE id = $1', [result[0].id]);
 
         // [MODIFIED] Send OTP instead of returning user
         const otpResult = await sendOtpInternal(cleanContact, 'register', email);

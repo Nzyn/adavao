@@ -73,7 +73,7 @@ const verificationUpload = multer({
 });
 
 const handleRegister = require("./handleRegister");
-const { handleGoogleLogin, handleGoogleLoginWithToken } = require("./handleGoogleAuth");
+const { handleGoogleLogin, handleGoogleLoginWithToken, handleGoogleOtpVerify } = require("./handleGoogleAuth");
 const handleLogin = require("./handleLogin");
 const { handleVerifyEmail, handleResendVerification } = require("./handleEmailVerification");
 const { handleForgotPassword, handleVerifyResetToken, handleResetPassword } = require("./handlePasswordReset");
@@ -176,6 +176,7 @@ const {
 // 🔐 Secure file serving with decryption (Admin/Police only)
 // Files are encrypted at rest and decrypted on-demand for authorized users
 const { decryptFile } = require('./encryptionService');
+const { getVerifiedUserRole } = require('./authMiddleware');
 const fs = require('fs');
 
 // Decrypt and serve evidence files (Admin/Police only)
@@ -293,9 +294,8 @@ app.use((req, res, next) => {
 });
 
 // Authentication Routes
-const handleRegister = require("./handleRegister");
+// Authentication Routes
 const handleGoogleRegister = require("./handleGoogleRegister"); // Import
-const { handleGoogleLogin, handleGoogleLoginWithToken, handleGoogleOtpVerify } = require("./handleGoogleAuth");
 
 // ...
 
@@ -319,8 +319,6 @@ const { sendOtp, verifyOtp } = require('./handleOtp');
 app.post('/api/send-otp', sendOtp);
 app.post('/api/verify-otp', verifyOtp);
 
-app.post("/google-login", handleGoogleLogin); // Google Sign-In (legacy)
-app.post("/google-login-token", handleGoogleLoginWithToken); // Google Sign-In with ID token verification (more secure)
 app.post("/google-login", handleGoogleLogin); // Google Sign-In (legacy)
 app.post("/google-login-token", handleGoogleLoginWithToken); // Google Sign-In with ID token verification (more secure)
 app.post("/api/auth/google", handleGoogleLoginWithToken); // ID token verification endpoint

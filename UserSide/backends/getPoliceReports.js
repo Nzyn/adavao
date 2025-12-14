@@ -45,20 +45,20 @@ async function getReportsByStation(req, res) {
         ps.station_name,
         ps.address as station_address,
         ps.contact_number,
-        GROUP_CONCAT(CONCAT(rm.media_id, ':', rm.media_url, ':', rm.media_type) SEPARATOR '|') as media
+        STRING_AGG(CONCAT(rm.media_id, ':', rm.media_url, ':', rm.media_type), '|') as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN users_public u ON r.user_id = u.id
       LEFT JOIN police_stations ps ON r.assigned_station_id = ps.station_id
       LEFT JOIN report_media rm ON r.report_id = rm.report_id
-      WHERE r.assigned_station_id = ?
+      WHERE r.assigned_station_id = $1
         AND r.location_id IS NOT NULL 
         AND r.location_id != 0
         AND l.latitude IS NOT NULL 
         AND l.longitude IS NOT NULL
         AND l.latitude != 0
         AND l.longitude != 0
-      GROUP BY r.report_id
+      GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, r.user_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, ps.station_name, ps.address, ps.contact_number
       ORDER BY r.created_at DESC`,
       [stationId]
     );
@@ -86,18 +86,11 @@ async function getReportsByStation(req, res) {
       // 🔓 Decrypt sensitive data before sending to client
       const decryptedDescription = decrypt(report.description);
       console.log(`🔓 Decrypting report ${report.report_id}:`);
-      console.log(`   Encrypted Description (base64): ${report.description ? report.description.substring(0, 50) + '...' : 'null'}`);
-      console.log(`   Decrypted Description Preview: ${decryptedDescription ? decryptedDescription.substring(0, 50) + '...' : 'null'}`);
+      // console.log(`   Encrypted Description (base64): ${report.description ? report.description.substring(0, 50) + '...' : 'null'}`);
+      // console.log(`   Decrypted Description Preview: ${decryptedDescription ? decryptedDescription.substring(0, 50) + '...' : 'null'}`);
 
       const decryptedBarangay = report.barangay ? decrypt(report.barangay) : null;
       const decryptedAddress = report.reporters_address ? decrypt(report.reporters_address) : null;
-
-      if (decryptedBarangay) {
-        console.log(`   Decrypted Barangay: ${decryptedBarangay}`);
-      }
-      if (decryptedAddress) {
-        console.log(`   Decrypted Address: ${decryptedAddress}`);
-      }
 
       return {
         report_id: report.report_id,
@@ -195,20 +188,20 @@ async function getReportsByStationAndStatus(req, res) {
         ps.station_name,
         ps.address as station_address,
         ps.contact_number,
-        GROUP_CONCAT(CONCAT(rm.media_id, ':', rm.media_url, ':', rm.media_type) SEPARATOR '|') as media
+        STRING_AGG(CONCAT(rm.media_id, ':', rm.media_url, ':', rm.media_type), '|') as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN users_public u ON r.user_id = u.id
       LEFT JOIN police_stations ps ON r.assigned_station_id = ps.station_id
       LEFT JOIN report_media rm ON r.report_id = rm.report_id
-      WHERE r.assigned_station_id = ? AND r.status = ?
+      WHERE r.assigned_station_id = $1 AND r.status = $2
         AND r.location_id IS NOT NULL 
         AND r.location_id != 0
         AND l.latitude IS NOT NULL 
         AND l.longitude IS NOT NULL
         AND l.latitude != 0
         AND l.longitude != 0
-      GROUP BY r.report_id
+      GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, r.user_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, ps.station_name, ps.address, ps.contact_number
       ORDER BY r.created_at DESC`,
       [stationId, status]
     );
@@ -235,19 +228,10 @@ async function getReportsByStationAndStatus(req, res) {
 
       // 🔓 Decrypt sensitive data before sending to client  
       const decryptedDescription = decrypt(report.description);
-      console.log(`🔓 Decrypting report ${report.report_id} (status: ${status}):`);
-      console.log(`   Encrypted Description (base64): ${report.description ? report.description.substring(0, 50) + '...' : 'null'}`);
-      console.log(`   Decrypted Description Preview: ${decryptedDescription ? decryptedDescription.substring(0, 50) + '...' : 'null'}`);
+      // console.log(`🔓 Decrypting report ${report.report_id} (status: ${status}):`);
 
       const decryptedBarangay = report.barangay ? decrypt(report.barangay) : null;
       const decryptedAddress = report.reporters_address ? decrypt(report.reporters_address) : null;
-
-      if (decryptedBarangay) {
-        console.log(`   Decrypted Barangay: ${decryptedBarangay}`);
-      }
-      if (decryptedAddress) {
-        console.log(`   Decrypted Address: ${decryptedAddress}`);
-      }
 
       return {
         report_id: report.report_id,
@@ -325,7 +309,7 @@ async function getStationDashboardStats(req, res) {
         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved,
         SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected
       FROM reports
-      WHERE assigned_station_id = ?`,
+      WHERE assigned_station_id = $1`,
       [stationId]
     );
 
@@ -335,7 +319,7 @@ async function getStationDashboardStats(req, res) {
         report_type,
         COUNT(*) as count
       FROM reports
-      WHERE assigned_station_id = ?
+      WHERE assigned_station_id = $1
       GROUP BY report_type
       ORDER BY count DESC
       LIMIT 5`,
@@ -373,7 +357,7 @@ async function getStationDashboardStats(req, res) {
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN users_public u ON r.user_id = u.id
-      WHERE r.assigned_station_id = ?
+      WHERE r.assigned_station_id = $1
       ORDER BY r.created_at DESC
       LIMIT 10`,
       [stationId]

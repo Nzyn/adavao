@@ -9,11 +9,11 @@ const handleVerifyEmail = async (req, res) => {
   }
 
   try {
-     // Find user with this token in users_public table (UserSide app users only)
-     const [rows] = await db.query(
-       "SELECT * FROM users_public WHERE verification_token = ? AND token_expires_at > NOW() AND email_verified_at IS NULL",
-       [token]
-     );
+    // Find user with this token in users_public table (UserSide app users only)
+    const [rows] = await db.query(
+      "SELECT * FROM users_public WHERE verification_token = $1 AND token_expires_at > NOW() AND email_verified_at IS NULL",
+      [token]
+    );
 
     if (rows.length === 0) {
       return res.send(`
@@ -96,7 +96,7 @@ const handleVerifyEmail = async (req, res) => {
 
     // Mark email as verified
     await db.query(
-      "UPDATE users_public SET email_verified_at = NOW(), verification_token = NULL, token_expires_at = NULL WHERE id = ?",
+      "UPDATE users_public SET email_verified_at = NOW(), verification_token = NULL, token_expires_at = NULL WHERE id = $1",
       [user.id]
     );
 
@@ -244,39 +244,39 @@ const handleResendVerification = async (req, res) => {
   }
 
   try {
-     // Find user in users_public table (UserSide app users only)
-     const [rows] = await db.query("SELECT * FROM users_public WHERE email = ?", [email]);
+    // Find user in users_public table (UserSide app users only)
+    const [rows] = await db.query("SELECT * FROM users_public WHERE email = $1", [email]);
 
-     if (rows.length === 0) {
-       return res.status(404).json({ 
-         message: "User not found. This account may be restricted to the AdminSide application." 
-       });
-     }
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: "User not found. This account may be restricted to the AdminSide application."
+      });
+    }
 
-     const user = rows[0];
+    const user = rows[0];
 
-     // Check if already verified
-     if (user.email_verified_at) {
-       return res.status(400).json({ 
-         message: "This email address is already verified.",
-         alreadyVerified: true
-       });
-     }
+    // Check if already verified
+    if (user.email_verified_at) {
+      return res.status(400).json({
+        message: "This email address is already verified.",
+        alreadyVerified: true
+      });
+    }
 
-     // Generate new verification token
-     const verificationToken = generateToken();
-     const tokenExpiresAt = formatForMySQL(getVerificationTokenExpiry());
+    // Generate new verification token
+    const verificationToken = generateToken();
+    const tokenExpiresAt = formatForMySQL(getVerificationTokenExpiry());
 
-     await db.query(
-       "UPDATE users_public SET verification_token = ?, token_expires_at = ? WHERE id = ?",
-       [verificationToken, tokenExpiresAt, user.id]
-     );
+    await db.query(
+      "UPDATE users_public SET verification_token = $1, token_expires_at = $2 WHERE id = $3",
+      [verificationToken, tokenExpiresAt, user.id]
+    );
 
     // Send verification email
     const emailResult = await sendVerificationEmail(email, verificationToken, user.firstname);
 
     if (!emailResult.success) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: "Failed to send verification email. Please try again later.",
         error: emailResult.error
       });
@@ -284,7 +284,7 @@ const handleResendVerification = async (req, res) => {
 
     console.log("✅ Verification email resent to:", email);
 
-    res.json({ 
+    res.json({
       success: true,
       message: "Verification email has been sent! Please check your inbox."
     });

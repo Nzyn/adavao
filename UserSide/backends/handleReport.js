@@ -1,3 +1,4 @@
+// handleReport.js
 const db = require("./db");
 const multer = require("multer");
 const path = require("path");
@@ -130,7 +131,7 @@ async function submitReport(req, res) {
 
     // Check if user is restricted
     const [userCheck] = await connection.query(
-      'SELECT restriction_level, total_flags FROM users_public WHERE id = ?',
+      'SELECT restriction_level, total_flags FROM users_public WHERE id = $1',
       [user_id]
     );
 
@@ -182,11 +183,11 @@ async function submitReport(req, res) {
     }
 
     const [locationResult] = await connection.query(
-      "INSERT INTO locations (barangay, reporters_address, latitude, longitude, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+      "INSERT INTO locations (barangay, reporters_address, latitude, longitude, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING location_id",
       [encryptedBarangayName, encryptedAddress, lat, lng]
     );
 
-    const locationId = locationResult.insertId;
+    const locationId = locationResult[0].location_id;
     console.log("✅ Location created with ID:", locationId);
     console.log("   Barangay:", barangayName);
     console.log("   Address:", address);
@@ -226,7 +227,7 @@ async function submitReport(req, res) {
         // Use provided barangay_id to get station_id
         try {
           const [barangayResult] = await connection.query(
-            `SELECT station_id FROM barangays WHERE barangay_id = ?`,
+            `SELECT station_id FROM barangays WHERE barangay_id = $1`,
             [barangay_id]
           );
           if (barangayResult && barangayResult.length > 0) {
@@ -304,11 +305,11 @@ async function submitReport(req, res) {
     const [reportResult] = await connection.query(
       `INSERT INTO reports 
        (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW(), NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, NOW(), NOW()) RETURNING report_id`,
       [user_id, locationId, title, reportType, encryptedDescription, incident_date, isAnon, stationId]
     );
 
-    const reportId = reportResult.insertId;
+    const reportId = reportResult[0].report_id;
     console.log("✅ Report created with ID:", reportId);
 
     // Handle media upload if file exists
@@ -347,12 +348,12 @@ async function submitReport(req, res) {
 
       try {
         const [mediaResult] = await connection.query(
-          "INSERT INTO report_media (report_id, media_url, media_type, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())",
+          "INSERT INTO report_media (report_id, media_url, media_type, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING media_id",
           [reportId, mediaUrl, mediaType]
         );
 
         mediaData = {
-          media_id: mediaResult.insertId,
+          media_id: mediaResult[0].media_id,
           media_url: mediaUrl,
           media_type: mediaType,
           file_size: encryptedBuffer.length,
@@ -360,7 +361,7 @@ async function submitReport(req, res) {
         };
 
         console.log("✅ Media uploaded successfully!");
-        console.log("   Media ID:", mediaResult.insertId);
+        console.log("   Media ID:", mediaResult[0].media_id);
         console.log("   Stored in database: report_media table");
         console.log("   File location: evidence/", req.file.filename);
       } catch (dbError) {
@@ -382,7 +383,7 @@ async function submitReport(req, res) {
 
       await connection.query(
         `INSERT INTO report_ip_tracking (report_id, ip_address, user_agent, submitted_at) 
-         VALUES (?, ?, ?, NOW())`,
+         VALUES ($1, $2, $3, NOW())`,
         [reportId, clientIp, userAgent]
       );
 
@@ -441,7 +442,7 @@ async function getUserReports(req, res) {
     let userRole = 'user';
     if (requestingUserId) {
       const [requestingUsers] = await db.query(
-        "SELECT role FROM users_public WHERE id = ?",
+        "SELECT role FROM users_public WHERE id = $1",
         [requestingUserId]
       );
       if (requestingUsers.length > 0) {
@@ -467,19 +468,19 @@ async function getUserReports(req, res) {
         ps.station_name,
         ps.address as station_address,
         ps.contact_number,
-        GROUP_CONCAT(CONCAT(rm.media_id, ':', rm.media_url, ':', rm.media_type) SEPARATOR '|') as media
+        STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN police_stations ps ON r.station_id = ps.station_id
       LEFT JOIN report_media rm ON r.report_id = rm.report_id
-      WHERE r.user_id = ? 
+      WHERE r.user_id = $1 
         AND r.location_id IS NOT NULL 
         AND r.location_id != 0
         AND l.latitude IS NOT NULL 
         AND l.longitude IS NOT NULL
         AND l.latitude != 0
         AND l.longitude != 0
-      GROUP BY r.report_id
+      GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, ps.station_name, ps.address, ps.contact_number
       ORDER BY r.created_at DESC`,
       [userId]
     );
@@ -559,7 +560,7 @@ async function getAllReports(req, res) {
 
     if (requestingUserId) {
       const [requestingUsers] = await db.query(
-        "SELECT role, station_id FROM users_public WHERE id = ?",
+        "SELECT role, station_id FROM users_public WHERE id = $1",
         [requestingUserId]
       );
       if (requestingUsers.length > 0) {
@@ -591,7 +592,7 @@ async function getAllReports(req, res) {
         ps.station_name,
         ps.address as station_address,
         ps.contact_number,
-        GROUP_CONCAT(CONCAT(rm.media_id, ':', rm.media_url, ':', rm.media_type) SEPARATOR '|') as media
+        STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN users_public u ON r.user_id = u.id
@@ -610,18 +611,18 @@ async function getAllReports(req, res) {
     // - User: See only their own reports
     const queryParams = [];
     if (userRole === 'police' && userStationId) {
-      query += ` AND r.assigned_station_id = ?`;
+      query += ` AND r.assigned_station_id = $1`;
       queryParams.push(userStationId);
       console.log(`👮 Police user requesting reports - filtering by station_id: ${userStationId}`);
     } else if (userRole === 'admin') {
       console.log(`👨‍💼 Admin user requesting reports - showing all reports (assigned and unassigned)`);
     } else if (userRole === 'user' && requestingUserId) {
-      query += ` AND r.user_id = ?`;
+      query += ` AND r.user_id = $1`;
       queryParams.push(requestingUserId);
       console.log(`👤 Regular user requesting reports - filtering by user_id: ${requestingUserId}`);
     }
 
-    query += ` GROUP BY r.report_id ORDER BY r.created_at DESC`;
+    query += ` GROUP BY r.report_id, r.title, r.report_type, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.user_id, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, u.role, ps.station_name, ps.address, ps.contact_number ORDER BY r.created_at DESC`;
 
     const [reports] = await db.query(query, queryParams);
 

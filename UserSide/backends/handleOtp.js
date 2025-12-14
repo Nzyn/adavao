@@ -37,24 +37,24 @@ const ensureTables = async () => {
   // otp_codes table
   await db.query(`
     CREATE TABLE IF NOT EXISTS otp_codes (
-      id INT AUTO_INCREMENT PRIMARY KEY,
+      id SERIAL PRIMARY KEY,
       phone VARCHAR(64) NOT NULL,
       otp_hash VARCHAR(255) NOT NULL,
       purpose VARCHAR(64) NOT NULL,
       user_id INT DEFAULT NULL,
-      expires_at DATETIME NOT NULL,
-      created_at DATETIME DEFAULT NOW()
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
   `);
 
   // verified_phones table
   await db.query(`
     CREATE TABLE IF NOT EXISTS verified_phones (
-      id INT AUTO_INCREMENT PRIMARY KEY,
+      id SERIAL PRIMARY KEY,
       phone VARCHAR(64) NOT NULL UNIQUE,
-      verified TINYINT(1) DEFAULT 1,
-      verified_at DATETIME DEFAULT NOW()
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      verified BOOLEAN DEFAULT TRUE,
+      verified_at TIMESTAMP DEFAULT NOW()
+    );
   `);
 };
 
@@ -97,9 +97,7 @@ const sendSms = async (phone, otp, email = null, purpose = null) => {
   const logFile = path.join(__dirname, 'otp_debug_backend.log');
 
   const logToDebug = (msg) => {
-    const timestamp = new Date().toISOString();
-    // fs.appendFileSync(logFile, `${timestamp} - ${msg}\n`); // Optional: write to file if needed
-    console.log(msg);
+    // console.log(msg); // Reduced noise
   };
 
   logToDebug(`🔍 Twilio Config Check: SID=${!!TWILIO_SID}, Token=${!!TWILIO_TOKEN}`);
@@ -215,7 +213,7 @@ const sendOtp = async (req, res) => {
 
     // Store OTP in database
     await db.query(
-      'INSERT INTO otp_codes (phone, otp_hash, purpose, expires_at) VALUES (?, ?, ?, ?)',
+      'INSERT INTO otp_codes (phone, otp_hash, purpose, expires_at) VALUES ($1, $2, $3, $4)',
       [phone, otpHash, purpose, expiresAt]
     );
 
@@ -226,7 +224,7 @@ const sendOtp = async (req, res) => {
     if (!email && phone) {
       try {
         // Try to find in users_public
-        const [userRows] = await db.query('SELECT email FROM users_public WHERE contact = ?', [phone]);
+        const [userRows] = await db.query('SELECT email FROM users_public WHERE contact = $1', [phone]);
         if (userRows.length > 0) {
           email = userRows[0].email;
         }
@@ -296,14 +294,14 @@ const sendOtpInternal = async (phone, purpose, email = null) => {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     await db.query(
-      'INSERT INTO otp_codes (phone, otp_hash, purpose, expires_at) VALUES (?, ?, ?, ?)',
+      'INSERT INTO otp_codes (phone, otp_hash, purpose, expires_at) VALUES ($1, $2, $3, $4)',
       [phone, otpHash, purpose, expiresAt]
     );
 
     // Try to find email if not provided (for notification text)
     if (!email) {
       try {
-        const [userRows] = await db.query('SELECT email FROM users_public WHERE contact = ?', [phone]);
+        const [userRows] = await db.query('SELECT email FROM users_public WHERE contact = $1', [phone]);
         if (userRows.length > 0) email = userRows[0].email;
       } catch (e) { }
     }
@@ -367,7 +365,7 @@ const verifyOtp = async (req, res) => {
 
     // Find the most recent OTP for this phone
     const [rows] = await db.query(
-      'SELECT * FROM otp_codes WHERE phone = ? AND purpose = ? ORDER BY created_at DESC LIMIT 1',
+      'SELECT * FROM otp_codes WHERE phone = $1 AND purpose = $2 ORDER BY created_at DESC LIMIT 1',
       [phone, purpose]
     );
 
@@ -386,7 +384,7 @@ const verifyOtp = async (req, res) => {
     if (new Date(otpRow.expires_at) < new Date()) {
       console.log('❌ OTP expired at:', otpRow.expires_at);
       // Delete expired OTP
-      await db.query('DELETE FROM otp_codes WHERE id = ?', [otpRow.id]);
+      await db.query('DELETE FROM otp_codes WHERE id = $1', [otpRow.id]);
       return res.status(400).json({
         success: false,
         message: 'OTP expired. Please request a new OTP.'
@@ -408,12 +406,12 @@ const verifyOtp = async (req, res) => {
 
     // Mark phone as verified for future use
     await db.query(
-      'INSERT INTO verified_phones (phone, verified) VALUES (?, 1) ON DUPLICATE KEY UPDATE verified = 1, verified_at = NOW()',
+      'INSERT INTO verified_phones (phone, verified) VALUES ($1, TRUE) ON CONFLICT (phone) DO UPDATE SET verified = TRUE, verified_at = NOW()',
       [phone]
     );
 
     // Delete the used OTP
-    await db.query('DELETE FROM otp_codes WHERE id = ?', [otpRow.id]);
+    await db.query('DELETE FROM otp_codes WHERE id = $1', [otpRow.id]);
 
     res.json({
       success: true,
@@ -443,7 +441,7 @@ const verifyOtpInternal = async (phone, code, purpose) => {
 
     // Find OTP
     const [rows] = await db.query(
-      'SELECT * FROM otp_codes WHERE phone = ? AND purpose = ? ORDER BY created_at DESC LIMIT 1',
+      'SELECT * FROM otp_codes WHERE phone = $1 AND purpose = $2 ORDER BY created_at DESC LIMIT 1',
       [phone, purpose]
     );
 
@@ -453,7 +451,7 @@ const verifyOtpInternal = async (phone, code, purpose) => {
 
     // Check expiry
     if (new Date(otpRow.expires_at) < new Date()) {
-      await db.query('DELETE FROM otp_codes WHERE id = ?', [otpRow.id]);
+      await db.query('DELETE FROM otp_codes WHERE id = $1', [otpRow.id]);
       return { success: false, message: 'OTP expired' };
     }
 
@@ -462,12 +460,12 @@ const verifyOtpInternal = async (phone, code, purpose) => {
     if (!match) return { success: false, message: 'Invalid OTP code' };
 
     // Valid - Consume OTP
-    await db.query('DELETE FROM otp_codes WHERE id = ?', [otpRow.id]);
+    await db.query('DELETE FROM otp_codes WHERE id = $1', [otpRow.id]);
 
     // Also mark as verified if it was a phone verification
     if (purpose === 'change_phone' || purpose === 'register') {
       await db.query(
-        'INSERT INTO verified_phones (phone, verified) VALUES (?, 1) ON DUPLICATE KEY UPDATE verified = 1, verified_at = NOW()',
+        'INSERT INTO verified_phones (phone, verified) VALUES ($1, TRUE) ON CONFLICT (phone) DO UPDATE SET verified = TRUE, verified_at = NOW()',
         [phone]
       );
     }

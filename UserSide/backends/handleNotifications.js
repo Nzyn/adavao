@@ -22,8 +22,8 @@ const getUserNotifications = async (req, res) => {
         FROM messages m
         LEFT JOIN notification_reads nr 
           ON nr.notification_id = CONCAT('msg_', m.message_id) 
-          AND nr.user_id = ?
-        WHERE m.receiver_id = ? AND m.status = FALSE
+          AND nr.user_id = $1
+        WHERE m.receiver_id = $2 AND m.status = FALSE
         ORDER BY m.created_at DESC
         LIMIT 10`, // Get up to 10 recent unread messages
         [userId, userId]
@@ -58,8 +58,8 @@ const getUserNotifications = async (req, res) => {
         FROM reports r
         LEFT JOIN notification_reads nr 
           ON nr.notification_id = CONCAT('report_', r.report_id) 
-          AND nr.user_id = ?
-        WHERE r.user_id = ?
+          AND nr.user_id = $1
+        WHERE r.user_id = $2
         ORDER BY r.created_at DESC
         LIMIT 10`, // Get up to 10 recent reports
         [userId, userId]
@@ -98,8 +98,8 @@ const getUserNotifications = async (req, res) => {
         FROM reports r
         LEFT JOIN notification_reads nr 
           ON nr.notification_id = CONCAT('update_', r.report_id) 
-          AND nr.user_id = ?
-        WHERE r.user_id = ?
+          AND nr.user_id = $1
+        WHERE r.user_id = $2
         AND r.status != 'pending'
         AND r.updated_at > r.created_at  /* Only reports that have been updated */
         ORDER BY r.updated_at DESC
@@ -141,8 +141,8 @@ const getUserNotifications = async (req, res) => {
         FROM verifications v
         LEFT JOIN notification_reads nr 
           ON nr.notification_id = CONCAT('verify_', v.verification_id) 
-          AND nr.user_id = ?
-        WHERE v.user_id = ? 
+          AND nr.user_id = $1
+        WHERE v.user_id = $2 
         AND v.status IN ('approved', 'rejected')
         ORDER BY v.created_at DESC 
         LIMIT 5`,
@@ -184,8 +184,8 @@ const getUserNotifications = async (req, res) => {
         FROM user_flags uf
         LEFT JOIN notification_reads nr 
           ON nr.notification_id = CONCAT('flag_', uf.id) 
-          AND nr.user_id = ?
-        WHERE uf.user_id = ? 
+          AND nr.user_id = $1
+        WHERE uf.user_id = $2 
         AND uf.status IN ('confirmed')
         ORDER BY uf.created_at DESC 
         LIMIT 10`,
@@ -249,10 +249,11 @@ const markNotificationAsRead = async (req, res) => {
     console.log(`Marking notification ${notificationId} as read for user ${userId}`);
 
     // Insert into notification_reads table
-    // Using INSERT IGNORE to handle duplicate entries gracefully
+    // Using ON CONFLICT DO NOTHING to handle duplicate entries gracefully (PostgreSQL replacement for INSERT IGNORE)
+    // Assumes constraint on (user_id, notification_id) exists
     await db.query(
-      `INSERT IGNORE INTO notification_reads (user_id, notification_id, read_at) 
-       VALUES (?, ?, NOW())`,
+      `INSERT INTO notification_reads (user_id, notification_id, read_at) 
+       VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING`,
       [userId, notificationId]
     );
 
