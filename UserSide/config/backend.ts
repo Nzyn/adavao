@@ -26,10 +26,13 @@ const PRODUCTION_API_URL = Constants.expoConfig?.extra?.apiBaseUrl;
  * Uses production URL if available, otherwise auto-detects
  */
 function getBackendUrl(): string {
-  // Use production URL if configured
+  // Use production URL if configured or defaulting to Render
   if (PRODUCTION_API_URL && PRODUCTION_API_URL !== 'https://YOUR_NGROK_BACKEND_URL_HERE') {
     return PRODUCTION_API_URL;
   }
+
+  // Default to Render URL for APK builds if no other config found
+  return 'https://node-server-gk1u.onrender.com';
 
   // Otherwise use auto-detection for development
   return getBackendUrlSync();

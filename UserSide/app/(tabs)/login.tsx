@@ -20,7 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useUser } from '../../contexts/UserContext';
 import { BACKEND_URL } from '../../config/backend';
 // import CaptchaObfuscated, { generateCaptchaWord } from '../../components/CaptchaObfuscated'; // Removed
-import Recaptcha from 'react-native-recaptcha-that-works';
+// import Recaptcha from 'react-native-recaptcha-that-works';
 import { PhoneInput, validatePhoneNumber } from '../../components/PhoneInput';
 import { useGoogleAuth, getGoogleUserInfo } from '../../config/googleAuth';
 import * as Google from 'expo-auth-session/providers/google';
@@ -42,9 +42,9 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Recaptcha State
-  const [captchaValid, setCaptchaValid] = useState(false);
-  const recaptchaRef = React.useRef<any>(null);
+  // Recaptcha State (Removed)
+  // const [captchaValid, setCaptchaValid] = useState(false);
+  // const recaptchaRef = React.useRef<any>(null);
 
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -72,7 +72,7 @@ const Login = () => {
 
       // Clear password 
       setPassword("");
-      setCaptchaValid(false);
+      // setCaptchaValid(false);
       // Ensure captcha is closed if validation expired
       // recaptchaRef.current?.close();
 
@@ -326,12 +326,12 @@ const Login = () => {
       return;
     }
 
-    // Verify captcha
-    if (!captchaValid) {
+    // Verify captcha (Removed)
+    /* if (!captchaValid) {
       Alert.alert('Security Check', 'Please verify that you are not a robot.');
       recaptchaRef.current?.open();
       return;
-    }
+    } */
 
     setIsLoading(true);
     console.log('🔑 Starting login for:', sanitizedEmail);
@@ -488,35 +488,10 @@ const Login = () => {
             ) : null}
           </View>
 
-          {/* Recaptcha Section */}
-          <View style={localStyles.captchaSection}>
-            <Recaptcha
-              ref={recaptchaRef}
-              siteKey="6Lc-kyMqAAAAAL_QW9-qFwT2su-3sylJgeuXqFq8"
-              baseUrl="http://localhost"
-              onVerify={(token) => {
-                console.log('✅ Captcha Verified');
-                setCaptchaValid(true);
-              }}
-              onExpire={() => {
-                setCaptchaValid(false);
-              }}
-              size="normal"
-            />
-
-            <TouchableOpacity
-              style={[
-                localStyles.captchaTrigger,
-                captchaValid && localStyles.captchaTriggerValid
-              ]}
-              onPress={() => recaptchaRef.current?.open()}
-              disabled={captchaValid}
-            >
-              <Text style={[localStyles.captchaText, captchaValid && { color: '#fff' }]}>
-                {captchaValid ? '✓ Verified' : 'Click to Verify (I am not a robot)'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {/* Recaptcha Section Removed */ /*}
+          {/* <View style={localStyles.captchaSection}>
+             ... Recaptcha removed ...
+          </View> */}
 
           {/* Remember Me Checkbox */}
           <View style={localStyles.rememberMeContainer}>
@@ -533,10 +508,10 @@ const Login = () => {
           <TouchableOpacity
             style={[
               localStyles.loginButton,
-              (!captchaValid || isLoading) && localStyles.loginButtonDisabled
+              (isLoading) && localStyles.loginButtonDisabled
             ]}
             onPress={handleLogin}
-            disabled={!captchaValid || isLoading}
+            disabled={isLoading}
           >
             <Text style={localStyles.loginButtonText}>
               {isLoading ? "Logging in..." : "Login"}

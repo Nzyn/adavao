@@ -31,9 +31,9 @@ const Register = () => {
   const [lastname, setLastname] = useState("");
   const [contact, setContact] = useState("");
 
-  // Recaptcha State
-  const [captchaValid, setCaptchaValid] = useState(false);
-  const recaptchaRef = React.useRef<any>(null);
+  // Recaptcha State (Removed)
+  // const [captchaValid, setCaptchaValid] = useState(false);
+  // const recaptchaRef = React.useRef<any>(null);
 
   const [isChecked, setChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,7 +64,7 @@ const Register = () => {
       // Clear fields
       // setFirstname(''); setLastname(''); setEmail(''); setContact(''); 
       // setPassword(''); setConfirmPassword(''); setIsChecked(false);
-      setCaptchaValid(false);
+      // setCaptchaValid(false);
       setRegistrationError('');
       setPasswordMatchError('');
 
@@ -269,12 +269,12 @@ const Register = () => {
       return;
     }
 
-    // Captcha Validation
-    if (!captchaValid) {
+    // Captcha Validation (Removed)
+    /* if (!captchaValid) {
       Alert.alert('Security Check', 'Please complete the captcha verification.');
       recaptchaRef.current?.open();
       return;
-    }
+    } */
 
     try {
       if (!validatePhoneNumber(sanitizedContact)) {
@@ -434,8 +434,8 @@ const Register = () => {
           </Text>
         </View>
 
-        {/* Captcha Section */}
-        <View style={localStyles.captchaSection}>
+        {/* Captcha Section Removed */}
+        {/* <View style={localStyles.captchaSection}>
           <Recaptcha
             ref={recaptchaRef}
             siteKey="6Lc-kyMqAAAAAL_QW9-qFwT2su-3sylJgeuXqFq8"
@@ -453,14 +453,14 @@ const Register = () => {
               {captchaValid ? '✓ Verified' : 'Click to Verify (I am not a robot)'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         {/* Register Button */}
         <Button
           title={isLoading ? "Registering..." : "Register"}
           onPress={handleRegister}
-          disabled={!isChecked || !captchaValid || isLoading}
-          color={isChecked && captchaValid ? "#1D3557" : "#999"}
+          disabled={!isChecked || isLoading}
+          color={isChecked ? "#1D3557" : "#999"}
         />
 
         {/* Google Sign In Option */}

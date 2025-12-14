@@ -2110,9 +2110,14 @@ function getVerificationBadge(report) {
          return '';
      }
      
-     // Check if user is verified (email_verified_at is not null)
-     if (report.user.email_verified_at) {
+     // Check if user is ID verified (using the verification relationship)
+     // The PHP controller eager loads 'user.verification'
+     const verification = report.user.verification;
+     
+     if (verification && (verification.is_verified === 1 || verification.is_verified === true || verification.is_verified === '1')) {
          return '<span style="display: inline-block; margin-left: 6px; background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">✓ Verified</span>';
+     } else if (verification && (verification.is_verified === 0 || verification.is_verified === false || verification.is_verified === '0')) {
+         return '<span style="display: inline-block; margin-left: 6px; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">⏳ Pending</span>';
      }
      
      return '';

@@ -20,7 +20,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://tubbable-erwin-adequately.ngrok-free.dev/api/mobile"
+        "EXPO_PUBLIC_API_BASE_URL": "https://node-server-gk1u.onrender.com"
       },
       "android": {
         "buildType": "apk"

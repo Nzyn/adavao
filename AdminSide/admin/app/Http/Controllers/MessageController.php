@@ -117,28 +117,37 @@ class MessageController extends Controller
      */
     public function getConversationsList()
     {
-        $currentUserId = Auth::id();
+        $currentUserId = auth()->id();
 
-        // Get all unique users who have messaged with current admin
-        $conversations = Message::where(function ($query) use ($currentUserId) {
-            $query->where('sender_id', $currentUserId)
-                  ->orWhere('receiver_id', $currentUserId);
-        })
-        ->select(DB::raw('CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END as user_id, MAX(sent_at) as last_message_time'), 
-                 'message as last_message')
-        ->setBindings([$currentUserId])
-        ->groupBy(DB::raw('CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END'), 'message')
-        ->setBindings([$currentUserId, $currentUserId])
-        ->orderBy('last_message_time', 'desc')
-        ->get();
+        // PostgreSQL optimized query using DISTINCT ON to get the latest message per conversation partner
+        // We calculate conversation_partner first, then order by it and sent_at desc to pick the latest
+        $query = "
+            SELECT DISTINCT ON (partner_id)
+                CASE 
+                    WHEN sender_id = ? THEN receiver_id 
+                    ELSE sender_id 
+                END as partner_id,
+                message as last_message,
+                sent_at as last_message_time
+            FROM messages
+            WHERE sender_id = ? OR receiver_id = ?
+            ORDER BY partner_id, sent_at DESC
+        ";
+
+        $conversations = \DB::select($query, [$currentUserId, $currentUserId, $currentUserId]);
+
+        // Wrap in collection for easy sorting by time (since DISTINCT ON requires sorting by partner_id first)
+        $conversations = collect($conversations)->sortByDesc('last_message_time')->values();
 
         // Get details for each conversation
         $result = [];
         foreach ($conversations as $conv) {
-            $user = User::find($conv->user_id);
-            if (!$user) continue;
+            $user = \App\Models\User::find($conv->partner_id);
+            if (! $user) {
+                continue;
+            }
 
-            $unreadCount = Message::where('sender_id', $conv->user_id)
+            $unreadCount = \App\Models\Message::where('sender_id', $conv->partner_id)
                 ->where('receiver_id', $currentUserId)
                 ->where('status', false)
                 ->count();
@@ -150,13 +159,13 @@ class MessageController extends Controller
                 'email' => $user->email,
                 'last_message' => $conv->last_message,
                 'last_message_time' => $conv->last_message_time,
-                'unread_count' => $unreadCount
+                'unread_count' => $unreadCount,
             ];
         }
 
         return response()->json([
             'success' => true,
-            'conversations' => $result
+            'conversations' => $result,
         ]);
     }
 
