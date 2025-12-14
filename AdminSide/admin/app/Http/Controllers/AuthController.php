@@ -737,4 +737,43 @@ class AuthController extends Controller
             ])->withInput();
         }
     }
+    // Google Auth Redirect
+    public function redirectToGoogle()
+    {
+        return \Laravel\Socialite\Facades\Socialite::driver('google')->redirect();
+    }
+
+    // Google Auth Callback
+    public function handleGoogleCallback()
+    {
+        try {
+            $googleUser = \Laravel\Socialite\Facades\Socialite::driver('google')->stateless()->user();
+            
+            // Check if user exists in user_admin table
+            $userAdmin = UserAdmin::where('email', $googleUser->getEmail())->first();
+            
+            if (!$userAdmin) {
+                return redirect()->route('login')->withErrors([
+                    'email' => 'Access Denied. NO ADMIN/POLICE ACCOUNT FOUND for ' . $googleUser->getEmail(),
+                ]);
+            }
+            
+            // Login user directly (bypass OTP for Google Auth users as Google is trusted IDP)
+            Auth::guard('admin')->login($userAdmin, true);
+            
+            // Reset lockout/failures
+            $userAdmin->update([
+                'failed_login_attempts' => 0,
+                'lockout_until' => null
+            ]);
+            
+            return redirect()->intended(route('dashboard'));
+            
+        } catch (\Exception $e) {
+            \Log::error('Google Auth Failed: ' . $e->getMessage());
+            return redirect()->route('login')->withErrors([
+                'email' => 'Google Sign-In failed. Please try again or use password.'
+            ]);
+        }
+    }
 }
