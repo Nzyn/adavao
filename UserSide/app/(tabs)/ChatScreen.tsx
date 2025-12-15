@@ -266,11 +266,12 @@ const ChatScreen = () => {
                     keyExtractor={(item) => item.message_id.toString()}
                     renderItem={renderMessage}
                     style={styles.chatArea}
-                    contentContainerStyle={{ paddingBottom: 10 }}
+                    contentContainerStyle={{ paddingBottom: 10, flexGrow: 1, justifyContent: 'flex-end' }}
                     initialNumToRender={15}
                     maxToRenderPerBatch={10}
                     windowSize={10}
                     removeClippedSubviews={true}
+                    inverted={true}
                 />
 
                 {/* Typing Indicator */}
@@ -317,7 +318,7 @@ const ChatScreen = () => {
                             </Text>
                         </View>
                     )}
-                    <View style={styles.inputContainer}>
+                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 10 : 0 }]}>
                         <TextInput
                             style={styles.chatInput}
                             placeholder="Write a message"

@@ -704,7 +704,7 @@ const getMessagesBetweenUsers = async (req, res) => {
       WHERE 
         (m.sender_id = $1 AND m.receiver_id = $2) OR
         (m.sender_id = $3 AND m.receiver_id = $4)
-      ORDER BY m.sent_at ASC
+      ORDER BY m.sent_at DESC
     `, [userId, otherUserId, otherUserId, userId]);
 
     console.log(`✅ [getMessagesBetweenUsers] Found ${messages.length} messages`);
