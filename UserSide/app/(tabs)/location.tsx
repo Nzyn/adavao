@@ -6,6 +6,7 @@ import { useUser } from '../../contexts/UserContext';
 import * as Location from 'expo-location';
 import styles from './styles';
 import { BACKEND_URL } from '../../config/backend';
+import { searchBarangay } from '../../services/policeStationService';
 
 interface Barangay {
   barangay_id: number;
@@ -70,14 +71,40 @@ const LocationScreen = () => {
     b.barangay_name.toLowerCase().includes(searchAddress.toLowerCase())
   ).slice(0, 5); // Limit to top 5
 
-  const handleBarangaySelect = (barangay: Barangay) => {
+  const handleBarangaySelect = async (barangay: Barangay) => {
     setSearchAddress(barangay.barangay_name);
     setShowBarangayDropdown(false);
+    setCurrentLocationName(barangay.barangay_name);
+
+    // 1. Try to find ASSIGNED station first (Barangay-Based)
+    try {
+      const assignedStation = await searchBarangay(barangay.barangay_name);
+      if (assignedStation) {
+        console.log('✅ Found assigned station via service:', assignedStation.station_name);
+        const formattedStation = {
+          name: assignedStation.station_name,
+          phone: assignedStation.contact_number || 'N/A',
+          address: assignedStation.address || 'N/A',
+          coordinates: `${assignedStation.latitude}, ${assignedStation.longitude}`,
+          distance: 0 // Not distance-based
+        };
+        setSortedStations([formattedStation]);
+
+        // Center map on Barangay coords if available, otherwise Station coords
+        if (barangay.latitude && barangay.longitude) {
+          setUserCoordinates({ latitude: barangay.latitude, longitude: barangay.longitude });
+        } else if (assignedStation.latitude && assignedStation.longitude) {
+          setUserCoordinates({ latitude: assignedStation.latitude, longitude: assignedStation.longitude });
+        }
+        return; // Skip nearest search
+      }
+    } catch (e) {
+      console.error('Error in barangay lookup:', e);
+    }
 
     if (barangay.latitude && barangay.longitude) {
       const coords = { latitude: barangay.latitude, longitude: barangay.longitude };
       setUserCoordinates(coords);
-      setCurrentLocationName(barangay.barangay_name);
       fetchNearestStations(coords.latitude, coords.longitude);
     } else {
       // Fallback to geocoding if lat/lon missing in DB
@@ -236,23 +263,44 @@ const LocationScreen = () => {
     }
   }, [user]);
 
-  // Sort stations by distance when coordinates are available
-  useEffect(() => {
-    if (userCoordinates) {
-      // Fetch nearest stations using the backend API
-      fetchNearestStations(userCoordinates.latitude, userCoordinates.longitude);
-    } else {
-      // If no coordinates (initial state), DO NOT show nearest stations by default.
-      // User wants to search first.
-      setSortedStations([]); // Clear list
-    }
-  }, [userCoordinates]);
+  // useEffect removed to prevent overwriting manual station selection
+  // fetchNearestStations is now called explicitly where needed
 
   // Handle search address input
   const handleSearchAddress = async () => {
     if (searchAddress.trim()) {
       setShowBarangayDropdown(false);
       console.log('🔍 User searching for address:', searchAddress);
+
+      // Try Barangay Lookup First
+      try {
+        const assignedStation = await searchBarangay(searchAddress);
+        if (assignedStation) {
+          console.log('✅ Found assigned station via text search:', assignedStation.station_name);
+          const formattedStation = {
+            name: assignedStation.station_name,
+            phone: assignedStation.contact_number || 'N/A',
+            address: assignedStation.address || 'N/A',
+            coordinates: `${assignedStation.latitude}, ${assignedStation.longitude}`,
+            distance: 0
+          };
+          setSortedStations([formattedStation]);
+          setCurrentLocationName(assignedStation.barangay_name);
+
+          if (assignedStation.latitude && assignedStation.longitude) {
+            setUserCoordinates({ latitude: assignedStation.latitude, longitude: assignedStation.longitude });
+          } else {
+            // If no coords in station data, try geocoding just to center map? 
+            // Or just leave it. Geocode callback would fetch nearest, which we want to avoid if we found the station.
+            // We'll proceed to geocode ONLY for map centering if needed? 
+            // Actually, if we have the station, we are good.
+          }
+          return;
+        }
+      } catch (e) {
+        // Continue to geocode
+      }
+
       await geocodeAddress(searchAddress, searchAddress, true);
     } else {
       Alert.alert('Please enter an address or barangay to search.');
@@ -322,6 +370,8 @@ const LocationScreen = () => {
       };
 
       setUserCoordinates(coords);
+      // Explicitly fetch station for current location
+      fetchNearestStations(coords.latitude, coords.longitude);
 
       // Reverse geocode to get address and auto-fill the search bar
       console.log('🔄 Reverse geocoding coordinates...');
