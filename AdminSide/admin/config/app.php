@@ -61,6 +61,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Node Backend URL
+    |--------------------------------------------------------------------------
+    |
+    | The URL of the Node.js backend server that handles media files,
+    | authentication, and other API requests. Set this in your .env file.
+    |
+    */
+
+    'node_backend_url' => env('NODE_BACKEND_URL', 'http://localhost:3000'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
