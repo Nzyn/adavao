@@ -174,23 +174,68 @@ const reverseGeocode = async (req, res) => {
 
     console.log('🔄 Reverse geocoding:', latitude, longitude);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    // Helper: Delay function for retries
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=18`,
-      {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'AlertDavao/2.0 (Crime Reporting App)',
+    let response;
+    let attempts = 0;
+    const maxAttempts = 3;
+    let lastError = null;
+
+    // Retry loop with exponential backoff
+    while (attempts < maxAttempts) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      try {
+        attempts++;
+        console.log(`🌍 Reverse geocode attempt ${attempts}/${maxAttempts}...`);
+
+        response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=18`,
+          {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'AlertDavao/2.0 (Crime Reporting App; contact@alertdavao.ph)',
+              'Accept': 'application/json',
+            }
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) break; // Success!
+
+        throw new Error(`Nominatim API error: ${response.status}`);
+
+      } catch (error) {
+        clearTimeout(timeoutId);
+        lastError = error;
+        console.warn(`⚠️ Reverse geocode attempt ${attempts} failed:`, error.message);
+
+        if (attempts < maxAttempts) {
+          // Wait before retrying (exponential backoff: 1s, 2s, 4s...)
+          const waitTime = 1000 * Math.pow(2, attempts - 1);
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+          await delay(waitTime);
         }
       }
-    );
+    }
 
-    clearTimeout(timeoutId);
+    // If all retries failed, return coordinate-based fallback
+    if (!response || !response.ok) {
+      console.warn('⚠️ All reverse geocode attempts failed, using coordinate fallback');
+      const fallbackAddress = `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 
-    if (!response.ok) {
-      throw new Error(`Nominatim API error: ${response.status}`);
+      return res.json({
+        success: true,
+        latitude: latitude,
+        longitude: longitude,
+        address: fallbackAddress,
+        display_name: fallbackAddress,
+        raw: null,
+        fallback: true
+      });
     }
 
     const data = await response.json();
@@ -236,9 +281,22 @@ const reverseGeocode = async (req, res) => {
   } catch (error) {
     console.error('Error reverse geocoding:', error);
 
-    if (error.name === 'AbortError') {
-      return res.status(408).json({
-        error: "Reverse geocoding request timed out"
+    // Even on error, return a fallback response so the frontend doesn't break
+    const { lat, lon } = req.query;
+    const latitude = parseFloat(lat) || 0;
+    const longitude = parseFloat(lon) || 0;
+
+    if (latitude && longitude) {
+      const fallbackAddress = `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+      return res.json({
+        success: true,
+        latitude: latitude,
+        longitude: longitude,
+        address: fallbackAddress,
+        display_name: fallbackAddress,
+        raw: null,
+        fallback: true,
+        error: error.message
       });
     }
 

@@ -61,8 +61,12 @@ const ChatScreen = () => {
             const response = await messageService.getMessages(parseInt(user.id), parseInt(otherUserId));
 
             if (response.success) {
-                // Reverse messages to show newest at the bottom (inverted FlatList)
-                setMessages(response.data.reverse());
+                // Sort messages by timestamp ascending (oldest first)
+                // This ensures newest appears at bottom when FlatList is inverted
+                const sortedMessages = response.data.sort((a: any, b: any) =>
+                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+                setMessages(sortedMessages);
                 // Mark conversation as read
                 await messageService.markConversationAsRead(parseInt(user.id), parseInt(otherUserId));
             } else {
@@ -210,6 +214,7 @@ const ChatScreen = () => {
     const fetchEnforcerDetails = async () => {
         if (!otherUserId) {
             console.log('❌ No otherUserId available');
+            Alert.alert('Error', 'No officer ID available.');
             return;
         }
 
@@ -218,12 +223,32 @@ const ChatScreen = () => {
         try {
             const details = await userService.getUserWithStation(otherUserId);
             console.log('✅ Enforcer details received:', details);
-            setEnforcerDetails(details);
-            setShowEnforcerModal(true);
-            console.log('✅ Modal should now be visible');
+            if (details) {
+                setEnforcerDetails(details);
+                setShowEnforcerModal(true);
+                console.log('✅ Modal should now be visible');
+            } else {
+                // Show basic info if detailed fetch fails
+                setEnforcerDetails({
+                    firstname: otherUserName?.split(' ')[0] || 'Officer',
+                    lastname: otherUserName?.split(' ').slice(1).join(' ') || '',
+                    contact: 'N/A',
+                    stationName: 'Information not available',
+                    stationAddress: 'Please contact admin for details'
+                });
+                setShowEnforcerModal(true);
+            }
         } catch (error) {
             console.error('❌ Error fetching enforcer details:', error);
-            Alert.alert('Error', 'Unable to load officer details. Please try again.');
+            // Show available info instead of error
+            setEnforcerDetails({
+                firstname: otherUserName?.split(' ')[0] || 'Officer',
+                lastname: otherUserName?.split(' ').slice(1).join(' ') || '',
+                contact: 'N/A',
+                stationName: 'Unable to load station details',
+                stationAddress: 'Please try again later'
+            });
+            setShowEnforcerModal(true);
         } finally {
             setLoadingEnforcerDetails(false);
         }
@@ -330,7 +355,7 @@ const ChatScreen = () => {
                             </Text>
                         </View>
                     )}
-                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 80 : 10 }]}>
+                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 100 : 10 }]}>
                         <TextInput
                             style={styles.chatInput}
                             placeholder="Write a message"

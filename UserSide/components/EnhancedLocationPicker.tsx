@@ -498,7 +498,9 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                         })
                         .catch(err => {
                             console.error('Reverse geocode error (Web):', err);
-                            setStreetAddress("Error retrieving address"); // Temporary visual feedback
+                            // Set coordinates as fallback address when geocode fails
+                            const fallbackAddr = `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+                            setStreetAddress(fallbackAddr);
                             determineBarangayFromCoordinates(latitude, longitude);
                         });
                 }
@@ -1053,7 +1055,9 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                                                         })
                                                         .catch(err => {
                                                             console.error('Reverse geocode error (Mobile):', err);
-                                                            // Alert.alert("Debug", "Reverse geocode failed: " + err.message);
+                                                            // Set coordinates as fallback address when geocode fails
+                                                            const fallbackAddr = `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+                                                            setStreetAddress(fallbackAddr);
                                                             determineBarangayFromCoordinates(latitude, longitude);
                                                         });
                                                 }
