@@ -398,7 +398,7 @@ const history = () => {
                           borderColor: '#e9ecef'
                         }}>
                           {/* Display image if it's an image type */}
-                          {['jpg', 'jpeg', 'png', 'gif'].includes(media.media_type.toLowerCase()) && (
+                          {(media.media_type.toLowerCase().startsWith('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'].includes(media.media_type.toLowerCase())) && (
                             <Image
                               source={{ uri: `${BACKEND_URL}${media.media_url}` }}
                               style={{ width: '100%', height: 200, borderRadius: 8, marginBottom: 8, backgroundColor: '#e9ecef' }}
@@ -410,8 +410,8 @@ const history = () => {
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                               <Ionicons
-                                name={['jpg', 'jpeg', 'png', 'gif'].includes(media.media_type.toLowerCase()) ? 'image' :
-                                  ['mp4', 'mov', 'avi'].includes(media.media_type.toLowerCase()) ? 'videocam' : 'document'}
+                                name={(media.media_type.toLowerCase().startsWith('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'].includes(media.media_type.toLowerCase())) ? 'image' :
+                                  (media.media_type.toLowerCase().startsWith('video') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(media.media_type.toLowerCase())) ? 'videocam' : 'document'}
                                 size={20}
                                 color="#1D3557"
                               />

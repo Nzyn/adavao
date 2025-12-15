@@ -296,6 +296,10 @@ const Register = () => {
         normalizedPhone = '0' + normalizedPhone; // Convert 912... to 0912...
       }
 
+      // Create a timeout controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
       const regResp = await fetch(`${BACKEND_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -306,7 +310,8 @@ const Register = () => {
           contact: normalizedPhone,
           password
         }),
-      });
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
       const regData = await regResp.json();
 
       setIsLoading(false);

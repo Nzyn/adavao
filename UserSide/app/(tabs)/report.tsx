@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BACKEND_URL } from '../../config/backend';
 
 // Conditional WebView import for native platforms only
 let WebView: any = null;
@@ -201,7 +202,12 @@ export default function ReportCrime() {
                     });
 
                     // Auto-reverse geocode to get address
-                    fetch(`http://localhost:3000/api/location/reverse?lat=${latitude}&lon=${longitude}`)
+                    // Use BACKEND_URL directly (it's already configured for live/dev)
+                    const apiUrl = typeof window !== 'undefined'
+                        ? `${window.location.protocol}//${window.location.host}/api/location/reverse`
+                        : `${BACKEND_URL}/api/location/reverse`;
+
+                    fetch(`${apiUrl}?lat=${latitude}&lon=${longitude}`)
                         .then(res => res.json())
                         .then(addressData => {
                             if (addressData.success) {
@@ -928,20 +934,11 @@ export default function ReportCrime() {
 
                             <View style={confirmStyles.buttonContainer}>
                                 <TouchableOpacity
-                                    style={[
-                                        styles.submitButton,
-                                        (isSubmitting || isFlagged) && styles.submitButtonDisabled
-                                    ]}
-                                    onPress={handleSubmit}
-                                    disabled={isSubmitting || isFlagged}
+                                    style={[confirmStyles.button, confirmStyles.cancelButton]}
+                                    onPress={() => setShowConfirmDialog(false)}
+                                    disabled={isSubmitting}
                                 >
-                                    {isSubmitting ? (
-                                        <ActivityIndicator color="#fff" />
-                                    ) : (
-                                        <Text style={styles.submitButtonText}>
-                                            {isFlagged ? 'Account Flagged' : 'Submit Report'}
-                                        </Text>
-                                    )}
+                                    <Text style={confirmStyles.cancelButtonText}>Cancel</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
@@ -953,7 +950,7 @@ export default function ReportCrime() {
                                     }}
                                 >
                                     <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
-                                    <Text style={confirmStyles.submitButtonText}>Submit Report</Text>
+                                    <Text style={confirmStyles.submitButtonText}>Confirm Submit</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>

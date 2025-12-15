@@ -21,9 +21,6 @@ const searchLocation = async (req, res) => {
 
     console.log('🔍 Searching for location:', q);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
     // Davao City bounding box for geofencing
     // Southwest: 6.85, 125.20
     // Northeast: 7.40, 125.75
@@ -44,36 +41,72 @@ const searchLocation = async (req, res) => {
         longitude <= DAVAO_BOUNDS.maxLon;
     };
 
-    // Add bounding box to the search query for better results
+    // Add bounding box to the search query
     const boundingBox = `&bounded=1&viewbox=${DAVAO_BOUNDS.minLon},${DAVAO_BOUNDS.maxLat},${DAVAO_BOUNDS.maxLon},${DAVAO_BOUNDS.minLat}`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&addressdetails=1&limit=20&countrycodes=PH${boundingBox}`;
 
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&addressdetails=1&limit=20&countrycodes=PH${boundingBox}`,
-      {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'AlertDavao/2.0 (Crime Reporting App)',
+    // Helper: Delay function for retries
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    let response;
+    let attempts = 0;
+    const maxAttempts = 3;
+    let lastError = null;
+
+    // Retry loop
+    while (attempts < maxAttempts) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout per attempt
+
+      try {
+        attempts++;
+        console.log(`🌍 Attempt ${attempts}/${maxAttempts} fetching from Nominatim...`);
+
+        response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'AlertDavao/2.0 (Crime Reporting App)',
+            'Accept': 'application/json'
+          }
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) break; // Success!
+
+        // If not ok, throw error to trigger retry
+        throw new Error(`Nominatim API error: ${response.status}`);
+
+      } catch (error) {
+        clearTimeout(timeoutId);
+        lastError = error;
+        console.warn(`⚠️ Attempt ${attempts} failed:`, error.message);
+
+        if (attempts < maxAttempts) {
+          // Wait before retrying (exponential backoff: 1s, 2s, 4s...)
+          const waitTime = 1000 * Math.pow(2, attempts - 1);
+          await delay(waitTime);
         }
       }
-    );
+    }
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`Nominatim API error: ${response.status}`);
+    // If still failing after retries
+    if (!response || !response.ok) {
+      console.error('❌ All geocoding attempts failed.');
+      throw lastError || new Error('Failed to connect to geocoding service');
     }
 
     const data = await response.json();
     console.log(`📍 Found ${data.length} total results for "${q}"`);
 
     // Filter results to only include locations within Davao City boundaries
-    const davaoCityResults = data.filter(item => {
+    constdavaoCityResults = data.filter(item => {
       // Check if coordinates are within Davao City bounds
       if (!isInDavaoCity(item.lat, item.lon)) {
         return false;
       }
 
-      // Additional check: ensure the address mentions Davao
+      // Additional check
       const addressLower = item.display_name.toLowerCase();
       const isDavaoRelated = addressLower.includes('davao');
 

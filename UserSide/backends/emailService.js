@@ -9,7 +9,7 @@ const createTransporter = () => {
     host: 'smtp.gmail.com',
     port: 587
   });
-  
+
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
@@ -18,15 +18,18 @@ const createTransporter = () => {
       user: process.env.EMAIL_USER || 'your-email@gmail.com',
       pass: process.env.EMAIL_PASSWORD || 'your-app-password',
     },
+    connectionTimeout: 30000, // 30 seconds
+    greetingTimeout: 30000, // 30 seconds
+    socketTimeout: 30000, // 30 seconds
   });
 };
 
 // Send verification email
 const sendVerificationEmail = async (email, token, userName) => {
   const transporter = createTransporter();
-  
+
   const verificationUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/verify-email/${token}`;
-  
+
   const mailOptions = {
     from: `"AlertDavao" <${process.env.EMAIL_USER || 'your-email@gmail.com'}>`,
     to: email,
@@ -81,9 +84,9 @@ const sendVerificationEmail = async (email, token, userName) => {
 // Send password reset email
 const sendPasswordResetEmail = async (email, token, userName) => {
   const transporter = createTransporter();
-  
+
   const resetUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/reset-password/${token}`;
-  
+
   const mailOptions = {
     from: `"AlertDavao" <${process.env.EMAIL_USER || 'your-email@gmail.com'}>`,
     to: email,
@@ -137,7 +140,7 @@ const sendPasswordResetEmail = async (email, token, userName) => {
 // Send account lockout notification email
 const sendLockoutEmail = async (email, userName, attemptCount) => {
   const transporter = createTransporter();
-  
+
   const mailOptions = {
     from: `"AlertDavao Security" <${process.env.EMAIL_USER || 'your-email@gmail.com'}>`,
     to: email,

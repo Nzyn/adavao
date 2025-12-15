@@ -8,7 +8,7 @@
     "scheme": "alertdavao",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "owner": "imiyataox",
+    "owner": "imiyataox1s-organization",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.imiyataox.alertdavao",
@@ -29,7 +29,8 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE"
       ],
-      "package": "com.imiyataox.alertdavao"
+      "package": "com.imiyataox.alertdavao",
+      "versionCode": 13
     },
     "web": {
       "bundler": "metro",
@@ -60,7 +61,7 @@
       "apiBaseUrl": "https://node-server-gk1u.onrender.com",
       "router": {},
       "eas": {
-        "projectId": "57deaf16-b346-4358-a5d6-45dbf0bdc160"
+        "projectId": "4fb5adfe-d7ad-41e6-ae53-a2b9a9dfe07a"
       }
     }
   }

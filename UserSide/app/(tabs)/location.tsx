@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, FlatList } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useUser } from '../../contexts/UserContext';
@@ -7,15 +7,28 @@ import * as Location from 'expo-location';
 import styles from './styles';
 import { BACKEND_URL } from '../../config/backend';
 
+interface Barangay {
+  barangay_id: number;
+  barangay_name: string;
+  latitude: number | null;
+  longitude: number | null;
+  station_id: number;
+}
+
 const LocationScreen = () => {
   const router = useRouter();
-  const { user } = useUser(); 
+  const { user } = useUser();
   const [userAddress, setUserAddress] = useState("");
   const [searchAddress, setSearchAddress] = useState("");
   const [userCoordinates, setUserCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [sortedStations, setSortedStations] = useState<any[]>([]);
   const [currentLocationName, setCurrentLocationName] = useState(""); // Track which location is being used for sorting
+
+  // Barangay Search State
+  const [barangays, setBarangays] = useState<Barangay[]>([]);
+  const [showBarangayDropdown, setShowBarangayDropdown] = useState(false);
+  const [loadingBarangays, setLoadingBarangays] = useState(false);
 
   // Haversine formula to calculate distance between two coordinates
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -31,6 +44,48 @@ const LocationScreen = () => {
     return distance;
   };
 
+  // Fetch Barangays on Mount
+  useEffect(() => {
+    fetchBarangays();
+  }, []);
+
+  const fetchBarangays = async () => {
+    try {
+      setLoadingBarangays(true);
+      const response = await fetch(`${BACKEND_URL}/api/barangays`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data && Array.isArray(data.data)) {
+          setBarangays(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching barangays:', error);
+    } finally {
+      setLoadingBarangays(false);
+    }
+  };
+
+  const filteredBarangays = barangays.filter(b =>
+    b.barangay_name.toLowerCase().includes(searchAddress.toLowerCase())
+  ).slice(0, 5); // Limit to top 5
+
+  const handleBarangaySelect = (barangay: Barangay) => {
+    setSearchAddress(barangay.barangay_name);
+    setShowBarangayDropdown(false);
+
+    if (barangay.latitude && barangay.longitude) {
+      const coords = { latitude: barangay.latitude, longitude: barangay.longitude };
+      setUserCoordinates(coords);
+      setCurrentLocationName(barangay.barangay_name);
+      fetchNearestStations(coords.latitude, coords.longitude);
+    } else {
+      // Fallback to geocoding if lat/lon missing in DB
+      geocodeAddress(barangay.barangay_name + ", Davao City", barangay.barangay_name, true);
+    }
+  };
+
+
   // Geocode address to get coordinates using backend proxy
   const geocodeAddress = async (address: string, locationName?: string, isUserSearch: boolean = false) => {
     // Don't geocode if address is empty or invalid
@@ -42,7 +97,7 @@ const LocationScreen = () => {
     try {
       setIsGeocoding(true);
       console.log('🌍 Geocoding address:', address);
-      
+
       // Use backend location search API
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -56,15 +111,15 @@ const LocationScreen = () => {
           }
         }
       );
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success && data.results && data.results.length > 0) {
         const firstResult = data.results[0];
         const coords = {
@@ -74,10 +129,10 @@ const LocationScreen = () => {
         setUserCoordinates(coords);
         setCurrentLocationName(locationName || address);
         console.log('✅ Geocoded successfully:', coords);
-        
+
         // Fetch nearest stations using the new endpoint
         await fetchNearestStations(coords.latitude, coords.longitude);
-        
+
         return coords;
       } else {
         console.log('⚠️ Address not found');
@@ -88,7 +143,7 @@ const LocationScreen = () => {
       }
     } catch (error: any) {
       console.error('💥 Geocoding error:', error);
-      
+
       // Show alert only if user explicitly searched for an address
       if (isUserSearch) {
         if (error.name === 'AbortError') {
@@ -111,7 +166,7 @@ const LocationScreen = () => {
   const fetchNearestStations = async (latitude: number, longitude: number) => {
     try {
       console.log('🚓 Fetching nearest stations for:', { latitude, longitude });
-      
+
       const response = await fetch(
         `${BACKEND_URL}/api/police-stations/nearest?latitude=${latitude}&longitude=${longitude}`,
         {
@@ -120,7 +175,7 @@ const LocationScreen = () => {
           }
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.data) {
@@ -161,7 +216,7 @@ const LocationScreen = () => {
         return { ...station, distance };
       })
       .sort((a, b) => a.distance - b.distance);
-    
+
     setSortedStations(stationsWithDistance);
   };
 
@@ -171,7 +226,7 @@ const LocationScreen = () => {
       console.log('👤 User address found:', user.address);
       setUserAddress(user.address);
       setSearchAddress(user.address); // Set as default search value
-      
+
       // Geocode user's saved address (silently fail if it doesn't work)
       geocodeAddress(user.address, user.address, false).catch(err => {
         console.warn('⚠️ Failed to geocode user address on mount:', err);
@@ -187,18 +242,20 @@ const LocationScreen = () => {
       // Fetch nearest stations using the backend API
       fetchNearestStations(userCoordinates.latitude, userCoordinates.longitude);
     } else {
-      // If no coordinates, show all stations in original order
-      setSortedStations(stations);
+      // If no coordinates (initial state), DO NOT show nearest stations by default.
+      // User wants to search first.
+      setSortedStations([]); // Clear list
     }
   }, [userCoordinates]);
 
   // Handle search address input
   const handleSearchAddress = async () => {
     if (searchAddress.trim()) {
+      setShowBarangayDropdown(false);
       console.log('🔍 User searching for address:', searchAddress);
       await geocodeAddress(searchAddress, searchAddress, true);
     } else {
-      Alert.alert('Please enter an address to search.');
+      Alert.alert('Please enter an address or barangay to search.');
     }
   };
 
@@ -206,6 +263,7 @@ const LocationScreen = () => {
   const handleUseCurrentLocation = async () => {
     try {
       setIsGeocoding(true);
+      setShowBarangayDropdown(false);
       console.log('📍 Getting current location...');
 
       // Request location permission
@@ -438,7 +496,7 @@ const LocationScreen = () => {
       name: "PS19 Eden",
       phone: "09171309130",
       address: "—",
-      coordinates: "—", 
+      coordinates: "—",
     },
     {
       name: "PS20 Los Amigos",
@@ -465,45 +523,66 @@ const LocationScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Display User Address or Search Input */}
-      {userAddress && (
+      {/* Display User Address */}
+      {userAddress && !searchAddress && (
         <View style={localStyles.userAddressContainer}>
           <Ionicons name="location" size={20} color="#1d3557" style={{ marginRight: 8 }} />
           <Text style={localStyles.userAddressText}>Saved Address: {userAddress}</Text>
         </View>
       )}
-      
-      {/* Search Address Input - Always visible */}
-      <View style={localStyles.searchBar}>
-        <Ionicons name="search-outline" size={20} color="#999" style={{ marginRight: 8 }} />
-        <TextInput
-          style={localStyles.searchInput}
-          placeholder="Enter address to find nearest stations"
-          placeholderTextColor="#999"
-          value={searchAddress}
-          onChangeText={setSearchAddress}
-          onSubmitEditing={handleSearchAddress}
-          returnKeyType="search"
-        />
-        <TouchableOpacity onPress={handleSearchAddress} disabled={!searchAddress.trim()}>
-          <Ionicons 
-            name="search-circle" 
-            size={32} 
-            color={searchAddress.trim() ? "#1d3557" : "#ccc"} 
+
+      {/* Search Input */}
+      <View style={{ zIndex: 10 }}>
+        <View style={localStyles.searchBar}>
+          <Ionicons name="search-outline" size={20} color="#999" style={{ marginRight: 8 }} />
+          <TextInput
+            style={localStyles.searchInput}
+            placeholder="Search by Barangay or Address..."
+            placeholderTextColor="#999"
+            value={searchAddress}
+            onChangeText={(text) => {
+              setSearchAddress(text);
+              if (text.length > 1) {
+                setShowBarangayDropdown(true);
+              } else {
+                setShowBarangayDropdown(false);
+              }
+            }}
+            onSubmitEditing={handleSearchAddress}
+            returnKeyType="search"
           />
-        </TouchableOpacity>
+          <TouchableOpacity onPress={handleSearchAddress}>
+            <Ionicons name="search-circle" size={32} color="#1d3557" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Barangay Dropdown */}
+        {showBarangayDropdown && searchAddress.length > 0 && filteredBarangays.length > 0 && (
+          <View style={localStyles.dropdown}>
+            {filteredBarangays.map((barangay) => (
+              <TouchableOpacity
+                key={barangay.barangay_id}
+                style={localStyles.dropdownItem}
+                onPress={() => handleBarangaySelect(barangay)}
+              >
+                <Ionicons name="location-outline" size={16} color="#666" style={{ marginRight: 8 }} />
+                <Text style={localStyles.dropdownText}>{barangay.barangay_name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Use Current Location Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={localStyles.useLocationButton}
         onPress={handleUseCurrentLocation}
         disabled={isGeocoding}
       >
-        <Ionicons 
-          name="locate" 
-          size={20} 
-          color="#fff" 
+        <Ionicons
+          name="locate"
+          size={20}
+          color="#fff"
           style={{ marginRight: 8 }}
         />
         <Text style={localStyles.useLocationButtonText}>
@@ -531,8 +610,17 @@ const LocationScreen = () => {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={localStyles.sectionTitle}>
-          {userCoordinates ? "Police Stations (Nearest First)" : "Police Stations"}
+          {userCoordinates ? "Results" : (sortedStations.length > 0 ? "Police Stations" : "")}
         </Text>
+
+        {!userCoordinates && sortedStations.length === 0 && (
+          <View style={{ alignItems: 'center', marginTop: 40, paddingHorizontal: 20 }}>
+            <Ionicons name="search" size={48} color="#ccc" />
+            <Text style={{ textAlign: 'center', color: '#666', marginTop: 16, fontSize: 16 }}>
+              Search for a Barangay or use your location to find the nearest police station.
+            </Text>
+          </View>
+        )}
 
         {sortedStations.map((station, index) => (
           <View key={index} style={localStyles.card}>
@@ -621,18 +709,47 @@ const localStyles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginBottom: 20,
+    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: "#333",
   },
+  dropdown: {
+    position: 'absolute',
+    top: 55, // Height of searchBar + margin/padding
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    zIndex: 100,
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: '#eee'
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0'
+  },
+  dropdownText: {
+    fontSize: 14,
+    color: '#333'
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#0a2a66",
     marginBottom: 10,
+    marginTop: 10,
   },
   card: {
     backgroundColor: "#fff",

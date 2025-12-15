@@ -251,10 +251,15 @@ const ChatScreen = () => {
                             <Text style={styles.alertWelcome}>Alert</Text>
                             <Text style={styles.davao}>Davao</Text>
                         </Text>
-                        <TouchableOpacity onPress={fetchEnforcerDetails} disabled={loadingEnforcerDetails}>
+                        <TouchableOpacity
+                            onPress={fetchEnforcerDetails}
+                            disabled={loadingEnforcerDetails}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                        >
                             <Text style={[styles.subheadingCenter, { color: '#1D3557', textDecorationLine: 'underline' }]}>
                                 {otherUserName || 'Chat'}
                             </Text>
+                            <Ionicons name="information-circle" size={20} color="#1D3557" />
                         </TouchableOpacity>
                     </View>
                     <View style={{ width: 24 }} />
@@ -318,7 +323,7 @@ const ChatScreen = () => {
                             </Text>
                         </View>
                     )}
-                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 10 : 0 }]}>
+                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 40 : 10 }]}>
                         <TextInput
                             style={styles.chatInput}
                             placeholder="Write a message"

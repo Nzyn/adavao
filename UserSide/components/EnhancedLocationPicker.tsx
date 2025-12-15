@@ -329,9 +329,17 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                 return;
             }
 
-            const location = await Location.getCurrentPositionAsync({
+
+            // Wrap get current position in a timeout promise (15 seconds)
+            const locationPromise = Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
             });
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Location request timed out. Please make sure GPS is enabled and try again, or select manually on map.')), 15000)
+            );
+
+            const location = await Promise.race([locationPromise, timeoutPromise]) as Location.LocationObject;
 
             const { latitude, longitude } = location.coords;
 
