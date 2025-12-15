@@ -1159,7 +1159,11 @@
                             <tr data-report-id="{{ $report->report_id }}">
                                 <td class="report-id">{{ str_pad($report->report_id, 5, '0', STR_PAD_LEFT) }}</td>
                                 <td>
-                                    @if($report->user)
+                                    @if($report->is_anonymous)
+                                        <span style="display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-size: 1.25em;">🕵️</span> Anonymous
+                                        </span>
+                                    @elseif($report->user)
                                         {{ substr($report->user->firstname, 0, 1) }}. {{ substr($report->user->lastname, 0, 1) }}.
                                     @else
                                         Unknown
@@ -1315,7 +1319,7 @@
     <div class="lightbox-overlay" id="lightbox">
         <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
         <div class="lightbox-content">
-            <img id="lightboxImage" src="" alt="Enlarged view">
+            <img id="lightboxImage" src="" alt="Enlarged view" onerror="console.error('LightBox Image Load Error'); this.src='https://placehold.co/600x400?text=Image+Not+Found';">
         </div>
     </div>
 

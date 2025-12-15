@@ -61,7 +61,8 @@ const ChatScreen = () => {
             const response = await messageService.getMessages(parseInt(user.id), parseInt(otherUserId));
 
             if (response.success) {
-                setMessages(response.data);
+                // Reverse messages to show newest at the bottom (inverted FlatList)
+                setMessages(response.data.reverse());
                 // Mark conversation as read
                 await messageService.markConversationAsRead(parseInt(user.id), parseInt(otherUserId));
             } else {
@@ -243,7 +244,7 @@ const ChatScreen = () => {
     return (
         <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
             <View style={styles.container}>

@@ -378,8 +378,14 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
             let rawAddress = null;
             if (response.ok) {
                 const data = await response.json().catch(() => ({}));
-                if (data.success && data.address) {
-                    setStreetAddress(data.address);
+                if (data.success) {
+                    // Try to get address from structured address object or fallback to display_name
+                    const addr = data.address || data.display_name;
+                    if (addr) {
+                        console.log('🏠 Reverse geocoded address (GPS):', addr);
+                        setStreetAddress(addr);
+                    }
+
                     if (data.raw && data.raw.address) {
                         rawAddress = data.raw.address;
                     }
@@ -474,9 +480,15 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                     fetch(`${BACKEND_URL}/api/location/reverse?lat=${latitude}&lon=${longitude}`)
                         .then(res => res.json())
                         .then(data => {
-                            if (data.success && data.address) {
-                                console.log('🏠 Reverse geocoded address:', data.address);
-                                setStreetAddress(data.address);
+                            if (data.success) {
+                                const addr = data.address || data.display_name;
+                                if (addr) {
+                                    console.log('🏠 Reverse geocoded address (Web):', addr);
+                                    setStreetAddress(addr);
+                                } else {
+                                    console.warn('⚠️ No address found in reverse geocode response');
+                                }
+
                             }
 
                             // Determine barangay using raw address components if available
@@ -1025,9 +1037,13 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                                                         .then(res => res.json())
                                                         .then(addressData => {
                                                             let rawAddress = null;
-                                                            if (addressData.success && addressData.address) {
-                                                                console.log('🏠 Reverse geocoded address (mobile):', addressData.address);
-                                                                setStreetAddress(addressData.address);
+                                                            if (addressData.success) {
+                                                                const addr = addressData.address || addressData.display_name;
+                                                                if (addr) {
+                                                                    console.log('🏠 Reverse geocoded address (mobile):', addr);
+                                                                    setStreetAddress(addr);
+                                                                }
+
                                                                 if (addressData.raw && addressData.raw.address) {
                                                                     rawAddress = addressData.raw.address;
                                                                 }
