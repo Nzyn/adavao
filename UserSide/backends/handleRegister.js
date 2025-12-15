@@ -47,9 +47,27 @@ const handleRegister = async (req, res) => {
     await db.query(sql, [firstname, lastname, email, contact, hashedPassword, verificationToken, tokenExpiresAt]);
 
     console.log('📧 Sending verification email to:', email);
-    // Send verification email
-    const emailResult = await sendVerificationEmail(email, verificationToken, firstname);
-    console.log('📧 Email result:', emailResult);
+
+    // Send verification email with timeout (30 seconds)
+    let emailResult;
+    try {
+      const emailPromise = sendVerificationEmail(email, verificationToken, firstname);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Email sending timed out after 30 seconds')), 30000)
+      );
+
+      emailResult = await Promise.race([emailPromise, timeoutPromise]);
+      console.log('📧 Email result:', emailResult);
+    } catch (emailError) {
+      console.error('❌ Email sending error:', emailError);
+      // Delete user if email fails
+      await db.query("DELETE FROM users_public WHERE email = $1", [email]);
+
+      return res.status(500).json({
+        message: "Failed to send verification email. This could be due to email service issues. Please try again in a few moments.",
+        error: emailError.message || "Email service timeout"
+      });
+    }
 
     if (!emailResult.success) {
       console.log('❌ Email failed, deleting user...');

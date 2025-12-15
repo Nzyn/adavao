@@ -816,7 +816,7 @@ export default function ReportCrime() {
                 )}
 
                 {/* Full-screen media viewer */}
-                {showMediaViewer && (
+                {showMediaViewer && selectedMedia && (
                     <Modal
                         transparent
                         visible={showMediaViewer}
@@ -824,22 +824,35 @@ export default function ReportCrime() {
                         onRequestClose={() => setShowMediaViewer(false)}
                     >
                         <View style={styles.modalOverlay}>
-                            <View style={[styles.modalContent, { paddingHorizontal: 16, paddingTop: 16 }]}>
+                            <View style={[styles.modalContent, { paddingHorizontal: 16, paddingTop: 16, backgroundColor: '#fff' }]}>
                                 <View style={styles.modalHeader}>
                                     <Text style={styles.modalTitle}>{selectedMedia?.fileName || 'Preview'}</Text>
                                     <TouchableOpacity onPress={() => setShowMediaViewer(false)}>
                                         <Ionicons name="close" size={22} color="#666" />
                                     </TouchableOpacity>
                                 </View>
-                                {selectedMedia?.type?.startsWith('image') ? (
-                                    <Image
-                                        source={{ uri: selectedMedia.uri }}
-                                        style={{ width: '100%', height: 400, resizeMode: 'contain' }}
-                                    />
+                                {selectedMedia?.type?.startsWith('image') || selectedMedia?.uri?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ? (
+                                    <View style={{ width: '100%', height: 400, backgroundColor: '#f5f5f5', borderRadius: 8, overflow: 'hidden' }}>
+                                        <Image
+                                            source={{ uri: selectedMedia.uri }}
+                                            style={{ width: '100%', height: '100%' }}
+                                            resizeMode="contain"
+                                            onError={(error) => {
+                                                console.error('❌ Media preview failed to load:', selectedMedia.uri, error.nativeEvent);
+                                            }}
+                                            onLoad={() => {
+                                                console.log('✅ Media preview loaded:', selectedMedia.uri);
+                                            }}
+                                        />
+                                    </View>
                                 ) : (
-                                    <View style={{ padding: 16 }}>
-                                        <Text style={{ textAlign: 'center', color: '#666' }}>
+                                    <View style={{ padding: 16, alignItems: 'center' }}>
+                                        <Ionicons name="document-outline" size={48} color="#999" />
+                                        <Text style={{ textAlign: 'center', color: '#666', marginTop: 12 }}>
                                             Preview not available for this file type.
+                                        </Text>
+                                        <Text style={{ textAlign: 'center', color: '#999', marginTop: 4, fontSize: 12 }}>
+                                            {selectedMedia?.type || 'Unknown type'}
                                         </Text>
                                     </View>
                                 )}
@@ -948,9 +961,10 @@ export default function ReportCrime() {
                                         setShowConfirmDialog(false);
                                         submitReportData();
                                     }}
+                                    disabled={isSubmitting}
                                 >
                                     <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
-                                    <Text style={confirmStyles.submitButtonText}>Confirm Submit</Text>
+                                    <Text style={confirmStyles.submitButtonText}>Submit Report</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>

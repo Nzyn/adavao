@@ -207,16 +207,22 @@ const ChatScreen = () => {
     };
 
     const fetchEnforcerDetails = async () => {
-        if (!otherUserId) return;
+        if (!otherUserId) {
+            console.log('❌ No otherUserId available');
+            return;
+        }
 
+        console.log('🔍 Fetching enforcer details for userId:', otherUserId);
         setLoadingEnforcerDetails(true);
         try {
             const details = await userService.getUserWithStation(otherUserId);
+            console.log('✅ Enforcer details received:', details);
             setEnforcerDetails(details);
             setShowEnforcerModal(true);
+            console.log('✅ Modal should now be visible');
         } catch (error) {
-            console.error('Error fetching enforcer details:', error);
-            alert('Unable to load enforcer details. Please try again.');
+            console.error('❌ Error fetching enforcer details:', error);
+            Alert.alert('Error', 'Unable to load officer details. Please try again.');
         } finally {
             setLoadingEnforcerDetails(false);
         }
@@ -323,7 +329,7 @@ const ChatScreen = () => {
                             </Text>
                         </View>
                     )}
-                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 40 : 10 }]}>
+                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 80 : 10 }]}>
                         <TextInput
                             style={styles.chatInput}
                             placeholder="Write a message"

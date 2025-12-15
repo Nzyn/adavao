@@ -403,6 +403,12 @@ const history = () => {
                               source={{ uri: `${BACKEND_URL}${media.media_url}` }}
                               style={{ width: '100%', height: 200, borderRadius: 8, marginBottom: 8, backgroundColor: '#e9ecef' }}
                               resizeMode="cover"
+                              onError={(error) => {
+                                console.error('❌ Image failed to load:', `${BACKEND_URL}${media.media_url}`, error.nativeEvent);
+                              }}
+                              onLoad={() => {
+                                console.log('✅ Image loaded successfully:', `${BACKEND_URL}${media.media_url}`);
+                              }}
                             />
                           )}
 

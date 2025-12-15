@@ -603,6 +603,9 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
     };
 
     const handleClose = () => {
+        console.log('🔄 Closing location picker - resetting all state');
+
+        // Reset all form fields
         setSelectedBarangay(null);
         setBarangaySearch('');
         setStreetAddress('');
@@ -611,9 +614,22 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
         setShowAddressSuggestions(false);
         setMapLocationSet(false);
         setBarangayAutoDetected(false);
-        setBarangayAutoDetected(false);
         setIsLocationValid(true);
         setIsMapInteractive(false);
+
+        // Reset map coordinates to Davao City center
+        setMapCoordinates({
+            latitude: 7.0731,
+            longitude: 125.6128,
+        });
+
+        // Clear any pending timeouts
+        if (addressTimeoutRef.current) {
+            clearTimeout(addressTimeoutRef.current);
+            addressTimeoutRef.current = null;
+        }
+
+        console.log('✅ Location picker state reset complete');
         onClose();
     };
 

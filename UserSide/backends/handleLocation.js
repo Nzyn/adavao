@@ -100,7 +100,7 @@ const searchLocation = async (req, res) => {
     console.log(`📍 Found ${data.length} total results for "${q}"`);
 
     // Filter results to only include locations within Davao City boundaries
-    constdavaoCityResults = data.filter(item => {
+    const davaoCityResults = data.filter(item => {
       // Check if coordinates are within Davao City bounds
       if (!isInDavaoCity(item.lat, item.lon)) {
         return false;

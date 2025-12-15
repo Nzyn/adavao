@@ -298,7 +298,7 @@ const Register = () => {
 
       // Create a timeout controller
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout (increased from 60s)
 
       const regResp = await fetch(`${BACKEND_URL}/register`, {
         method: 'POST',
@@ -325,12 +325,27 @@ const Register = () => {
         }
       } else {
         setRegistrationError(regData.message || 'Failed to register');
-        Alert.alert('Registration Failed', regData.message || 'Failed to register');
+
+        // Show more specific error messages
+        if (regData.message && regData.message.includes('email')) {
+          Alert.alert('Email Service Issue', regData.message + '\n\nPlease verify your email address is correct and try again.');
+        } else {
+          Alert.alert('Registration Failed', regData.message || 'Failed to register');
+        }
       }
     } catch (error: any) {
       console.error('Register Error:', error);
-      Alert.alert('Error', 'Failed to register: ' + (error.message || 'Network Error'));
       setIsLoading(false);
+
+      // Handle different error types
+      if (error.name === 'AbortError') {
+        Alert.alert(
+          'Request Timeout',
+          'Registration is taking longer than expected. This might be due to email service delays.\n\nPlease check your email inbox (including spam folder) in a few minutes, or try registering again.'
+        );
+      } else {
+        Alert.alert('Error', 'Failed to register: ' + (error.message || 'Network Error'));
+      }
     }
   };
 
