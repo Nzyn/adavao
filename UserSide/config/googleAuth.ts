@@ -7,6 +7,8 @@ WebBrowser.maybeCompleteAuthSession();
 
 // Get Google Client ID from app.json configuration
 export const GOOGLE_WEB_CLIENT_ID = Constants.expoConfig?.extra?.googleWebClientId || '';
+export const GOOGLE_ANDROID_CLIENT_ID = Constants.expoConfig?.extra?.googleAndroidClientId || '';
+// export const GOOGLE_IOS_CLIENT_ID = Constants.expoConfig?.extra?.googleIosClientId || ''; // Future use
 
 export const useGoogleAuth = () => {
   try {
@@ -17,15 +19,17 @@ export const useGoogleAuth = () => {
     });
 
     console.log('🔐 Google Auth Config:', {
-      clientId: GOOGLE_WEB_CLIENT_ID,
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      androidClientId: GOOGLE_ANDROID_CLIENT_ID,
       redirectUrl: redirectUrl,
       appOwnership: Constants.appOwnership,
     });
 
     const [request, response, promptAsync] = Google.useAuthRequest({
-      clientId: GOOGLE_WEB_CLIENT_ID,
+      clientId: GOOGLE_WEB_CLIENT_ID, // Default/Web
+      androidClientId: GOOGLE_ANDROID_CLIENT_ID, // [NEW] Use Native Android Client ID
       scopes: ['profile', 'email'],
-      redirectUrl: redirectUrl,
+      redirectUri: redirectUrl,
     });
 
     return {
