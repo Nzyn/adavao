@@ -651,13 +651,16 @@ function getImageUrl(path) {
         return path;
     }
     
+    // Use configured Node backend URL from Laravel config
+    const nodeBackendUrl = '{{ config("app.node_backend_url", "http://localhost:3000") }}';
+    
     // If it's a relative path, prepend the backend server URL
     if (path.startsWith('/')) {
-        return 'http://localhost:3000' + path;
+        return nodeBackendUrl + path;
     }
     
     // If it's just a filename, assume it's in the verifications directory
-    return 'http://localhost:3000/verifications/' + path;
+    return nodeBackendUrl + '/verifications/' + path;
 }
 
 // Load all verification requests

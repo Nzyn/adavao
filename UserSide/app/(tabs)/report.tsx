@@ -831,8 +831,12 @@ export default function ReportCrime() {
                                         <Ionicons name="close" size={22} color="#666" />
                                     </TouchableOpacity>
                                 </View>
-                                {selectedMedia?.type?.startsWith('image') || selectedMedia?.uri?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ? (
-                                    <View style={{ width: '100%', height: 400, backgroundColor: '#f5f5f5', borderRadius: 8, overflow: 'hidden' }}>
+                                {/* Check mimeType (from ImagePicker) OR file extension */}
+                                {(selectedMedia?.mimeType?.startsWith('image') ||
+                                    selectedMedia?.type?.startsWith('image') ||
+                                    selectedMedia?.uri?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) ? (
+                                    <View style={{ width: '100%', height: 400, backgroundColor: '#f5f5f5', borderRadius: 8, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
+                                        <ActivityIndicator size="large" color="#1D3557" style={{ position: 'absolute' }} />
                                         <Image
                                             source={{ uri: selectedMedia.uri }}
                                             style={{ width: '100%', height: '100%' }}
@@ -852,7 +856,7 @@ export default function ReportCrime() {
                                             Preview not available for this file type.
                                         </Text>
                                         <Text style={{ textAlign: 'center', color: '#999', marginTop: 4, fontSize: 12 }}>
-                                            {selectedMedia?.type || 'Unknown type'}
+                                            {selectedMedia?.mimeType || selectedMedia?.type || 'Unknown type'}
                                         </Text>
                                     </View>
                                 )}

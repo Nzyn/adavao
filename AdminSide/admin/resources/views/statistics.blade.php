@@ -1228,16 +1228,40 @@ async function loadBarangayStats() {
     }
 }
 
-// Display top barangays in a clean, concise format
+// Display top barangays with hover tooltip showing crime breakdown
 function displayTopBarangays(topBarangays) {
     const container = document.getElementById('topBarangays');
     container.innerHTML = '';
     
     topBarangays.forEach((item, index) => {
         const div = document.createElement('div');
-        div.style.cssText = 'padding: 1rem; background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 8px; border-left: 4px solid ' + getRankColor(index) + '; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s;';
-        div.onmouseenter = function() { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)'; };
-        div.onmouseleave = function() { this.style.transform = 'translateY(0)'; this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)'; };
+        div.style.cssText = 'padding: 1rem; background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 8px; border-left: 4px solid ' + getRankColor(index) + '; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; position: relative; cursor: pointer;';
+        div.onmouseenter = function() { 
+            this.style.transform = 'translateY(-2px)'; 
+            this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+            const tooltip = this.querySelector('.crime-tooltip');
+            if (tooltip) tooltip.style.display = 'block';
+        };
+        div.onmouseleave = function() { 
+            this.style.transform = 'translateY(0)'; 
+            this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+            const tooltip = this.querySelector('.crime-tooltip');
+            if (tooltip) tooltip.style.display = 'none';
+        };
+        
+        // Build crime breakdown tooltip content
+        let tooltipContent = '';
+        if (item.crime_breakdown && item.crime_breakdown.length > 0) {
+            tooltipContent = item.crime_breakdown.map(crime => 
+                `<div style="display: flex; justify-content: space-between; gap: 1rem; padding: 0.25rem 0;">
+                    <span style="color: #374151;">${crime.type}</span>
+                    <span style="font-weight: 600; color: ${getRankColor(index)};">${crime.count}</span>
+                </div>`
+            ).join('');
+        } else {
+            tooltipContent = '<span style="color: #6b7280; font-style: italic;">No breakdown available</span>';
+        }
+        
         div.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="flex: 1;">
@@ -1248,6 +1272,10 @@ function displayTopBarangays(topBarangays) {
                     <div style="font-size: 1.5rem; font-weight: 700; color: ${getRankColor(index)};">${item.total_crimes}</div>
                     <div style="font-size: 0.65rem; color: #6b7280; text-transform: uppercase;">crimes</div>
                 </div>
+            </div>
+            <div class="crime-tooltip" style="display: none; position: absolute; bottom: 100%; left: 0; right: 0; background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; margin-bottom: 0.5rem;">
+                <div style="font-weight: 600; font-size: 0.75rem; color: #1D3557; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">Top Crime Types</div>
+                ${tooltipContent}
             </div>
         `;
         container.appendChild(div);

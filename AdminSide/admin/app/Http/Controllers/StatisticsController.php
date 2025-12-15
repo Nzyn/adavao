@@ -363,18 +363,20 @@ class StatisticsController extends Controller
 
     private function _getBarangayStats($month, $year) 
     {
-         $cacheKey = 'barangay_crime_stats' . ($month ? "_$month" : "") . ($year ? "_$year" : "");
+         $cacheKey = 'barangay_crime_stats_v2' . ($month ? "_$month" : "") . ($year ? "_$year" : "");
             
          return Cache::remember($cacheKey, 3600, function () use ($month, $year) {
              $csvPath = storage_path('app/davao_crime_5years.csv');
              if (!file_exists($csvPath)) throw new \Exception('Data file not found at: ' . $csvPath);
 
              $barangayData = [];
+             $barangayCrimeTypes = []; // Track crime types per barangay
              $file = fopen($csvPath, 'r');
              $header = fgetcsv($file); 
              $headerMap = array_flip($header);
              $idxDate = $headerMap['date'] ?? 1;
              $idxBarangay = $headerMap['barangay'] ?? 2;
+             $idxType = $headerMap['crime_type'] ?? 3;
              $idxCount = $headerMap['crime_count'] ?? 4;
 
             while (($row = fgetcsv($file)) !== false) {
@@ -382,6 +384,7 @@ class StatisticsController extends Controller
                 
                 $date = $row[$idxDate];
                 $barangay = trim($row[$idxBarangay]);
+                $crimeType = trim($row[$idxType]);
                 $count = floatval($row[$idxCount]);
                 
                 $rowYear = substr($date, 0, 4);
@@ -389,14 +392,38 @@ class StatisticsController extends Controller
                 if ($month && substr($date, 0, 7) !== $month) continue;
                 if ($year && $rowYear !== $year) continue;
                 
+                // Track total crimes per barangay
                 if (!isset($barangayData[$barangay])) $barangayData[$barangay] = 0;
                 $barangayData[$barangay] += $count;
+                
+                // Track crime types per barangay
+                if (!isset($barangayCrimeTypes[$barangay])) {
+                    $barangayCrimeTypes[$barangay] = [];
+                }
+                if (!isset($barangayCrimeTypes[$barangay][$crimeType])) {
+                    $barangayCrimeTypes[$barangay][$crimeType] = 0;
+                }
+                $barangayCrimeTypes[$barangay][$crimeType] += $count;
             }
             fclose($file);
             
             $result = [];
             foreach ($barangayData as $barangay => $totalCrimes) {
-                $result[] = ['barangay' => $barangay, 'total_crimes' => $totalCrimes];
+                // Sort crime types by count descending and get top 5
+                $crimeTypes = $barangayCrimeTypes[$barangay] ?? [];
+                arsort($crimeTypes);
+                $topCrimes = array_slice($crimeTypes, 0, 5, true);
+                
+                $crimeBreakdown = [];
+                foreach ($topCrimes as $type => $count) {
+                    $crimeBreakdown[] = ['type' => $type, 'count' => $count];
+                }
+                
+                $result[] = [
+                    'barangay' => $barangay, 
+                    'total_crimes' => $totalCrimes,
+                    'crime_breakdown' => $crimeBreakdown
+                ];
             }
             
             usort($result, function($a, $b) {
