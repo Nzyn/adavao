@@ -355,7 +355,7 @@ const ChatScreen = () => {
                             </Text>
                         </View>
                     )}
-                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 120 : 10 }]}>
+                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 70 : 10 }]}>
                         <TextInput
                             style={styles.chatInput}
                             placeholder="Write a message"

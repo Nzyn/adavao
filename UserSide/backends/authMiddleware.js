@@ -89,6 +89,7 @@ const requireAdminRole = (req, res, next) => {
 /**
  * Get verified user role from request (for file serving routes)
  * This checks the database instead of trusting client input
+ * Checks BOTH user_admin (AdminSide) and users_public (UserSide) tables
  */
 const getVerifiedUserRole = async (userId) => {
   try {
@@ -96,16 +97,30 @@ const getVerifiedUserRole = async (userId) => {
       return 'user';
     }
 
-    const [users] = await db.query(
+    // First check user_admin table (AdminSide: admins and police)
+    const [adminUsers] = await db.query(
+      "SELECT role FROM user_admin WHERE id = $1",
+      [userId]
+    );
+
+    if (adminUsers.length > 0) {
+      const role = adminUsers[0].role || 'admin';
+      console.log(`✅ Found admin/police user ${userId} with role: ${role}`);
+      return role;
+    }
+
+    // If not in user_admin, check users_public (UserSide app users)
+    const [publicUsers] = await db.query(
       "SELECT role FROM users_public WHERE id = $1",
       [userId]
     );
 
-    if (users.length === 0) {
-      return 'user';
+    if (publicUsers.length > 0) {
+      return publicUsers[0].role || 'user';
     }
 
-    return users[0].role || 'user';
+    console.log(`⚠️ User ${userId} not found in any user table`);
+    return 'user';
   } catch (error) {
     console.error("Error getting user role:", error);
     return 'user';
