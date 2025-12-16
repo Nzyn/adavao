@@ -1224,12 +1224,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load pending verifications
     loadPendingVerifications();
     
-    // Set up auto-refresh every 30 seconds
+    // Set up auto-refresh every 10 seconds
     setInterval(() => {
         console.log('Auto-refreshing verification data...');
         loadVerificationRequests();
         loadPendingVerifications();
-    }, 30000);
+    }, 10000);
 });
 </script>
 @endsection

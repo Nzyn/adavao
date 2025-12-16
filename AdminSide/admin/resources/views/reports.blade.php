@@ -3189,8 +3189,8 @@ function generatePDF(report) {
             document.head.appendChild(style);
         }
         
-        // Initialize polling (check every 10 seconds)
-        setInterval(checkForNewReports, 10000);
+        // Initialize polling (check every 3 seconds)
+        setInterval(checkForNewReports, 3000);
         
         // Initial check to set baseline
         checkForNewReports();

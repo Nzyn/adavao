@@ -121,7 +121,7 @@ export default function ProfileScreen() {
       }
     };
 
-    const intervalId = setInterval(pollVerificationStatus, 30000);
+    const intervalId = setInterval(pollVerificationStatus, 10000);
     return () => clearInterval(intervalId);
   }, [user?.id, verificationStatus?.status]);
 

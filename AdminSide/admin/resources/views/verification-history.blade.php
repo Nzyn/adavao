@@ -264,10 +264,10 @@ function escapeHtml(text) {
 // Load history when page loads
 document.addEventListener('DOMContentLoaded', loadHistory);
 
-// Auto-refresh every 30 seconds
+// Auto-refresh every 10 seconds
 setInterval(() => {
     console.log('🔄 Auto-refreshing verification history...');
     loadHistory();
-}, 30000);
+}, 10000);
 </script>
 @endsection
