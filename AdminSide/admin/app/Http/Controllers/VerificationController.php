@@ -93,7 +93,7 @@ class VerificationController extends Controller
     {
         $request->validate([
             'verificationId' => 'required|exists:verifications,verification_id',
-            'userId' => 'required|exists:users,id'
+            'userId' => 'required|exists:users_public,id'
         ]);
         
         try {
@@ -132,7 +132,7 @@ class VerificationController extends Controller
     {
         $request->validate([
             'verificationId' => 'required|exists:verifications,verification_id',
-            'userId' => 'required|exists:users,id'
+            'userId' => 'required|exists:users_public,id'
         ]);
         
         try {

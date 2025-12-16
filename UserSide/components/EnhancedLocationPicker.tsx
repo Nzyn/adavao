@@ -498,9 +498,15 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                         })
                         .catch(err => {
                             console.error('Reverse geocode error (Web):', err);
-                            // Set coordinates as fallback address when geocode fails
-                            const fallbackAddr = `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-                            setStreetAddress(fallbackAddr);
+                            // Only use coordinates as fallback if there's no existing street address
+                            // This preserves the address from "Use my current location" if geocode fails after pin move
+                            if (!streetAddress || streetAddress.startsWith('Location:')) {
+                                const fallbackAddr = `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+                                setStreetAddress(fallbackAddr);
+                            } else {
+                                console.log('⚠️ Keeping existing street address:', streetAddress);
+                            }
+                            // Still try to determine barangay from coordinates
                             determineBarangayFromCoordinates(latitude, longitude);
                         });
                 }

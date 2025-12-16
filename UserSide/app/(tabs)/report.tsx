@@ -802,12 +802,49 @@ export default function ReportCrime() {
 
                 {selectedMedia && (
                     <View style={styles.mediaPreviewContainer}>
-                        <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowMediaViewer(true)}>
-                            <Text style={styles.mediaName}>{selectedMedia.fileName || 'Selected Media'}</Text>
-                            <Text style={styles.mediaSize}>
-                                {selectedMedia.fileSize ? `${(selectedMedia.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'Unknown size'}
-                            </Text>
-                            <Text style={{ color: '#1D3557', marginTop: 4 }}>Tap to view</Text>
+                        <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} onPress={() => setShowMediaViewer(true)}>
+                            {/* Image Thumbnail Preview */}
+                            {(selectedMedia?.mimeType?.startsWith('image') ||
+                                selectedMedia?.type?.startsWith('image') ||
+                                selectedMedia?.uri?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) ? (
+                                <View style={{
+                                    width: 80,
+                                    height: 80,
+                                    borderRadius: 8,
+                                    overflow: 'hidden',
+                                    marginRight: 12,
+                                    backgroundColor: '#f0f0f0',
+                                    borderWidth: 1,
+                                    borderColor: '#ddd'
+                                }}>
+                                    <Image
+                                        source={{ uri: selectedMedia.uri }}
+                                        style={{ width: '100%', height: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                </View>
+                            ) : (
+                                <View style={{
+                                    width: 80,
+                                    height: 80,
+                                    borderRadius: 8,
+                                    marginRight: 12,
+                                    backgroundColor: '#f0f0f0',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    borderWidth: 1,
+                                    borderColor: '#ddd'
+                                }}>
+                                    <Ionicons name="videocam" size={32} color="#1D3557" />
+                                </View>
+                            )}
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.mediaName}>{selectedMedia.fileName || 'Selected Media'}</Text>
+                                <Text style={styles.mediaSize}>
+                                    {selectedMedia.fileSize ? `${(selectedMedia.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'Unknown size'}
+                                </Text>
+                                <Text style={{ color: '#1D3557', marginTop: 4, fontSize: 12 }}>Tap to view full size</Text>
+                            </View>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.removeButton} onPress={removeMedia}>
                             <Ionicons name="close-circle" size={24} color="#dc3545" />
