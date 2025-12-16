@@ -641,6 +641,7 @@ function sortVerificationTable(columnIndex) {
 }
 
 // Function to convert blob URLs or relative paths to proper URLs
+// Includes userId for authorization with Node backend
 function getImageUrl(path) {
     // If it's already a full URL, return as is
     if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -648,19 +649,28 @@ function getImageUrl(path) {
         if (path.startsWith('blob:')) {
             return null;
         }
+        // Add userId for authorization if it's a Node backend URL
+        const nodeBackendUrl = '{{ config("app.node_backend_url", "http://localhost:3000") }}';
+        if (path.startsWith(nodeBackendUrl)) {
+            const separator = path.includes('?') ? '&' : '?';
+            return path + separator + 'userId={{ auth()->id() }}';
+        }
         return path;
     }
     
     // Use configured Node backend URL from Laravel config
     const nodeBackendUrl = '{{ config("app.node_backend_url", "http://localhost:3000") }}';
     
+    // Add userId for authorization (required by Node server)
+    const authParam = '?userId={{ auth()->id() }}';
+    
     // If it's a relative path, prepend the backend server URL
     if (path.startsWith('/')) {
-        return nodeBackendUrl + path;
+        return nodeBackendUrl + path + authParam;
     }
     
     // If it's just a filename, assume it's in the verifications directory
-    return nodeBackendUrl + '/verifications/' + path;
+    return nodeBackendUrl + '/verifications/' + path + authParam;
 }
 
 // Load all verification requests
