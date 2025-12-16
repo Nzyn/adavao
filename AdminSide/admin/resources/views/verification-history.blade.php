@@ -263,5 +263,11 @@ function escapeHtml(text) {
 
 // Load history when page loads
 document.addEventListener('DOMContentLoaded', loadHistory);
+
+// Auto-refresh every 30 seconds
+setInterval(() => {
+    console.log('🔄 Auto-refreshing verification history...');
+    loadHistory();
+}, 30000);
 </script>
 @endsection

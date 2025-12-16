@@ -94,6 +94,37 @@ export default function ProfileScreen() {
     loadData();
   }, [user?.id]);
 
+  // Auto-refresh verification status every 30 seconds
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const pollVerificationStatus = async () => {
+      try {
+        console.log('🔄 Auto-refreshing verification status...');
+        const result = await verificationService.getVerificationStatus(user.id);
+        if (result.success && result.data) {
+          // Check if status changed
+          if (verificationStatus?.status !== result.data.status) {
+            console.log('✅ Verification status changed:', verificationStatus?.status, '→', result.data.status);
+            setVerificationStatus(result.data);
+
+            // Update form state based on new status
+            if (result.data.status === 'rejected') {
+              setIdPicture(null);
+              setIdSelfie(null);
+              setBillingDocument(null);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error polling verification status:', error);
+      }
+    };
+
+    const intervalId = setInterval(pollVerificationStatus, 30000);
+    return () => clearInterval(intervalId);
+  }, [user?.id, verificationStatus?.status]);
+
   // Request permissions for image picker
   const requestPermissions = async () => {
     if (Platform.OS !== 'web') {

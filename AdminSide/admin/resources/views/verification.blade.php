@@ -872,9 +872,17 @@ async function viewVerification(verificationId) {
     // Format documents section
     let documentsHtml = '<div class="documents-section">';
     
+    // Debug: Log all image paths
+    console.log('🖼️ Verification document paths:', {
+        id_picture: verification.id_picture,
+        id_selfie: verification.id_selfie,
+        billing_document: verification.billing_document
+    });
+    
     // ID Picture
     if (verification.id_picture) {
         const imageUrl = getImageUrl(verification.id_picture);
+        console.log('📸 ID Picture URL:', imageUrl);
         if (imageUrl) {
             documentsHtml += `
                 <div class="document-item">
