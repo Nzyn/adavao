@@ -74,10 +74,17 @@ class DashboardController extends Controller
                     // Unread Messages for this user (assuming message system uses user_id)
                     // Messages table structure check needed, assuming 'receiver_id' and 'is_read'
                     // If message system is complex, simplistic count might need adjustment
-                    $unreadMessages = DB::table('messages')
-                        ->where('receiver_id', $user->id)
-                        ->where('is_read', 0)
-                        ->count();
+                    // Try-catch to handle missing is_read column in production
+                    try {
+                        $unreadMessages = DB::table('messages')
+                            ->where('receiver_id', $user->id)
+                            ->where('is_read', 0)
+                            ->count();
+                    } catch (\Exception $e) {
+                        // Column may not exist in production, default to 0
+                        \Log::warning('is_read column missing in messages table: ' . $e->getMessage());
+                        $unreadMessages = 0;
+                    }
 
                     return [
                         'totalReports' => $totalReports,
