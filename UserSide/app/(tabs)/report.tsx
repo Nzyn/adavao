@@ -860,49 +860,28 @@ export default function ReportCrime() {
                         animationType="fade"
                         onRequestClose={() => setShowMediaViewer(false)}
                     >
-                        <View style={styles.modalOverlay}>
-                            <View style={[styles.modalContent, { paddingHorizontal: 16, paddingTop: 16, backgroundColor: '#fff' }]}>
-                                <View style={styles.modalHeader}>
-                                    <Text style={styles.modalTitle}>{selectedMedia?.fileName || 'Preview'}</Text>
-                                    <TouchableOpacity onPress={() => setShowMediaViewer(false)}>
-                                        <Ionicons name="close" size={22} color="#666" />
-                                    </TouchableOpacity>
-                                </View>
-                                {/* Check mimeType (from ImagePicker) OR file extension */}
-                                {(selectedMedia?.mimeType?.startsWith('image') ||
-                                    selectedMedia?.type?.startsWith('image') ||
-                                    selectedMedia?.uri?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) ? (
-                                    <View style={{ width: '100%', height: 400, backgroundColor: '#f5f5f5', borderRadius: 8, overflow: 'hidden' }}>
-                                        <Image
-                                            source={{ uri: selectedMedia.uri }}
-                                            style={{ width: '100%', height: '100%' }}
-                                            resizeMode="contain"
-                                            onError={(error) => {
-                                                console.error('❌ Media preview failed to load:', selectedMedia.uri, error.nativeEvent);
-                                            }}
-                                            onLoad={() => {
-                                                console.log('✅ Media preview loaded:', selectedMedia.uri);
-                                            }}
-                                        />
-                                        {/* Fallback text if image doesn't appear */}
-                                        <View style={{ position: 'absolute', bottom: 10, left: 0, right: 0, alignItems: 'center' }}>
-                                            <Text style={{ fontSize: 11, color: '#999' }}>
-                                                URI: {selectedMedia.uri?.substring(0, 50)}...
-                                            </Text>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    <View style={{ padding: 16, alignItems: 'center' }}>
-                                        <Ionicons name="document-outline" size={48} color="#999" />
-                                        <Text style={{ textAlign: 'center', color: '#666', marginTop: 12 }}>
-                                            Preview not available for this file type.
-                                        </Text>
-                                        <Text style={{ textAlign: 'center', color: '#999', marginTop: 4, fontSize: 12 }}>
-                                            {selectedMedia?.mimeType || selectedMedia?.type || 'Unknown type'}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
+                        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+                            {/* Close button */}
+                            <TouchableOpacity
+                                onPress={() => setShowMediaViewer(false)}
+                                style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}
+                            >
+                                <Ionicons name="close-circle" size={36} color="#fff" />
+                            </TouchableOpacity>
+
+                            {/* Image preview - full width */}
+                            <Image
+                                source={{ uri: selectedMedia.uri }}
+                                style={{ width: '95%', height: '70%' }}
+                                resizeMode="contain"
+                                onError={(e) => console.error('Image load error:', e.nativeEvent.error)}
+                                onLoad={() => console.log('✅ Image loaded successfully')}
+                            />
+
+                            {/* File name at bottom */}
+                            <Text style={{ color: '#fff', marginTop: 16, fontSize: 14 }}>
+                                {selectedMedia.fileName || 'Selected Image'}
+                            </Text>
                         </View>
                     </Modal>
                 )}
