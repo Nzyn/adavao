@@ -327,26 +327,33 @@ async function submitReport(req, res) {
       console.log("   MIME type:", req.file.mimetype);
       console.log("   Saved to:", req.file.path);
 
-      // 🔐 ENCRYPT the evidence file (AES-256-CBC)
-      console.log("🔐 Encrypting evidence file...");
-      const { encryptFile } = require('./encryptionService');
+      // ☁️ Upload to Cloudinary for persistent storage
+      const { uploadFile, isConfigured } = require('./cloudinaryService');
       const fs = require('fs');
 
-      // Read the uploaded file
-      const fileBuffer = fs.readFileSync(req.file.path);
-
-      // Encrypt the file content
-      const encryptedBuffer = encryptFile(fileBuffer);
-
-      // Write encrypted file back (overwrite original)
-      fs.writeFileSync(req.file.path, encryptedBuffer);
-
-      console.log("✅ Evidence file encrypted and saved");
-      console.log("   Original size:", fileBuffer.length, "bytes");
-      console.log("   Encrypted size:", encryptedBuffer.length, "bytes");
-
-      const mediaUrl = `/evidence/${req.file.filename}`;
+      let mediaUrl;
       const mediaType = path.extname(req.file.originalname).substring(1).toLowerCase();
+
+      if (isConfigured()) {
+        console.log("☁️ Uploading evidence to Cloudinary...");
+
+        const uploadResult = await uploadFile(req.file.path, 'evidence', {
+          public_id: `evidence_${reportId}_${Date.now()}`
+        });
+
+        if (uploadResult.success) {
+          mediaUrl = uploadResult.url;
+          console.log("✅ Evidence uploaded to Cloudinary:", mediaUrl);
+        } else {
+          console.error("❌ Cloudinary upload failed:", uploadResult.error);
+          // Fallback to local path (will be lost on redeploy)
+          mediaUrl = `/evidence/${req.file.filename}`;
+          console.log("⚠️ Using local fallback path:", mediaUrl);
+        }
+      } else {
+        console.log("⚠️ Cloudinary not configured, using local storage (will be lost on redeploy!)");
+        mediaUrl = `/evidence/${req.file.filename}`;
+      }
 
       console.log("   Media URL:", mediaUrl);
       console.log("   Media Type:", mediaType);
@@ -361,14 +368,14 @@ async function submitReport(req, res) {
           media_id: mediaResult[0].media_id,
           media_url: mediaUrl,
           media_type: mediaType,
-          file_size: encryptedBuffer.length,
+          file_size: req.file.size,
           original_name: req.file.originalname,
         };
 
         console.log("✅ Media uploaded successfully!");
         console.log("   Media ID:", mediaResult[0].media_id);
         console.log("   Stored in database: report_media table");
-        console.log("   File location: evidence/", req.file.filename);
+        console.log("   URL:", mediaUrl);
       } catch (dbError) {
         console.error("❌ Database insertion failed:", dbError);
         throw new Error("Failed to save media to database: " + dbError.message);

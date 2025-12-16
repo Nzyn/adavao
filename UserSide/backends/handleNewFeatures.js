@@ -294,7 +294,7 @@ const submitVerification = async (req, res) => {
 const uploadVerificationDocument = async (req, res) => {
   const fs = require('fs');
   const path = require('path');
-  const { encryptFile } = require('./encryptionService');
+  const { uploadFile, isConfigured } = require('./cloudinaryService');
 
   try {
     if (!req.file) {
@@ -304,28 +304,39 @@ const uploadVerificationDocument = async (req, res) => {
       });
     }
 
-    console.log("🔐 Encrypting verification document file...");
+    console.log("📸 Processing verification document upload...");
+    console.log("   Original name:", req.file.originalname);
+    console.log("   Saved as:", req.file.filename);
+    console.log("   Size:", req.file.size, "bytes");
 
-    // Read the uploaded file
-    const filePath = req.file.path;
-    const fileBuffer = fs.readFileSync(filePath);
+    let fileUrl;
 
-    // Encrypt the file content
-    const encryptedBuffer = encryptFile(fileBuffer);
+    if (isConfigured()) {
+      console.log("☁️ Uploading verification document to Cloudinary...");
 
-    // Write encrypted file back (overwrite original)
-    fs.writeFileSync(filePath, encryptedBuffer);
+      const uploadResult = await uploadFile(req.file.path, 'verifications', {
+        public_id: `verification_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      });
 
-    console.log("✅ Verification document encrypted and saved");
-    console.log("   File:", req.file.filename);
-    console.log("   Original size:", fileBuffer.length, "bytes");
-    console.log("   Encrypted size:", encryptedBuffer.length, "bytes");
+      if (uploadResult.success) {
+        fileUrl = uploadResult.url;
+        console.log("✅ Verification document uploaded to Cloudinary:", fileUrl);
+      } else {
+        console.error("❌ Cloudinary upload failed:", uploadResult.error);
+        // Fallback to local path (will be lost on redeploy)
+        fileUrl = `/verifications/${req.file.filename}`;
+        console.log("⚠️ Using local fallback path:", fileUrl);
+      }
+    } else {
+      console.log("⚠️ Cloudinary not configured, using local storage (will be lost on redeploy!)");
+      fileUrl = `/verifications/${req.file.filename}`;
+    }
 
-    // Return the file path for verifications
+    // Return the file URL for verifications
     res.json({
       success: true,
-      filePath: `/verifications/${req.file.filename}`,
-      message: "File uploaded and encrypted successfully"
+      filePath: fileUrl,
+      message: "File uploaded successfully"
     });
   } catch (error) {
     console.error("Error uploading verification document:", error);
