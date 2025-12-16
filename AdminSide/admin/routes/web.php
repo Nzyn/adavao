@@ -140,6 +140,10 @@ Route::middleware(['auth'])->group(function () {
         return view('verification');
     })->name('verification');
 
+    Route::get('/verification/history', function () {
+        return view('verification-history');
+    })->name('verification-history');
+
     // Reassignment requests page (admin only)
     Route::get('/reassignment-requests', function () {
         return view('reassignment-requests');

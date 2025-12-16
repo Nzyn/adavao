@@ -531,58 +531,10 @@
 @section('content')
 <div class="verification-header">
     <div class="verification-title-section">
-        <h1>Verification Requests</h1>
-        <p>Manage user verification requests</p>
+        <h1>Pending Verification Requests</h1>
+        <p>Review and manage pending user verification requests</p>
     </div>
 </div>
-
-<!-- Tabs Navigation -->
-<div class="verification-tabs" style="margin-bottom: 1rem;">
-    <button class="tab-btn active" id="tabPending" onclick="switchVerificationTab('pending')">
-        Pending Requests <span id="pendingCount" class="tab-count"></span>
-    </button>
-    <button class="tab-btn" id="tabHistory" onclick="switchVerificationTab('history')">
-        History <span id="historyCount" class="tab-count"></span>
-    </button>
-</div>
-
-<style>
-.verification-tabs {
-    display: flex;
-    gap: 0.5rem;
-    border-bottom: 2px solid #e5e7eb;
-    padding-bottom: 0;
-}
-.tab-btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    background: #f3f4f6;
-    color: #6b7280;
-    cursor: pointer;
-    border-radius: 8px 8px 0 0;
-    font-weight: 500;
-    transition: all 0.2s;
-    margin-bottom: -2px;
-}
-.tab-btn:hover {
-    background: #e5e7eb;
-}
-.tab-btn.active {
-    background: #1D3557;
-    color: white;
-    border-bottom: 2px solid #1D3557;
-}
-.tab-count {
-    background: rgba(255,255,255,0.2);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    margin-left: 6px;
-}
-.tab-btn.active .tab-count {
-    background: rgba(255,255,255,0.3);
-}
-</style>
 
 <div class="verification-table-container">
     <table class="verification-table" id="verificationTable">
@@ -783,9 +735,9 @@ async function loadVerificationRequests() {
             console.log('📋 First verification:', verifications[0]);
         }
         
-        // Update tab counts and display based on active tab
-        updateTabCounts();
-        switchVerificationTab(activeTab);
+        // Filter to only show pending requests
+        const pendingRequests = verifications.filter(v => v.status.toLowerCase() === 'pending');
+        displayVerificationRequests(pendingRequests);
     } catch (error) {
         console.error('💥 Error loading verification requests:', error);
         document.getElementById('loading').textContent = 'Error loading verification requests: ' + error.message;

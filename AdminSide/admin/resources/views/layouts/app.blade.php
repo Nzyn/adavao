@@ -387,12 +387,22 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="{{ route('verification') }}" class="nav-link {{ request()->routeIs('verification') ? 'active' : '' }}">
+                        <a href="{{ route('verification') }}" class="nav-link {{ request()->routeIs('verification') || request()->routeIs('verification-history') ? 'active' : '' }}">
                             <svg class="nav-icon" viewBox="0 0 24 24">
                                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                             Verification
                         </a>
+                        <ul style="padding-left: 2rem; margin-top: 0.5rem;">
+                            <li class="nav-item">
+                                <a href="{{ route('verification-history') }}" class="nav-link {{ request()->routeIs('verification-history') ? 'active' : '' }}" style="font-size: 0.875rem;">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" style="width: 18px; height: 18px;">
+                                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    History
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <a href="{{ route('statistics') }}" class="nav-link {{ request()->routeIs('statistics') ? 'active' : '' }}">
