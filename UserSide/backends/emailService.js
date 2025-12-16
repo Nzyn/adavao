@@ -1,48 +1,55 @@
-// emailService.js - Using Resend HTTP API (works on Render free tier)
-// Resend uses HTTP instead of SMTP, avoiding Render's SMTP blocking
+// emailService.js - Using SendGrid HTTP API (works on Render free tier)
+// SendGrid uses HTTP instead of SMTP, avoiding Render's SMTP blocking
 
 /**
- * Send email using Resend HTTP API
+ * Send email using SendGrid HTTP API
  * @param {object} options - Email options
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 const sendEmail = async (options) => {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.SENDGRID_API_KEY;
 
   if (!apiKey) {
-    console.error('❌ RESEND_API_KEY not set in environment variables');
+    console.error('❌ SENDGRID_API_KEY not set in environment variables');
     return { success: false, error: 'Email service not configured' };
   }
 
-  console.log('📧 Sending email via Resend:', {
+  console.log('📧 Sending email via SendGrid:', {
     to: options.to,
     subject: options.subject,
     from: options.from
   });
 
   try {
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: options.from || 'AlertDavao <onboarding@resend.dev>',
-        to: [options.to],
+        personalizations: [{
+          to: [{ email: options.to }]
+        }],
+        from: {
+          email: options.fromEmail || process.env.SENDGRID_FROM_EMAIL || 'noreply@alertdavao.com',
+          name: options.fromName || 'AlertDavao'
+        },
         subject: options.subject,
-        html: options.html,
+        content: [{
+          type: 'text/html',
+          value: options.html
+        }]
       }),
     });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      console.log('✅ Email sent successfully:', data.id);
-      return { success: true, id: data.id };
+    if (response.status === 202) {
+      console.log('✅ Email sent successfully via SendGrid');
+      return { success: true };
     } else {
-      console.error('❌ Resend API error:', data);
-      return { success: false, error: data.message || 'Failed to send email' };
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ SendGrid API error:', response.status, errorData);
+      return { success: false, error: errorData.errors?.[0]?.message || `HTTP ${response.status}` };
     }
   } catch (error) {
     console.error('❌ Error sending email:', error);
@@ -54,11 +61,7 @@ const sendEmail = async (options) => {
 const sendVerificationEmail = async (email, token, userName) => {
   const verificationUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/verify-email/${token}`;
 
-  // Use verified domain email or resend.dev for testing
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'AlertDavao <onboarding@resend.dev>';
-
   return sendEmail({
-    from: fromEmail,
     to: email,
     subject: 'Verify Your Email - AlertDavao',
     html: `
@@ -103,10 +106,7 @@ const sendVerificationEmail = async (email, token, userName) => {
 const sendPasswordResetEmail = async (email, token, userName) => {
   const resetUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/reset-password/${token}`;
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'AlertDavao <onboarding@resend.dev>';
-
   return sendEmail({
-    from: fromEmail,
     to: email,
     subject: 'Reset Your Password - AlertDavao',
     html: `
@@ -148,11 +148,9 @@ const sendPasswordResetEmail = async (email, token, userName) => {
 
 // Send account lockout notification email
 const sendLockoutEmail = async (email, userName, attemptCount) => {
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'AlertDavao Security <onboarding@resend.dev>';
-
   return sendEmail({
-    from: fromEmail,
     to: email,
+    fromName: 'AlertDavao Security',
     subject: 'Security Alert: Account Locked - AlertDavao',
     html: `
       <!DOCTYPE html>
@@ -199,11 +197,6 @@ const sendLockoutEmail = async (email, userName, attemptCount) => {
             <center>
               <a href="${process.env.BACKEND_URL || 'http://localhost:3000'}/forgot-password" class="button">Reset Password</a>
             </center>
-            
-            <p style="margin-top: 30px; font-size: 14px; color: #666;">
-              <strong>Need Help?</strong><br>
-              If you need assistance, contact AlertDavao support at support@alertdavao.com
-            </p>
             
             <div class="footer">
               <p>This is an automated security notification from AlertDavao.</p>
