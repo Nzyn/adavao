@@ -536,6 +536,54 @@
     </div>
 </div>
 
+<!-- Tabs Navigation -->
+<div class="verification-tabs" style="margin-bottom: 1rem;">
+    <button class="tab-btn active" id="tabPending" onclick="switchVerificationTab('pending')">
+        Pending Requests <span id="pendingCount" class="tab-count"></span>
+    </button>
+    <button class="tab-btn" id="tabHistory" onclick="switchVerificationTab('history')">
+        History <span id="historyCount" class="tab-count"></span>
+    </button>
+</div>
+
+<style>
+.verification-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 0;
+}
+.tab-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: #f3f4f6;
+    color: #6b7280;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    font-weight: 500;
+    transition: all 0.2s;
+    margin-bottom: -2px;
+}
+.tab-btn:hover {
+    background: #e5e7eb;
+}
+.tab-btn.active {
+    background: #1D3557;
+    color: white;
+    border-bottom: 2px solid #1D3557;
+}
+.tab-count {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-left: 6px;
+}
+.tab-btn.active .tab-count {
+    background: rgba(255,255,255,0.3);
+}
+</style>
+
 <div class="verification-table-container">
     <table class="verification-table" id="verificationTable">
         <thead>
@@ -589,6 +637,34 @@ let verifications = [];
 let currentImages = [];
 let currentImageIndex = 0;
 let verificationSortDirections = {};
+let activeTab = 'pending'; // 'pending' or 'history'
+
+// Tab switching function
+function switchVerificationTab(tabName) {
+    activeTab = tabName;
+    
+    // Update tab button styles
+    document.getElementById('tabPending').classList.toggle('active', tabName === 'pending');
+    document.getElementById('tabHistory').classList.toggle('active', tabName === 'history');
+    
+    // Filter and display based on tab
+    if (tabName === 'pending') {
+        const pending = verifications.filter(v => v.status.toLowerCase() === 'pending');
+        displayVerificationRequests(pending);
+    } else {
+        const history = verifications.filter(v => v.status.toLowerCase() === 'verified' || v.status.toLowerCase() === 'rejected');
+        displayVerificationRequests(history);
+    }
+}
+
+// Update tab counts
+function updateTabCounts() {
+    const pending = verifications.filter(v => v.status.toLowerCase() === 'pending');
+    const history = verifications.filter(v => v.status.toLowerCase() === 'verified' || v.status.toLowerCase() === 'rejected');
+    
+    document.getElementById('pendingCount').textContent = pending.length > 0 ? pending.length : '';
+    document.getElementById('historyCount').textContent = history.length > 0 ? history.length : '';
+}
 
 function sortVerificationTable(columnIndex) {
     const table = document.getElementById('verificationTable');
@@ -707,7 +783,9 @@ async function loadVerificationRequests() {
             console.log('📋 First verification:', verifications[0]);
         }
         
-        displayVerificationRequests(verifications);
+        // Update tab counts and display based on active tab
+        updateTabCounts();
+        switchVerificationTab(activeTab);
     } catch (error) {
         console.error('💥 Error loading verification requests:', error);
         document.getElementById('loading').textContent = 'Error loading verification requests: ' + error.message;

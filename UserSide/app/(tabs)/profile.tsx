@@ -50,10 +50,19 @@ export default function ProfileScreen() {
           if (result.success && result.data) {
             console.log('✅ Setting verification status:', result.data);
             setVerificationStatus(result.data);
-            // Set existing document URLs if they exist
-            if (result.data.id_picture) setIdPicture(result.data.id_picture);
-            if (result.data.id_selfie) setIdSelfie(result.data.id_selfie);
-            if (result.data.billing_document) setBillingDocument(result.data.billing_document);
+
+            // If rejected, clear the uploaded files so user can start fresh
+            if (result.data.status === 'rejected') {
+              console.log('🔄 Verification rejected - resetting form');
+              setIdPicture(null);
+              setIdSelfie(null);
+              setBillingDocument(null);
+            } else if (result.data.status === 'pending' || result.data.status === 'verified') {
+              // Only set existing document URLs if pending or verified
+              if (result.data.id_picture) setIdPicture(result.data.id_picture);
+              if (result.data.id_selfie) setIdSelfie(result.data.id_selfie);
+              if (result.data.billing_document) setBillingDocument(result.data.billing_document);
+            }
           } else {
             console.log('⚠️ No verification data found or API returned failure');
           }
@@ -354,80 +363,111 @@ export default function ProfileScreen() {
           <Text style={profileStyles.loadingText}>Loading verification status...</Text>
         ) : (
           <>
-            <View style={profileStyles.verificationStatus}>
-              <Text style={profileStyles.statusText}>
-                Status: {verificationStatus?.status || (isUserVerified ? 'verified' : 'not verified')}
-              </Text>
-              {hasPendingVerification && (
-                <Text style={profileStyles.pendingText}>Your verification is pending review</Text>
-              )}
-            </View>
-
-            {/* Verification Action Buttons */}
-            <View style={styles.buttonsContainer}>
-              <TouchableOpacity
-                style={[styles.button, isUserVerified || hasPendingVerification || uploading ? styles.disabledButton : {}]}
-                disabled={isUserVerified || hasPendingVerification || uploading}
-                onPress={() => pickImage(setIdPicture)}
-              >
-                <Text style={styles.buttonText}>
-                  {idPicture ? '✓ ID Picture Uploaded' : 'Upload ID'}
+            {/* Verified Users - Show status only */}
+            {isUserVerified && (
+              <View style={{
+                backgroundColor: '#d1fae5',
+                padding: 16,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#10b981',
+                alignItems: 'center'
+              }}>
+                <Ionicons name="checkmark-circle" size={48} color="#10b981" />
+                <Text style={{ fontSize: 18, fontWeight: '600', color: '#065f46', marginTop: 8 }}>
+                  Account Verified
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, isUserVerified || hasPendingVerification || uploading ? styles.disabledButton : {}]}
-                disabled={isUserVerified || hasPendingVerification || uploading}
-                onPress={() => pickImage(setIdSelfie)}
-              >
-                <Text style={styles.buttonText}>
-                  {idSelfie ? '✓ Selfie with ID Uploaded' : 'Upload a selfie holding an ID'}
+                <Text style={{ fontSize: 14, color: '#047857', marginTop: 4 }}>
+                  Your identity has been verified by an administrator.
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, isUserVerified || hasPendingVerification || uploading ? styles.disabledButton : {}]}
-                disabled={isUserVerified || hasPendingVerification || uploading}
-                onPress={() => pickImage(setBillingDocument)}
-              >
-                <Text style={styles.buttonText}>
-                  {billingDocument ? '✓ Billing Document Uploaded' : 'Billing Document'}
-                </Text>
-              </TouchableOpacity>
-
-              {!isUserVerified && (
-                <TouchableOpacity
-                  style={[styles.button, (!idPicture && !idSelfie && !billingDocument) || uploading || !canSubmitVerification ? styles.disabledButton : {}]}
-                  disabled={!idPicture && !idSelfie && !billingDocument || uploading || !canSubmitVerification}
-                  onPress={submitVerification}
-                >
-                  <Text style={styles.buttonText}>
-                    {uploading ? 'Submitting...' :
-                      hasPendingVerification ? 'Verification Pending' :
-                        wasRejected ? 'Resubmit Verification' :
-                          'Submit Verification'}
+                {verificationStatus?.updated_at && (
+                  <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
+                    Verified on: {new Date(verificationStatus.updated_at).toLocaleDateString('en-US', {
+                      year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Manila'
+                    })}
                   </Text>
-                </TouchableOpacity>
-              )}
+                )}
+              </View>
+            )}
 
-              {isUserVerified && (
-                <TouchableOpacity style={[styles.button, styles.disabledButton]} disabled>
-                  <Text style={styles.disabledText}>Account already Verified</Text>
-                </TouchableOpacity>
-              )}
-
-              {hasPendingVerification && (
-                <Text style={profileStyles.infoText}>
-                  Your verification is pending review. Please wait for admin approval.
+            {/* Pending Verification */}
+            {hasPendingVerification && (
+              <View style={{
+                backgroundColor: '#fef3c7',
+                padding: 16,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#f59e0b',
+                alignItems: 'center'
+              }}>
+                <Ionicons name="time" size={48} color="#f59e0b" />
+                <Text style={{ fontSize: 18, fontWeight: '600', color: '#92400e', marginTop: 8 }}>
+                  Verification Pending
                 </Text>
-              )}
-
-              {wasRejected && (
-                <Text style={profileStyles.infoText}>
-                  Your previous verification was rejected. You can resubmit once.
+                <Text style={{ fontSize: 14, color: '#b45309', marginTop: 4, textAlign: 'center' }}>
+                  Your verification request is being reviewed. Please wait for admin approval.
                 </Text>
-              )}
-            </View>
+              </View>
+            )}
+
+            {/* Rejected or Not Verified - Show upload form */}
+            {!isUserVerified && !hasPendingVerification && (
+              <>
+                <View style={profileStyles.verificationStatus}>
+                  <Text style={profileStyles.statusText}>
+                    Status: {wasRejected ? 'Rejected - Please resubmit' : 'Not verified'}
+                  </Text>
+                  {wasRejected && (
+                    <Text style={{ fontSize: 13, color: '#dc2626', marginTop: 4 }}>
+                      Your previous request was rejected. Please upload new documents.
+                    </Text>
+                  )}
+                </View>
+
+                {/* Upload Buttons */}
+                <View style={styles.buttonsContainer}>
+                  <TouchableOpacity
+                    style={[styles.button, uploading ? styles.disabledButton : {}]}
+                    disabled={uploading}
+                    onPress={() => pickImage(setIdPicture)}
+                  >
+                    <Text style={styles.buttonText}>
+                      {idPicture ? '✓ ID Picture Uploaded' : 'ID Picture: No file uploaded'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.button, uploading ? styles.disabledButton : {}]}
+                    disabled={uploading}
+                    onPress={() => pickImage(setIdSelfie)}
+                  >
+                    <Text style={styles.buttonText}>
+                      {idSelfie ? '✓ Selfie with ID Uploaded' : 'Selfie with ID: No file uploaded'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.button, uploading ? styles.disabledButton : {}]}
+                    disabled={uploading}
+                    onPress={() => pickImage(setBillingDocument)}
+                  >
+                    <Text style={styles.buttonText}>
+                      {billingDocument ? '✓ Billing Document Uploaded' : 'Billing Document: No file uploaded'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.button, (!idPicture && !idSelfie && !billingDocument) || uploading ? styles.disabledButton : {}]}
+                    disabled={(!idPicture && !idSelfie && !billingDocument) || uploading}
+                    onPress={submitVerification}
+                  >
+                    <Text style={styles.buttonText}>
+                      {uploading ? 'Submitting...' : wasRejected ? 'Resubmit Verification' : 'Submit Verification'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </>
         )}
       </View>

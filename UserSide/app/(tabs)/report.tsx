@@ -872,8 +872,7 @@ export default function ReportCrime() {
                                 {(selectedMedia?.mimeType?.startsWith('image') ||
                                     selectedMedia?.type?.startsWith('image') ||
                                     selectedMedia?.uri?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) ? (
-                                    <View style={{ width: '100%', height: 400, backgroundColor: '#f5f5f5', borderRadius: 8, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
-                                        <ActivityIndicator size="large" color="#1D3557" style={{ position: 'absolute' }} />
+                                    <View style={{ width: '100%', height: 400, backgroundColor: '#f5f5f5', borderRadius: 8, overflow: 'hidden' }}>
                                         <Image
                                             source={{ uri: selectedMedia.uri }}
                                             style={{ width: '100%', height: '100%' }}
@@ -885,6 +884,12 @@ export default function ReportCrime() {
                                                 console.log('✅ Media preview loaded:', selectedMedia.uri);
                                             }}
                                         />
+                                        {/* Fallback text if image doesn't appear */}
+                                        <View style={{ position: 'absolute', bottom: 10, left: 0, right: 0, alignItems: 'center' }}>
+                                            <Text style={{ fontSize: 11, color: '#999' }}>
+                                                URI: {selectedMedia.uri?.substring(0, 50)}...
+                                            </Text>
+                                        </View>
                                     </View>
                                 ) : (
                                     <View style={{ padding: 16, alignItems: 'center' }}>
