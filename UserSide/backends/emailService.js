@@ -1,37 +1,64 @@
-// emailService.js
-const nodemailer = require('nodemailer');
+// emailService.js - Using Resend HTTP API (works on Render free tier)
+// Resend uses HTTP instead of SMTP, avoiding Render's SMTP blocking
 
-// Create email transporter
-const createTransporter = () => {
-  console.log('📧 Email Config:', {
-    user: process.env.EMAIL_USER,
-    passLength: process.env.EMAIL_PASSWORD?.length,
-    host: 'smtp.gmail.com',
-    port: 587
+/**
+ * Send email using Resend HTTP API
+ * @param {object} options - Email options
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+const sendEmail = async (options) => {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    console.error('❌ RESEND_API_KEY not set in environment variables');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  console.log('📧 Sending email via Resend:', {
+    to: options.to,
+    subject: options.subject,
+    from: options.from
   });
 
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: process.env.EMAIL_USER || 'your-email@gmail.com',
-      pass: process.env.EMAIL_PASSWORD || 'your-app-password',
-    },
-    connectionTimeout: 30000, // 30 seconds
-    greetingTimeout: 30000, // 30 seconds
-    socketTimeout: 30000, // 30 seconds
-  });
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: options.from || 'AlertDavao <onboarding@resend.dev>',
+        to: [options.to],
+        subject: options.subject,
+        html: options.html,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      console.log('✅ Email sent successfully:', data.id);
+      return { success: true, id: data.id };
+    } else {
+      console.error('❌ Resend API error:', data);
+      return { success: false, error: data.message || 'Failed to send email' };
+    }
+  } catch (error) {
+    console.error('❌ Error sending email:', error);
+    return { success: false, error: error.message };
+  }
 };
 
 // Send verification email
 const sendVerificationEmail = async (email, token, userName) => {
-  const transporter = createTransporter();
-
   const verificationUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/verify-email/${token}`;
 
-  const mailOptions = {
-    from: `"AlertDavao" <${process.env.EMAIL_USER || 'your-email@gmail.com'}>`,
+  // Use verified domain email or resend.dev for testing
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'AlertDavao <onboarding@resend.dev>';
+
+  return sendEmail({
+    from: fromEmail,
     to: email,
     subject: 'Verify Your Email - AlertDavao',
     html: `
@@ -69,26 +96,17 @@ const sendVerificationEmail = async (email, token, userName) => {
       </body>
       </html>
     `,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log('✅ Verification email sent to:', email);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Error sending verification email:', error);
-    return { success: false, error: error.message };
-  }
+  });
 };
 
 // Send password reset email
 const sendPasswordResetEmail = async (email, token, userName) => {
-  const transporter = createTransporter();
-
   const resetUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/reset-password/${token}`;
 
-  const mailOptions = {
-    from: `"AlertDavao" <${process.env.EMAIL_USER || 'your-email@gmail.com'}>`,
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'AlertDavao <onboarding@resend.dev>';
+
+  return sendEmail({
+    from: fromEmail,
     to: email,
     subject: 'Reset Your Password - AlertDavao',
     html: `
@@ -125,24 +143,15 @@ const sendPasswordResetEmail = async (email, token, userName) => {
       </body>
       </html>
     `,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log('✅ Password reset email sent to:', email);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Error sending password reset email:', error);
-    return { success: false, error: error.message };
-  }
+  });
 };
 
 // Send account lockout notification email
 const sendLockoutEmail = async (email, userName, attemptCount) => {
-  const transporter = createTransporter();
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'AlertDavao Security <onboarding@resend.dev>';
 
-  const mailOptions = {
-    from: `"AlertDavao Security" <${process.env.EMAIL_USER || 'your-email@gmail.com'}>`,
+  return sendEmail({
+    from: fromEmail,
     to: email,
     subject: 'Security Alert: Account Locked - AlertDavao',
     html: `
@@ -205,16 +214,7 @@ const sendLockoutEmail = async (email, userName, attemptCount) => {
       </body>
       </html>
     `,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log('✅ Account lockout email sent to:', email);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Error sending lockout email:', error);
-    return { success: false, error: error.message };
-  }
+  });
 };
 
 module.exports = {
