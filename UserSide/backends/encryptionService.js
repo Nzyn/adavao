@@ -16,13 +16,13 @@ const ENCRYPTION_KEY = process.env.APP_KEY || 'base64:ciPqFYTQJ2bGZ0NUrfY7mvwODu
  */
 function getEncryptionKey() {
   let key = ENCRYPTION_KEY;
-  
+
   // If key starts with "base64:", decode it
   if (key.startsWith('base64:')) {
     key = key.substring(7); // Remove "base64:" prefix
     return Buffer.from(key, 'base64');
   }
-  
+
   // Otherwise, use the key directly (must be 32 bytes for AES-256)
   return Buffer.from(key.padEnd(32, '0').substring(0, 32));
 }
@@ -34,25 +34,25 @@ function getEncryptionKey() {
  */
 function encrypt(text) {
   if (!text) return text;
-  
+
   try {
     // Generate a random IV (Initialization Vector)
     const iv = crypto.randomBytes(16);
-    
+
     // Get the encryption key
     const key = getEncryptionKey();
-    
+
     // Create cipher
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-    
+
     // Encrypt the text
     let encrypted = cipher.update(text, 'utf8', 'base64');
     encrypted += cipher.final('base64');
-    
+
     // Combine IV and encrypted data in Laravel-compatible format
     // Format: base64(iv + encrypted)
     const combined = Buffer.concat([iv, Buffer.from(encrypted, 'base64')]);
-    
+
     return combined.toString('base64');
   } catch (error) {
     console.error('❌ Encryption error:', error.message);
@@ -67,7 +67,7 @@ function encrypt(text) {
  */
 function decrypt(encryptedData) {
   if (!encryptedData) return encryptedData;
-  
+
   // If data is clearly not encrypted (too short or not base64), return as-is
   if (typeof encryptedData !== 'string' || encryptedData.length < 24) {
     return encryptedData;
@@ -117,14 +117,14 @@ function decrypt(encryptedData) {
  */
 function encryptFile(fileBuffer) {
   if (!fileBuffer) return fileBuffer;
-  
+
   try {
     const iv = crypto.randomBytes(16);
     const key = getEncryptionKey();
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-    
+
     const encrypted = Buffer.concat([cipher.update(fileBuffer), cipher.final()]);
-    
+
     // Prepend IV to encrypted data
     return Buffer.concat([iv, encrypted]);
   } catch (error) {
@@ -140,20 +140,27 @@ function encryptFile(fileBuffer) {
  */
 function decryptFile(encryptedBuffer) {
   if (!encryptedBuffer) return encryptedBuffer;
-  
+
+  // Check if buffer is too small to be encrypted (needs at least IV + 1 byte)
+  if (encryptedBuffer.length < 17) {
+    console.log('⚠️ File too small to be encrypted, returning as-is');
+    return encryptedBuffer;
+  }
+
   try {
     const key = getEncryptionKey();
-    
+
     // Extract IV and encrypted content
     const iv = encryptedBuffer.slice(0, 16);
     const encrypted = encryptedBuffer.slice(16);
-    
+
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-    
+
     return Buffer.concat([decipher.update(encrypted), decipher.final()]);
   } catch (error) {
-    console.error('❌ File decryption error:', error.message);
-    throw new Error('Failed to decrypt file');
+    // If decryption fails, file is probably not encrypted - return original
+    console.log('⚠️ File decryption failed, returning original (likely not encrypted)');
+    return encryptedBuffer;
   }
 }
 
@@ -165,13 +172,13 @@ function decryptFile(encryptedBuffer) {
  */
 function encryptFields(obj, fields) {
   const encrypted = { ...obj };
-  
+
   fields.forEach(field => {
     if (encrypted[field]) {
       encrypted[field] = encrypt(String(encrypted[field]));
     }
   });
-  
+
   return encrypted;
 }
 
@@ -183,13 +190,13 @@ function encryptFields(obj, fields) {
  */
 function decryptFields(obj, fields) {
   const decrypted = { ...obj };
-  
+
   fields.forEach(field => {
     if (decrypted[field]) {
       decrypted[field] = decrypt(decrypted[field]);
     }
   });
-  
+
   return decrypted;
 }
 
@@ -214,17 +221,17 @@ async function getVerifiedUserRole(userId, db) {
   if (!userId || !db) {
     return 'user';
   }
-  
+
   try {
     const [users] = await db.query(
       "SELECT role FROM users WHERE id = ?",
       [userId]
     );
-    
+
     if (users.length === 0) {
       return 'user';
     }
-    
+
     const role = users[0].role || 'user';
     console.log(`✅ Verified user ${userId} has role: ${role}`);
     return role;
