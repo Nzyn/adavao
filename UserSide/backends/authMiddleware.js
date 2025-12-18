@@ -104,7 +104,11 @@ const getVerifiedUserRole = async (userId) => {
     );
 
     if (adminUsers.length > 0) {
-      const role = adminUsers[0].role || 'admin';
+      let role = adminUsers[0].role || 'admin';
+      // Normalize superadmin variants to 'admin' for access control purposes
+      if (role === 'superadmin' || role === 'super_admin') {
+        role = 'admin';
+      }
       console.log(`✅ Found admin/police user ${userId} with role: ${role}`);
       return role;
     }
