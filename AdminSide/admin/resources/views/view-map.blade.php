@@ -1051,22 +1051,10 @@
                 maxZoom: 18,
             });
             
-            // Initialize marker cluster group with custom icons (NO ANIMATIONS)
-            markerClusterGroup = L.markerClusterGroup({
-                showCoverageOnHover: false,
-                zoomToBoundsOnClick: true,
-                spiderfyOnMaxZoom: false,  // Disable spider animation
-                animate: false,             // Disable all animations
-                animateAddingMarkers: false, // Disable marker add animation
-                disableClusteringAtZoom: 16, // Show individual markers at zoom 16+
-                removeOutsideVisibleBounds: true,
-                chunkedLoading: true,
-                chunkInterval: 200,
-                chunkDelay: 50,
-                chunkDelay: 50
-            });
+            // Initialize regular layer group for markers (NO CLUSTERING)
+            markerClusterGroup = L.layerGroup();
             
-            // Add cluster group to map
+            // Add layer group to map
             map.addLayer(markerClusterGroup);
             
             // Load initial data
@@ -1601,11 +1589,12 @@
             }
         });
         
-        console.log(`Added ${markers.length} markers to cluster group`);
+        console.log(`Added ${markers.length} individual markers to map`);
         
         // Fit bounds if there are markers
         if (markers.length > 0) {
-            const bounds = markerClusterGroup.getBounds();
+            const group = L.featureGroup(markers);
+            const bounds = group.getBounds();
             if (bounds.isValid()) {
                 map.fitBounds(bounds.pad(0.1), {
                     maxZoom: 15
