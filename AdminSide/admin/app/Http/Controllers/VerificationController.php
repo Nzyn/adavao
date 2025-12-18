@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Verification;
 use App\Models\User;
+use App\Services\EncryptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
@@ -25,6 +26,15 @@ class VerificationController extends Controller
             // Debug log
             Log::info('getAllVerifications called', ['count' => $verifications->count()]);
             
+            // Decrypt image paths for each verification
+            $verifications = $verifications->map(function($v) {
+                // Decrypt the image path fields using the EncryptionService
+                $v->id_picture = EncryptionService::decrypt($v->id_picture);
+                $v->id_selfie = EncryptionService::decrypt($v->id_selfie);
+                $v->billing_document = EncryptionService::decrypt($v->billing_document);
+                return $v;
+            });
+            
             // Log the first few verifications for debugging
             if ($verifications->count() > 0) {
                 $sampleData = $verifications->take(3)->map(function($v) {
@@ -36,9 +46,13 @@ class VerificationController extends Controller
                         'user_lastname' => $v->user ? $v->user->lastname : null,
                         'status' => $v->status,
                         'created_at' => $v->created_at,
+                        // Add image paths for debugging
+                        'id_picture' => $v->id_picture,
+                        'id_selfie' => $v->id_selfie,
+                        'billing_document' => $v->billing_document,
                     ];
                 });
-                Log::info('Sample verifications data', ['data' => $sampleData]);
+                Log::info('Sample verifications data (decrypted)', ['data' => $sampleData]);
             }
             
             return response()->json([
