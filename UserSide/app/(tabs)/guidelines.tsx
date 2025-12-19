@@ -7,6 +7,14 @@ import Checkbox from 'expo-checkbox';
 import UpdateSuccessDialog from '../../components/UpdateSuccessDialog';
 
 const Guidelines = () => {
+    // 📊 Performance Timing - Start
+    const pageStartTime = useRef(Date.now());
+    React.useEffect(() => {
+        const loadTime = Date.now() - pageStartTime.current;
+        console.log(`📊 [Guidelines] Page Load Time: ${loadTime}ms`);
+    }, []);
+    // 📊 Performance Timing - End
+
     const scrollViewRef = useRef<ScrollView>(null);
     const crimeTypesSectionRef = useRef<View>(null);
     const { scrollToSection } = useLocalSearchParams<{ scrollToSection?: string }>();

@@ -177,8 +177,8 @@
             <img src="{{ asset('dcpo.jpg') }}" alt="DCPO" style="width:100%;height:100%;object-fit:cover;display:block;" />
         </div>
         <div class="auth-form">
-            <div class="text-center mb-4">
-                <i class="fas fa-shield-alt fa-3x text-primary" style="color: #3b82f6; margin-bottom: 15px;"></i>
+            <div style="text-align: center; margin-bottom: 15px;">
+                <i class="fas fa-shield-alt fa-3x" style="color: #3b82f6;"></i>
             </div>
             
             <h1 class="auth-title">Security Verification</h1>
@@ -229,16 +229,7 @@
                 </div>
             </form>
             
-            <div class="mt-4" style="text-align: center; margin-top: 20px; padding: 10px; background: #fffbeb; border-radius: 6px; border: 1px solid #fcd34d;">
-                <p style="font-size: 0.825rem; color: #92400e; margin-bottom: 5px; font-weight: 600;">
-                    <i class="fas fa-exclamation-triangle me-1"></i> Trouble receiving code?
-                </p>
-                <p style="font-size: 0.8rem; color: #b45309;">
-                    If using WhatsApp Sandbox, your session may have expired (72h limit).
-                    <br>
-                    <strong>Action:</strong> Send <code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 3px;">join clever-fox</code> (or your sandbox code) to <strong>+1 415 523 8886</strong> on WhatsApp to re-enable delivery.
-                </p>
-            </div>
+
             
             <div class="mt-4 text-center">
                 <form method="POST" action="{{ route('otp.login.resend') }}" id="resend-form">

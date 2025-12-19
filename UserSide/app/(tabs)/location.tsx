@@ -17,6 +17,14 @@ interface Barangay {
 }
 
 const LocationScreen = () => {
+  // 📊 Performance Timing - Start
+  const pageStartTime = React.useRef(Date.now());
+  React.useEffect(() => {
+    const loadTime = Date.now() - pageStartTime.current;
+    console.log(`📊 [Station] Page Load Time: ${loadTime}ms`);
+  }, []);
+  // 📊 Performance Timing - End
+
   const router = useRouter();
   const { user } = useUser();
   const [userAddress, setUserAddress] = useState("");

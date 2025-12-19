@@ -37,6 +37,14 @@ const sanitizeEmail = (email: string): string => {
 };
 
 const Login = () => {
+  // 📊 Performance Timing - Start
+  const pageStartTime = React.useRef(Date.now());
+  React.useEffect(() => {
+    const loadTime = Date.now() - pageStartTime.current;
+    console.log(`📊 [Login] Page Load Time: ${loadTime}ms`);
+  }, []);
+  // 📊 Performance Timing - End
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

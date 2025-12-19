@@ -13,6 +13,14 @@ import { BACKEND_URL } from '../../config/backend';
 import ChangePasswordModal from '../../components/ChangePasswordModal';
 
 export default function ProfileScreen() {
+  // 📊 Performance Timing - Start
+  const pageStartTime = React.useRef(Date.now());
+  React.useEffect(() => {
+    const loadTime = Date.now() - pageStartTime.current;
+    console.log(`📊 [Profile] Page Load Time: ${loadTime}ms`);
+  }, []);
+  // 📊 Performance Timing - End
+
   const { user, refreshProfile } = useUser();
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
   const [loadingVerification, setLoadingVerification] = useState(true);

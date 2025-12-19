@@ -24,6 +24,14 @@ const sanitizeText = (text: string): string => {
 };
 
 const Register = () => {
+  // 📊 Performance Timing - Start
+  const pageStartTime = React.useRef(Date.now());
+  React.useEffect(() => {
+    const loadTime = Date.now() - pageStartTime.current;
+    console.log(`📊 [Register] Page Load Time: ${loadTime}ms`);
+  }, []);
+  // 📊 Performance Timing - End
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmpassword, setConfirmPassword] = useState("");

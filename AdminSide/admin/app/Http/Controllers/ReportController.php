@@ -696,6 +696,12 @@ class ReportController extends Controller
                 'success' => true,
                 'message' => 'Reassignment request submitted successfully'
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please select a valid police station',
+                'errors' => $e->errors()
+            ], 422);
         } catch (\Exception $e) {
             \Log::error('Error requesting report reassignment', [
                 'report_id' => $id,
@@ -707,6 +713,7 @@ class ReportController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Get all reassignment requests (Admin only)

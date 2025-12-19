@@ -97,6 +97,14 @@ function CheckRow({ label, checked, onToggle }: CheckRowProps) {
 }
 
 export default function ReportCrime() {
+    // 📊 Performance Timing - Start
+    const pageStartTime = React.useRef(Date.now());
+    React.useEffect(() => {
+        const loadTime = Date.now() - pageStartTime.current;
+        console.log(`📊 [Report] Page Load Time: ${loadTime}ms`);
+    }, []);
+    // 📊 Performance Timing - End
+
     const { user } = useUser();
     const [title, setTitle] = useState('');
     const [titleError, setTitleError] = useState('');

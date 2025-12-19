@@ -36,6 +36,14 @@ const ChatMessage = React.memo(({ item, userId }: { item: Message, userId: strin
 });
 
 const ChatScreen = () => {
+    // 📊 Performance Timing - Start
+    const pageStartTime = React.useRef(Date.now());
+    React.useEffect(() => {
+        const loadTime = Date.now() - pageStartTime.current;
+        console.log(`📊 [Chat] Page Load Time: ${loadTime}ms`);
+    }, []);
+    // 📊 Performance Timing - End
+
     const { user } = useUser();
     const params = useLocalSearchParams();
     const otherUserId = params.otherUserId as string;

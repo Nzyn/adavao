@@ -1,0 +1,516 @@
+// AlertDavao Database Schema - 29 Tables (Optimized)
+// Database: alertdavao_f2ij (PostgreSQL)
+// Generated: 2025-12-18
+// Use this code at: https://dbdiagram.io/
+
+Project AlertDavao {
+  database_type: 'PostgreSQL'
+  Note: 'AlertDavao Crime Reporting System - 29 Optimized Tables'
+}
+
+// ========================================
+// USER MANAGEMENT
+// ========================================
+
+Table users_public {
+  id bigint [pk, increment]
+  firstname varchar(50) [not null]
+  lastname varchar(50) [not null]
+  contact varchar(15) [not null]
+  email varchar(100) [not null, unique]
+  email_verified_at timestamp
+  password varchar(255) [not null]
+  address varchar(255)
+  latitude double
+  longitude double
+  station_id bigint [ref: > police_stations.station_id]
+  is_verified boolean [default: false]
+  role varchar(50) [default: 'user']
+  total_flags int [default: 0]
+  false_report_count int [default: 0]
+  spam_count int [default: 0]
+  harassment_count int [default: 0]
+  inappropriate_content_count int [default: 0]
+  last_flag_date timestamp
+  restriction_level varchar(50) [default: 'none']
+  trust_score int [default: 100]
+  failed_login_attempts int [default: 0]
+  lockout_until timestamp
+  last_failed_login timestamp
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  Note: 'Mobile app users (4 rows)'
+}
+
+Table user_admin {
+  id bigint [pk, increment]
+  firstname varchar(50) [not null]
+  lastname varchar(50) [not null]
+  contact varchar(15) [not null]
+  email varchar(100) [not null, unique]
+  email_verified_at timestamp
+  password varchar(255) [not null]
+  address varchar(255)
+  latitude double
+  longitude double
+  station_id bigint [ref: > police_stations.station_id]
+  is_verified boolean [default: false]
+  role varchar(50) [default: 'user']
+  total_flags int [default: 0]
+  false_report_count int [default: 0]
+  spam_count int [default: 0]
+  harassment_count int [default: 0]
+  inappropriate_content_count int [default: 0]
+  last_flag_date timestamp
+  restriction_level varchar(50) [default: 'none']
+  trust_score int [default: 100]
+  failed_login_attempts int [default: 0]
+  lockout_until timestamp
+  last_failed_login timestamp
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  Note: 'Admin and police users (10 rows)'
+}
+
+Table roles {
+  role_id bigint [pk, increment]
+  role_name varchar(255) [not null, unique]
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'User roles (6 rows)'
+}
+
+Table user_admin_roles {
+  id int [pk, increment]
+  user_admin_id bigint [ref: > user_admin.id, not null]
+  role_id bigint [ref: > roles.role_id, not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  Note: 'Admin role assignments (3 rows)'
+}
+
+// ========================================
+// REPORTS SYSTEM
+// ========================================
+
+Table reports {
+  report_id bigint [pk, increment]
+  user_id bigint [ref: > users_public.id, not null]
+  location_id bigint [ref: > locations.location_id, not null]
+  assigned_station_id bigint [ref: > police_stations.station_id]
+  station_id bigint [ref: > police_stations.station_id]
+  title varchar(255)
+  report_type json [not null]
+  description text [not null]
+  date_reported timestamp
+  status varchar(255) [default: 'pending']
+  is_valid varchar(255) [default: 'checking_for_report_validity']
+  is_anonymous boolean [default: false]
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Crime reports (15 rows)'
+}
+
+Table report_media {
+  media_id bigint [pk, increment]
+  report_id bigint [ref: > reports.report_id, not null]
+  media_url varchar(255) [not null]
+  media_type varchar(255) [not null]
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Report photos/videos (12 rows)'
+}
+
+Table report_ip_tracking {
+  id bigint [pk, increment]
+  report_id bigint [ref: > reports.report_id, not null]
+  ip_address varchar(45) [not null]
+  user_agent text
+  submitted_at timestamp [default: `now()`]
+  
+  Note: 'Spam prevention tracking (15 rows)'
+}
+
+Table report_reassignment_requests {
+  request_id bigint [pk, increment]
+  report_id bigint [ref: > reports.report_id, not null]
+  requested_by_user_id bigint [not null]
+  current_station_id bigint [ref: > police_stations.station_id]
+  requested_station_id bigint [ref: > police_stations.station_id, not null]
+  reason varchar(500)
+  status varchar(50) [default: 'pending']
+  reviewed_by_user_id bigint
+  reviewed_at timestamp
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Station transfer requests (0 rows - feature ready)'
+}
+
+// ========================================
+// LOCATION & GEOGRAPHY
+// ========================================
+
+Table locations {
+  location_id bigint [pk, increment]
+  barangay varchar(255) [not null]
+  reporters_address text
+  latitude double [not null]
+  longitude double [not null]
+  station_id bigint [ref: > police_stations.station_id]
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Crime locations (18,543 rows)'
+}
+
+Table barangays {
+  barangay_id bigint [pk, increment]
+  barangay_name varchar(100) [not null]
+  citymuncode varchar(10)
+  station_id bigint [ref: > police_stations.station_id, not null]
+  latitude double
+  longitude double
+  boundary_polygon text
+  osm_id varchar(50)
+  ref varchar(50)
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Davao City barangays (233 rows)'
+}
+
+Table police_stations {
+  station_id bigint [pk, increment]
+  station_name varchar(100) [not null]
+  address varchar(255)
+  latitude double
+  longitude double
+  contact_number varchar(50)
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  Note: 'Police stations (21 rows)'
+}
+
+Table police_officers {
+  officer_id bigint [pk, increment]
+  user_id bigint [ref: > user_admin.id, not null]
+  station_id bigint [ref: > police_stations.station_id, not null]
+  assigned_since date
+  rank varchar(255)
+  status varchar(255) [default: 'active']
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Officer assignments (0 rows - feature ready)'
+}
+
+// ========================================
+// VERIFICATION SYSTEM
+// ========================================
+
+Table verifications {
+  verification_id bigint [pk, increment]
+  user_id bigint [ref: > users_public.id, not null]
+  otp_code varchar(255) [not null]
+  expiration timestamp
+  status varchar(255) [not null]
+  id_picture varchar(255)
+  id_selfie varchar(255)
+  billing_document varchar(255)
+  is_verified boolean [default: false]
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'ID verification requests (2 rows)'
+}
+
+Table verified_phones {
+  id int [pk]
+  phone varchar(64) [not null, unique]
+  verified boolean [default: true]
+  verified_at timestamp
+  
+  Note: 'Phone verification (4 rows)'
+}
+
+Table otp_codes {
+  id int [pk, increment]
+  phone varchar(64) [not null]
+  otp_hash varchar(255) [not null]
+  purpose varchar(64) [not null]
+  user_id int
+  expires_at timestamp
+  created_at timestamp
+  
+  Note: 'OTP codes (22 rows)'
+}
+
+// ========================================
+// COMMUNICATION
+// ========================================
+
+Table messages {
+  message_id bigint [pk, increment]
+  sender_id bigint [not null]
+  receiver_id bigint [not null]
+  report_id bigint [ref: > reports.report_id]
+  message text [not null]
+  status boolean [default: false]
+  sent_at timestamp
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'User-admin chat (13 rows)'
+}
+
+Table notifications {
+  id bigint [pk, increment]
+  user_id bigint [ref: > users_public.id, not null]
+  type varchar(255) [not null]
+  message text [not null]
+  data json
+  read boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  Note: 'User notifications (10 rows)'
+}
+
+Table notification_reads {
+  id bigint [pk, increment]
+  user_id bigint [ref: > users_public.id, not null]
+  notification_id varchar(255) [not null]
+  read_at timestamp [default: `now()`]
+  
+  Note: 'Read status tracking (23 rows)'
+}
+
+// ========================================
+// USER MODERATION
+// ========================================
+
+Table user_flags {
+  id int [pk, increment]
+  user_id int [not null]
+  flagged_by int [default: 1, not null]
+  violation_type varchar(50) [not null]
+  reason text
+  severity varchar(50) [default: 'minor']
+  description text
+  evidence json
+  reported_by int
+  related_report_id int
+  status varchar(50) [default: 'pending']
+  reviewed_by int
+  reviewed_at timestamp
+  created_at timestamp
+  updated_at timestamp
+  duration_days int
+  expires_at timestamp
+  
+  Note: 'User violations (29 rows)'
+}
+
+Table user_restrictions {
+  id int [pk, increment]
+  user_id int [not null]
+  restriction_type varchar(50) [not null]
+  reason text
+  restricted_by bigint
+  expires_at timestamp
+  can_report boolean [default: true]
+  can_comment boolean [default: true]
+  can_upload boolean [default: true]
+  can_message boolean [default: true]
+  is_active boolean [default: true]
+  created_by int
+  lifted_by int
+  lifted_at timestamp
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'User penalties (10 rows)'
+}
+
+// ========================================
+// ANALYTICS
+// ========================================
+
+Table crime_analytics {
+  analytics_id bigint [pk, increment]
+  location_id bigint [ref: > locations.location_id, not null]
+  year int
+  month int
+  total_reports int [not null]
+  crime_rate double [not null]
+  last_updated timestamp
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Crime statistics (0 rows - feature ready)'
+}
+
+Table crime_forecasts {
+  forecast_id bigint [pk, increment]
+  location_id bigint [ref: > locations.location_id, not null]
+  forecast_date date
+  predicted_count int [not null]
+  model_used varchar(255) [not null]
+  confidence_score double [not null]
+  lower_ci double
+  upper_ci double
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'SARIMA predictions (0 rows - feature ready)'
+}
+
+// ========================================
+// LARAVEL SYSTEM TABLES
+// ========================================
+
+Table migrations {
+  id bigint [pk, increment]
+  migration varchar(255) [not null]
+  batch int [not null]
+  
+  Note: 'Database version control (56 rows)'
+}
+
+Table failed_jobs {
+  id bigint [pk, increment]
+  uuid varchar(255) [not null, unique]
+  connection text [not null]
+  queue text [not null]
+  payload text [not null]
+  exception text [not null]
+  failed_at timestamp [default: `now()`]
+  
+  Note: 'Queue failures (0 rows)'
+}
+
+Table password_reset_tokens {
+  email varchar(255) [pk]
+  token varchar(255) [not null]
+  created_at timestamp
+  
+  Note: 'Password resets (0 rows)'
+}
+
+Table personal_access_tokens {
+  id bigint [pk, increment]
+  tokenable_type varchar(255) [not null]
+  tokenable_id bigint [not null]
+  name varchar(255) [not null]
+  token varchar(64) [not null, unique]
+  abilities text
+  last_used_at timestamp
+  expires_at timestamp
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'API tokens (0 rows)'
+}
+
+// ========================================
+// PERMISSIONS (RBAC)
+// ========================================
+
+Table routes {
+  route_id bigint [pk, increment]
+  route_name varchar(255) [not null]
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Route definitions (0 rows - RBAC ready)'
+}
+
+Table role_route {
+  id bigint [pk, increment]
+  role_id bigint [ref: > roles.role_id, not null]
+  route_id bigint [ref: > routes.route_id, not null]
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Role-route mapping (0 rows - RBAC ready)'
+}
+
+Table admin_actions {
+  action_id bigint [pk, increment]
+  admin_id bigint [ref: > user_admin.id, not null]
+  action_type varchar(255) [not null]
+  description text [not null]
+  date_performed timestamp
+  created_at timestamp
+  updated_at timestamp
+  
+  Note: 'Admin audit trail (0 rows - feature ready)'
+}
+
+// ========================================
+// TABLE GROUPS (for visual organization)
+// ========================================
+
+TableGroup user_management {
+  users_public
+  user_admin
+  roles
+  user_admin_roles
+}
+
+TableGroup reports_system {
+  reports
+  report_media
+  report_ip_tracking
+  report_reassignment_requests
+}
+
+TableGroup location_geography {
+  locations
+  barangays
+  police_stations
+  police_officers
+}
+
+TableGroup verification {
+  verifications
+  verified_phones
+  otp_codes
+}
+
+TableGroup communication {
+  messages
+  notifications
+  notification_reads
+}
+
+TableGroup moderation {
+  user_flags
+  user_restrictions
+}
+
+TableGroup analytics {
+  crime_analytics
+  crime_forecasts
+}
+
+TableGroup laravel_system {
+  migrations
+  failed_jobs
+  password_reset_tokens
+  personal_access_tokens
+}
+
+TableGroup permissions {
+  routes
+  role_route
+  admin_actions
+}

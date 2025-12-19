@@ -114,6 +114,14 @@ const HistoryItem = React.memo(({ item, onPress }: {
 ));
 
 const history = () => {
+  // 📊 Performance Timing - Start
+  const pageStartTime = React.useRef(Date.now());
+  React.useEffect(() => {
+    const loadTime = Date.now() - pageStartTime.current;
+    console.log(`📊 [History] Page Load Time: ${loadTime}ms`);
+  }, []);
+  // 📊 Performance Timing - End
+
   const { user } = useUser();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
