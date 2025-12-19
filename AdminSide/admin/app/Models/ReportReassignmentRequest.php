@@ -35,11 +35,11 @@ class ReportReassignmentRequest extends Model
     }
 
     /**
-     * Get the user who requested the reassignment
+     * Get the user who requested the reassignment (Admin/Police user)
      */
     public function requestedBy()
     {
-        return $this->belongsTo(User::class, 'requested_by_user_id', 'id');
+        return $this->belongsTo(UserAdmin::class, 'requested_by_user_id', 'id');
     }
 
     /**
@@ -59,10 +59,10 @@ class ReportReassignmentRequest extends Model
     }
 
     /**
-     * Get the admin who reviewed the request
+     * Get the admin who reviewed the request (Admin user)
      */
     public function reviewedBy()
     {
-        return $this->belongsTo(User::class, 'reviewed_by_user_id', 'id');
+        return $this->belongsTo(UserAdmin::class, 'reviewed_by_user_id', 'id');
     }
 }
