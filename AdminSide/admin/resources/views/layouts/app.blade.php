@@ -372,21 +372,20 @@
                     <!-- Admin-only navigation -->
                     @if(auth()->user() && (auth()->user()->role === 'admin' || str_contains(auth()->user()->email, 'alertdavao.ph')))
                     <li class="nav-item">
-                        <a href="{{ route('users') }}" class="nav-link {{ request()->routeIs('users') ? 'active' : '' }}">
+                        <a href="{{ route('users') }}" class="nav-link {{ request()->routeIs('users') || request()->routeIs('flagged-users') ? 'active' : '' }}">
                             <svg class="nav-icon" viewBox="0 0 24 24">
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                 <circle cx="12" cy="7" r="4"/>
                             </svg>
                             Users
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('flagged-users') }}" class="nav-link {{ request()->routeIs('flagged-users') ? 'active' : '' }}">
-                            <svg class="nav-icon" viewBox="0 0 24 24">
-                                <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                            </svg>
-                            Flagged Users
-                        </a>
+                        <ul style="padding-left: 2rem; margin-top: 0.5rem;">
+                            <li class="nav-item">
+                                <a href="{{ route('flagged-users') }}" class="nav-link {{ request()->routeIs('flagged-users') ? 'active' : '' }}" style="font-size: 0.875rem;">
+                                    Flagged
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <a href="{{ route('personnel') }}" class="nav-link {{ request()->routeIs('personnel') ? 'active' : '' }}">

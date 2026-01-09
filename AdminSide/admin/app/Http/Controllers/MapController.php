@@ -172,6 +172,11 @@ class MapController extends Controller
             if (!$report->location || !$report->date_reported) {
                 return null;
             }
+            
+            // Filter out coordinates that are in water (Davao Gulf)
+            if ($this->isInWater($report->location->latitude, $report->location->longitude)) {
+                return null;
+            }
 
             // Add slight random offset to coordinates (±0.0005 degrees ≈ ±50 meters)
             // This prevents exact overlaps while keeping markers in same general area
@@ -441,6 +446,11 @@ class MapController extends Controller
                             }
                         }
                         
+                        // Filter out coordinates that are in water (Davao Gulf)
+                        if ($this->isInWater($csvRow['lat'], $csvRow['lng'])) {
+                            continue; // Skip water coordinates
+                        }
+                        
                         $csvData[] = $csvRow;
                     }
                 }
@@ -616,5 +626,61 @@ class MapController extends Controller
         $name = preg_replace('/^BARANGAY\s+/', '', $name);
         
         return trim($name);
+    }
+    
+    /**
+     * Check if coordinates are in water (Davao Gulf or other water bodies)
+     * Uses simplified polygon/bounds check for Davao City area
+     */
+    private function isInWater($lat, $lng)
+    {
+        // Early exit if coordinates are clearly on land (west/inland side of Davao)
+        if ($lng < 125.45) {
+            return false; // Definitely on land (western Davao)
+        }
+        
+        // Simplified water boundaries for Davao Gulf
+        // The gulf is generally east of longitude 125.55-125.65 depending on latitude
+        
+        // Main Davao Gulf area (simplified polygon check)
+        // If longitude is very far east AND within typical water areas
+        if ($lng > 125.65) {
+            return true; // Far east - definitely water
+        }
+        
+        // Coastal zone check - varies by latitude
+        // Northern Davao coast (around Samal Island area)
+        if ($lat >= 7.05 && $lat <= 7.35 && $lng > 125.55) {
+            // This is the Samal Island / Pakiputan Strait area
+            // Allow specific ranges for Samal
+            if ($lat >= 7.10 && $lat <= 7.15 && $lng >= 125.60 && $lng <= 125.70) {
+                return false; // Samal Island
+            }
+            if ($lng > 125.62) {
+                return true; // Water east of coast
+            }
+        }
+        
+        // Central Davao coast (main city coastline)
+        if ($lat >= 6.95 && $lat < 7.05 && $lng > 125.58) {
+            return true; // Water off main city coast
+        }
+        
+        // Southern coast (Toril/Daliao area)  
+        if ($lat >= 6.85 && $lat < 6.95 && $lng > 125.55) {
+            return true; // Water off southern coast
+        }
+        
+        // Very southern area (towards Sta. Cruz)
+        if ($lat < 6.85 && $lng > 125.52) {
+            return true; // Water
+        }
+        
+        // Additional water check - if outside typical city bounds
+        if ($lat < 6.80 || $lat > 7.50) {
+            return true; // Way outside city - likely water or invalid
+        }
+        
+        return false; // Default: on land
     }
 }

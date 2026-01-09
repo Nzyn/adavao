@@ -130,9 +130,10 @@
                 padding: 1.5rem;
                 border-radius: 12px;
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                border-left: 4px solid #e5e7eb;
-                border: 1px solid #9ca3af;
-                border-left-width: 4px;
+                border-top: 1px solid #9ca3af;
+                border-right: 1px solid #9ca3af;
+                border-bottom: 1px solid #9ca3af;
+                border-left: 4px solid #3b82f6;
                 transition: all 0.3s ease;
                 text-decoration: none;
                 display: block;
@@ -142,30 +143,19 @@
             
             .stat-card:hover {
                 transform: translateY(-4px);
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
             }
             
             .stat-card.total {
                 border-left-color: #3b82f6;
             }
             
-            .stat-card.total:hover {
-                box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
-            }
-            
             .stat-card.verified {
                 border-left-color: #10b981;
             }
             
-            .stat-card.verified:hover {
-                box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35);
-            }
-            
             .stat-card.pending {
                 border-left-color: #f59e0b;
-            }
-            
-            .stat-card.pending:hover {
-                box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35);
             }
             
             .stat-title {
