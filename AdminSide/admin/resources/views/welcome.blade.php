@@ -585,50 +585,50 @@
                     @else
                         <!-- ADMIN DASHBOARD: Summary Grid -->
                         
-                        <!-- 1. Reports -->
-                        <a href="{{ route('reports') }}" class="stat-card total">
+                        <!-- 1. Reports - Blue #3b82f6 -->
+                        <a href="{{ route('reports') }}" class="stat-card" style="border-left-color: #3b82f6;">
                             <div class="stat-title">Reports</div>
                             <div class="stat-value">{{ $totalReports }}</div>
                         </a>
                         
-                        <!-- 2. Messages -->
-                        <a href="{{ route('messages') }}" class="stat-card pending">
+                        <!-- 2. Messages - Amber #f59e0b -->
+                        <a href="{{ route('messages') }}" class="stat-card" style="border-left-color: #f59e0b;">
                             <div class="stat-title">Messages</div>
                             <div class="stat-value">{{ $unreadMessages }}</div>
                         </a>
                         
-                        <!-- 3. Users -->
-                        <a href="{{ route('users') }}" class="stat-card verified">
+                        <!-- 3. Users - Green #10b981 -->
+                        <a href="{{ route('users') }}" class="stat-card" style="border-left-color: #10b981;">
                             <div class="stat-title">Users</div>
                             <div class="stat-value">{{ $totalUsers }}</div>
                         </a>
                         
-                        <!-- 4. Flagged Users -->
-                        <a href="{{ route('flagged-users') }}" class="stat-card pending" style="border-left-color: #ef4444;">
+                        <!-- 4. Flagged Users - Red #ef4444 -->
+                        <a href="{{ route('flagged-users') }}" class="stat-card" style="border-left-color: #ef4444;">
                             <div class="stat-title">Flagged Users</div>
                             <div class="stat-value">{{ $flaggedUsersCount }}</div>
                         </a>
                         
-                        <!-- 5. Personnel -->
-                        <a href="{{ route('personnel') }}" class="stat-card pending" style="border-left-color: #6366f1;">
+                        <!-- 5. Personnel - Indigo #6366f1 -->
+                        <a href="{{ route('personnel') }}" class="stat-card" style="border-left-color: #6366f1;">
                             <div class="stat-title">Personnel</div>
                             <div class="stat-value">{{ $totalPoliceOfficers }}</div>
                         </a>
                         
-                        <!-- 6. Verification -->
-                        <a href="{{ route('verification') }}" class="stat-card total" style="border-left-color: #8b5cf6;">
+                        <!-- 6. Verification - Purple #8b5cf6 -->
+                        <a href="{{ route('verification') }}" class="stat-card" style="border-left-color: #8b5cf6;">
                             <div class="stat-title">Verification</div>
                             <div class="stat-value">{{ $pendingVerificationsCount }}</div>
                         </a>
                         
-                        <!-- 7. Statistics -->
-                        <a href="{{ route('statistics') }}" class="stat-card verified" style="border-left-color: #10b981;">
+                        <!-- 7. Statistics - Teal #14b8a6 -->
+                        <a href="{{ route('statistics') }}" class="stat-card" style="border-left-color: #14b8a6;">
                             <div class="stat-title">Statistics</div>
                             <div class="stat-value" style="font-size: 1.25rem;">View Analytics</div>
                         </a>
                         
-                        <!-- 8. View Map -->
-                        <a href="{{ route('view-map') }}" class="stat-card total" style="border-left-color: #3b82f6;">
+                        <!-- 8. View Map - Pink #ec4899 -->
+                        <a href="{{ route('view-map') }}" class="stat-card" style="border-left-color: #ec4899;">
                             <div class="stat-title">Crime Map</div>
                             <div class="stat-value" style="font-size: 1.25rem;">Open Live Map</div>
                         </a>
