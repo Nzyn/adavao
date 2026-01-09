@@ -1173,12 +1173,13 @@
                     $verification = $user ? $user->verification : null;
                     $verifiedStatus = $verification ? $verification->is_verified : null;
                     $verificationStatus = 'unverified';
-                    if ($verifiedStatus === 1) {
+                    // Use loose comparison to handle bool/int/string
+                    if ($verifiedStatus == 1 || $verifiedStatus === true) {
                         $verificationStatus = 'verified';
-                    } elseif ($verifiedStatus === 0) {
+                    } elseif ($verifiedStatus === 0 || $verifiedStatus === false || $verifiedStatus === '0') {
                         $verificationStatus = 'pending';
                     }
-                                    ?>
+                    ?>
                                     <span class="verified-badge {{ $verificationStatus }}">
                                         @if($verificationStatus === 'verified')
                                             Verified
