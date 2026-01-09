@@ -307,73 +307,58 @@
 
         .verified-badge {
             display: inline-block;
-            padding: 0.375rem 0.75rem;
-            border-radius: 9999px;
             font-size: 0.75rem;
             font-weight: 600;
             text-transform: capitalize;
         }
 
         .verified-badge.verified {
-            background-color: #d1fae5;
             color: #065f46;
         }
 
         .verified-badge.unverified {
-            background-color: #fee2e2;
             color: #991b1b;
         }
 
         .verified-badge.pending {
-            background-color: #e0e7ff;
             color: #3730a3;
         }
 
         .status-badge {
             display: inline-block;
-            padding: 0.375rem 0.75rem;
-            border-radius: 9999px;
             font-size: 0.75rem;
             font-weight: 600;
             text-transform: capitalize;
         }
 
         .status-badge.pending {
-            background-color: #e0e7ff;
             color: #3730a3;
         }
 
         .status-badge.investigating {
-            background-color: #dbeafe;
             color: #1e40af;
         }
 
         .status-badge.resolved {
-            background-color: #d1fae5;
             color: #065f46;
         }
 
         .validity-badge {
             display: inline-block;
-            padding: 0.375rem 0.75rem;
-            border-radius: 9999px;
             font-size: 0.75rem;
             font-weight: 600;
             text-transform: capitalize;
         }
 
         .validity-badge.valid {
-            background-color: #d1fae5;
             color: #065f46;
         }
 
         .validity-badge.invalid {
-            background-color: #fee2e2;
             color: #991b1b;
         }
 
         .validity-badge.checking_for_report_validity {
-            background-color: #e0e7ff;
             color: #3730a3;
         }
 

@@ -132,30 +132,27 @@
     }
     
     .badge-warning {
-        background: #fef3c7;
         color: #92400e;
+        font-weight: 600;
     }
     
     .badge-suspended {
-        background: #fee2e2;
         color: #991b1b;
+        font-weight: 600;
     }
     
     .badge-banned {
-        background: #1f2937;
-        color: #fff;
+        color: #1f2937;
+        font-weight: 600;
     }
     
     .badge-flagged {
-        background: #fee2e2;
         color: #991b1b;
+        font-weight: 600;
     }
     
     .flag-badge {
-        background: #dc2626;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
+        color: #dc2626;
         font-size: 0.75rem;
         font-weight: 600;
     }
