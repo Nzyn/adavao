@@ -1111,7 +1111,7 @@ function exportCrimeData() {
         const monthFilter = document.getElementById('monthFilter')?.value || '';
         const crimeType = document.getElementById('crimeTypeFilter')?.value || '';
         
-        let url = '/api/statistics/export-crime-data';
+        let url = '/api/statistics/export';
         const params = [];
         
         if (yearFilter) params.push(`year=${yearFilter}`);

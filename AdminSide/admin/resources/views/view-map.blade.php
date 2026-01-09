@@ -377,6 +377,10 @@
         height: 24px;
         object-fit: contain;
         display: block;
+        border: 1px solid #374151;
+        border-radius: 4px;
+        padding: 2px;
+        background: white;
     }
     
     .legend-item span {
