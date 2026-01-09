@@ -415,11 +415,17 @@ class MapController extends Controller
                             if ($coords) {
                                 $csvRow['lat'] = $coords[0] + (mt_rand(-50, 50) / 100000); // Add jitter
                                 $csvRow['lng'] = $coords[1] + (mt_rand(-50, 50) / 100000);
+                            } else {
+                                // 3. Last resort: Use Davao City center with wider random spread
+                                // Center: ~7.10, 125.58 (downtown Davao)
+                                // Spread: ±0.03 degrees (about 3km radius)
+                                $csvRow['lat'] = 7.10 + (mt_rand(-3000, 3000) / 100000);
+                                $csvRow['lng'] = 125.58 + (mt_rand(-3000, 3000) / 100000);
                             }
                         }
                         
-                        // 3. Skip if NO coordinates found at all (to prevent "Invalid LatLng" error)
-                        if (!isset($csvRow['lat']) || !isset($csvRow['lng'])) {
+                        // Skip if coordinates ended up in water (after all attempts)
+                        if ($this->isInWater($csvRow['lat'], $csvRow['lng'])) {
                              continue;
                         }
                         
@@ -601,7 +607,7 @@ class MapController extends Controller
             $similarity = 0;
             similar_text($normalizedName, $normalizedCoordName, $similarity);
             
-            if ($similarity > $bestScore && $similarity > 80) { // 80% similarity threshold
+            if ($similarity > $bestScore && $similarity > 60) { // 60% similarity threshold
                 $bestScore = $similarity;
                 $bestMatch = $coords;
             }
