@@ -349,6 +349,25 @@
         white-space: normal;
         word-break: break-word;
         flex-wrap: nowrap;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 6px;
+        border: 2px solid transparent;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    
+    .legend-item:hover {
+        background: #f3f4f6;
+    }
+    
+    .legend-item.active {
+        background: #dbeafe;
+        border-color: #3b82f6;
+    }
+    
+    .legend-item.greyed-out {
+        opacity: 0.35;
     }
     
     .legend-item img {
@@ -796,83 +815,83 @@
         <div class="legend-title">Crime Type Legends</div>
         <div class="legend-items">
             <!-- Violent Crimes -->
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="murder" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/squareMURDER.png" style="width: 24px; height: 24px;" alt="Murder">
                 <span>Murder</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="homicide" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/diamondHOMICIDE.png" style="width: 24px; height: 24px;" alt="Homicide">
                 <span>Homicide</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="rape" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/moonRAPE.png" style="width: 24px; height: 24px;" alt="Rape">
                 <span>Rape</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="sexual assault" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/tearSEXUALASSAULT.png" style="width: 24px; height: 24px;" alt="Sexual Assault">
                 <span>Sexual Assault</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="physical injury" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/001-pointed-star.png" style="width: 24px; height: 24px;" alt="Physical Injury">
                 <span>Physical Injury</span>
             </div>
             
             <!-- Property Crimes -->
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="burglary" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/circleBurglary.png" style="width: 24px; height: 24px;" alt="Burglary">
                 <span>Burglary</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="break-in" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/hexagonalBreak-in.png" style="width: 24px; height: 24px;" alt="Break-in">
                 <span>Break-in</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="theft" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/003-ellipse.png" style="width: 24px; height: 24px;" alt="Theft">
                 <span>Theft</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="robbery" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/002-rectangle.png" style="width: 24px; height: 24px;" alt="Robbery">
                 <span>Robbery</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="carnapping" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/001-close.png" style="width: 24px; height: 24px;" alt="Carnapping">
                 <span>Carnapping</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="motornapping" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/002-plus.png" style="width: 24px; height: 24px;" alt="Motornapping">
                 <span>Motornapping</span>
             </div>
             
             <!-- Domestic & Threats -->
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="domestic violence" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/flagDomesticViolence.png" style="width: 24px; height: 24px;" alt="Domestic Violence">
                 <span>Domestic Violence</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="harassment" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/quoteHARASSMENT.png" style="width: 24px; height: 24px;" alt="Harassment">
                 <span>Harassment</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="threats" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/playTHREATS.png" style="width: 24px; height: 24px;" alt="Threats">
                 <span>Threats</span>
             </div>
             
             <!-- Financial & Cyber -->
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="fraud" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/bookmarkFRAUD.png" style="width: 24px; height: 24px;" alt="Fraud">
                 <span>Fraud</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="cyber crime" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/webCyberCRIME.png" style="width: 24px; height: 24px;" alt="Cyber Crime">
                 <span>Cyber Crime</span>
             </div>
             
             <!-- Others -->
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="missing person" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/missingPerson.png" style="width: 24px; height: 24px;" alt="Missing Person">
                 <span>Missing Person</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" data-crime-type="others" onclick="toggleCrimeTypeFilter(this)">
                 <img src="/legends/moreOTHERS.png" style="width: 24px; height: 24px;" alt="Others">
                 <span>Others</span>
             </div>
@@ -923,14 +942,123 @@
     let hotspotCircles = [];
     let hotspotOverlayVisible = false;
     let mappingOverlayVisible = true; // Default to true
+    let selectedCrimeTypes = []; // Track selected crime types for filtering
 
     function toggleMappingOverlay() {
-        if (document.getElementById('mapping-overlay-toggle').checked) {
-            map.addLayer(csvLayer);
-            mappingOverlayVisible = true;
+        mappingOverlayVisible = document.getElementById('mapping-overlay-toggle').checked;
+        if (mappingOverlayVisible) {
+            // Show both CSV markers and database report markers
+            if (csvLayer) map.addLayer(csvLayer);
+            if (markerClusterGroup) map.addLayer(markerClusterGroup);
         } else {
-            map.removeLayer(csvLayer);
-            mappingOverlayVisible = false;
+            // Hide both CSV markers and database report markers
+            if (csvLayer) map.removeLayer(csvLayer);
+            if (markerClusterGroup) map.removeLayer(markerClusterGroup);
+        }
+        // Re-apply crime type filter if any are selected
+        if (selectedCrimeTypes.length > 0) {
+            applyCrimeTypeFilter();
+        }
+    }
+    
+    // Toggle crime type filter when legend item is clicked
+    function toggleCrimeTypeFilter(element) {
+        const crimeType = element.getAttribute('data-crime-type');
+        const isActive = element.classList.contains('active');
+        
+        if (isActive) {
+            // Remove from selected types
+            element.classList.remove('active');
+            selectedCrimeTypes = selectedCrimeTypes.filter(t => t !== crimeType);
+        } else {
+            // Add to selected types
+            element.classList.add('active');
+            selectedCrimeTypes.push(crimeType);
+        }
+        
+        // Update all legend item styles
+        updateLegendStyles();
+        
+        // Apply the filter to map markers
+        applyCrimeTypeFilter();
+    }
+    
+    // Update legend item styles based on selection
+    function updateLegendStyles() {
+        const allLegendItems = document.querySelectorAll('.legend-item[data-crime-type]');
+        
+        if (selectedCrimeTypes.length === 0) {
+            // No filter active - remove all styling
+            allLegendItems.forEach(item => {
+                item.classList.remove('active', 'greyed-out');
+            });
+        } else {
+            // Filter active - highlight selected, grey out others
+            allLegendItems.forEach(item => {
+                const itemType = item.getAttribute('data-crime-type');
+                if (selectedCrimeTypes.includes(itemType)) {
+                    item.classList.add('active');
+                    item.classList.remove('greyed-out');
+                } else {
+                    item.classList.remove('active');
+                    item.classList.add('greyed-out');
+                }
+            });
+        }
+    }
+    
+    // Apply crime type filter to map markers
+    function applyCrimeTypeFilter() {
+        if (!mappingOverlayVisible) return;
+        
+        // Filter CSV layer markers
+        if (csvLayer) {
+            csvLayer.eachLayer(marker => {
+                if (selectedCrimeTypes.length === 0) {
+                    // No filter - show all
+                    marker.setOpacity(1);
+                    if (marker._icon) marker._icon.style.display = '';
+                } else {
+                    // Check if marker matches any selected crime type
+                    const markerType = (marker.crimeType || '').toLowerCase().trim();
+                    const matches = selectedCrimeTypes.some(type => 
+                        markerType.includes(type.toLowerCase()) || 
+                        type.toLowerCase().includes(markerType)
+                    );
+                    if (matches) {
+                        marker.setOpacity(1);
+                        if (marker._icon) marker._icon.style.display = '';
+                    } else {
+                        marker.setOpacity(0);
+                        if (marker._icon) marker._icon.style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // Filter database report markers
+        if (markerClusterGroup) {
+            markerClusterGroup.eachLayer(marker => {
+                if (selectedCrimeTypes.length === 0) {
+                    // No filter - show all
+                    marker.setOpacity(1);
+                    if (marker._icon) marker._icon.style.display = '';
+                } else {
+                    // Check if marker matches any selected crime type
+                    const markerType = (marker.crimeType || '').toLowerCase().trim();
+                    const matches = selectedCrimeTypes.some(type => 
+                        markerType.includes(type.toLowerCase()) || 
+                        type.toLowerCase().includes(markerType)
+                    );
+                    if (matches) {
+                        marker.setOpacity(1);
+                        if (marker._icon) marker._icon.style.display = '';
+                    } else {
+                        marker.setOpacity(0);
+                        if (marker._icon) marker._icon.style.display = 'none';
+                    }
+                }
+            });
         }
     }
     
@@ -1326,6 +1454,9 @@
             const marker = L.marker([crime.lat, crime.lng], { 
                 icon: createCrimeMarker(crime.crime_type, 1) 
             });
+            
+            // Store crime type for filtering
+            marker.crimeType = crime.crime_type || '';
             
             const dateStr = crime.date ? new Date(crime.date).toLocaleDateString() : 'N/A';
             const popupContent = `

@@ -1160,9 +1160,7 @@
                                 <td class="report-id">{{ str_pad($report->report_id, 5, '0', STR_PAD_LEFT) }}</td>
                                 <td>
                                     @if($report->is_anonymous)
-                                        <span style="display: flex; align-items: center; gap: 4px;">
-                                            <span style="font-size: 1.25em;">🕵️</span> Anonymous
-                                        </span>
+                                        Anonymous
                                     @elseif($report->user)
                                         {{ substr($report->user->firstname, 0, 1) }}. {{ substr($report->user->lastname, 0, 1) }}.
                                     @else
@@ -1898,7 +1896,7 @@ window.downloadModalAsPDF = function() {};
                                     <div class="detail-item">
                                         <div class="detail-label">👤 Reported By</div>
                                         <div class="detail-value">
-                                            ${report.is_anonymous ? '🕵️ Anonymous' : (report.user ? (report.user.firstname + ' ' + report.user.lastname) : 'Unknown User')}
+                                            ${report.is_anonymous ? 'Anonymous' : (report.user ? (report.user.firstname + ' ' + report.user.lastname) : 'Unknown User')}
                                             ${getVerificationBadge(report)}
                                         </div>
                                     </div>

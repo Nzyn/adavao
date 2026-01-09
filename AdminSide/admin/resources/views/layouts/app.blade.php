@@ -14,6 +14,19 @@
                 padding: 0;
             }
             
+            /* Darken container borders for better UI visibility */
+            .reports-table-container,
+            .stat-card,
+            .chart-section,
+            .map-container,
+            .flagged-users-table-container,
+            .content-body,
+            .modal-content,
+            .user-button,
+            .dropdown-menu {
+                border-color: #9ca3af !important;
+            }
+            
             body {
                 font-family: 'Inter', sans-serif;
                 background-color: #f8fafc;

@@ -229,11 +229,13 @@ class UserController extends Controller
                 
                 if (!$existingRestriction) {
                     // Create new restriction with expiry
+                    // Use null for restricted_by to avoid foreign key violations 
+                    // (admin users are in user_admin table, not users_public)
                     DB::table('user_restrictions')->insert([
                         'user_id' => $id,
                         'restriction_type' => $restrictionType,
                         'reason' => "Flagged for {$validated['violation_type']} - {$validated['duration_days']} day(s)",
-                        'restricted_by' => auth()->id() ?? 1,
+                        'restricted_by' => null,
                         'is_active' => true,
                         'expires_at' => $expiresAt,
                         'created_at' => now(),

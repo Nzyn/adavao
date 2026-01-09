@@ -459,16 +459,6 @@
         </div>
     </div>
 
-    <!-- Top Barangays by Crime Count -->
-    <div class="chart-section" style="margin-top: 2rem;">
-        <div class="chart-header">
-            <h2 class="chart-title">Top Barangays by Crime Count</h2>
-            <p style="color: #6b7280; font-size: 0.875rem; margin-top: 0.5rem;">
-                Historical crime data from CrimeReports.csv
-            </p>
-        </div>
-        <div id="topBarangays" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem;"></div>
-    </div>
 
     <!-- Data Export Section -->
     <div class="chart-section">
@@ -530,12 +520,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('⏳ Loading forecast (deferred)');
         loadForecast();
     }, { timeout: 200 });
-    
-    // Priority 3: Load barangay stats (tertiary data)
-    requestIdleCallback(() => {
-        console.log('⏳ Loading barangay statistics (deferred)');
-        loadBarangayStats();
-    }, { timeout: 300 });
 });
 
 // Populate year filter dropdown with years from 2020 to current year
@@ -590,7 +574,6 @@ function applyFilter() {
     
     // Reload data with filter
     loadCrimeStats();
-    loadBarangayStats();
 }
 
 // Clear filter
@@ -603,7 +586,6 @@ function clearFilter() {
     
     // Reload data without filter
     loadCrimeStats();
-    loadBarangayStats();
 }
 
 // Load crime statistics
