@@ -1222,7 +1222,7 @@
                                 $isValid = $report->is_valid ?? 'checking_for_report_validity'; ?>
                                     <select class="validity-select" onchange="updateValidity(<?php    echo $reportId; ?>, this.value)"
                                         data-original-validity="<?php    echo $isValid; ?>">
-                                        <option value="checking_for_report_validity" <?php    echo $isValid === 'checking_for_report_validity' ? 'selected' : ''; ?>>Checking...</option>
+                                        <option value="checking_for_report_validity" <?php    echo $isValid === 'checking_for_report_validity' ? 'selected' : ''; ?>></option>
                                         <option value="valid" <?php    echo $isValid === 'valid' ? 'selected' : ''; ?>>Valid</option>
                                         <option value="invalid" <?php    echo $isValid === 'invalid' ? 'selected' : ''; ?>>Invalid</option>
                                     </select>
@@ -1913,7 +1913,7 @@ window.downloadModalAsPDF = function() {};
                                         <div class="detail-label">📊 Status</div>
                                         <div class="detail-value">
                                             <span class="status-badge ${report.status}">${report.status.charAt(0).toUpperCase() + report.status.slice(1)}</span>
-                                            <span class="status-badge ${report.is_valid}" style="margin-left: 0.5rem;">${report.is_valid === 'valid' ? '✓ Valid' : report.is_valid === 'invalid' ? '✗ Invalid' : '⏳ Checking'}</span>
+                                            <span style="margin-left: 0.5rem; font-size: 12px; font-weight: 600; ${report.is_valid === 'valid' ? 'color: #065f46;' : report.is_valid === 'invalid' ? 'color: #991b1b;' : 'color: #6b7280;'}">${report.is_valid === 'valid' ? '✓ Valid' : report.is_valid === 'invalid' ? '✗ Invalid' : ''}</span>
                                         </div>
                                     </div>
                                     <div class="detail-item">
@@ -2117,9 +2117,9 @@ function getVerificationBadge(report) {
      const verification = report.user.verification;
      
      if (verification && (verification.is_verified === 1 || verification.is_verified === true || verification.is_verified === '1')) {
-         return '<span style="display: inline-block; margin-left: 6px; background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">✓ Verified</span>';
+         return '<span style="margin-left: 6px; color: #065f46; font-size: 12px; font-weight: 600;">✓ Verified</span>';
      } else if (verification && (verification.is_verified === 0 || verification.is_verified === false || verification.is_verified === '0')) {
-         return '<span style="display: inline-block; margin-left: 6px; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">⏳ Pending</span>';
+         return '<span style="margin-left: 6px; color: #3730a3; font-size: 12px; font-weight: 600;">⏳ Pending</span>';
      }
      
      return '';
@@ -2756,19 +2756,19 @@ function generatePDF(report) {
                 <div style="font-weight: bold; margin-bottom: 5px; color: #1D3557;">User</div>
                 <div style="margin-bottom: 15px; padding-left: 10px;">
                     ${userDisplay} 
-                    <span style="display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; 
-                        ${verificationStatus === 'Verified' ? 'background-color: #d1fae5; color: #065f46;' : verificationStatus === 'Pending' ? 'background-color: #e0e7ff; color: #3730a3;' : 'background-color: #fee2e2; color: #991b1b;'}">
+                    <span style="margin-left: 8px; font-size: 11px; font-weight: bold; 
+                        ${verificationStatus === 'Verified' ? 'color: #065f46;' : verificationStatus === 'Pending' ? 'color: #3730a3;' : 'color: #991b1b;'}">
                         ${verificationStatus}
                     </span>
                 </div>
                 
                 <div style="font-weight: bold; margin-bottom: 5px; color: #1D3557;">Status</div>
                 <div style="margin-bottom: 15px; padding-left: 10px;">
-                    <span style="display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: capitalize;
-                        ${report.status === 'pending' ? 'background-color: #e0e7ff; color: #3730a3;' : 
-                          report.status === 'investigating' ? 'background-color: #dbeafe; color: #1e40af;' : 
-                          report.status === 'resolved' ? 'background-color: #d1fae5; color: #065f46;' : 
-                          'background-color: #fee2e2; color: #991b1b;'}">
+                    <span style="font-size: 12px; font-weight: 600; text-transform: capitalize;
+                        ${report.status === 'pending' ? 'color: #3730a3;' : 
+                          report.status === 'investigating' ? 'color: #1e40af;' : 
+                          report.status === 'resolved' ? 'color: #065f46;' : 
+                          'color: #991b1b;'}">
                         ${report.status}
                     </span>
                 </div>

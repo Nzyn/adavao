@@ -16,7 +16,6 @@
             
             /* Darken container borders for better UI visibility */
             .reports-table-container,
-            .stat-card,
             .chart-section,
             .map-container,
             .flagged-users-table-container,

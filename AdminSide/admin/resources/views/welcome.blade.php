@@ -470,6 +470,10 @@
                 display: block;
                 filter: drop-shadow(0 0 1px rgba(0,0,0,0.8)) 
                         drop-shadow(0 0 1px rgba(0,0,0,0.8));
+                border: 1px solid #374151;
+                border-radius: 4px;
+                padding: 2px;
+                background: white;
             }
             
             .icon-count {
