@@ -1939,10 +1939,11 @@
                     return;
                 }
                 
-                // Calculate radius based on crime rate (scale for visibility)
-                const baseRadius = 2000; // Increased from 1500 to 2km base for better visibility
-                const radiusScale = Math.min(barangay.crime_rate / 8, 3); // Scale up to 3x for high crime
-                const radius = baseRadius * (1 + radiusScale); // More dramatic scaling
+                // Calculate radius - smaller to fit within barangay areas
+                // Typical barangay in Davao City is 300-800m across
+                const baseRadius = 350; // Base radius of 350 meters
+                const radiusScale = Math.min(barangay.crime_rate / 10, 0.5); // Scale up to 50% more for high crime
+                const radius = baseRadius + (radiusScale * 150); // Max radius ~500m for highest crime rates
                 
                 // Enhanced styling with more dramatic effects
                 const circle = L.circle([barangay.latitude, barangay.longitude], {
