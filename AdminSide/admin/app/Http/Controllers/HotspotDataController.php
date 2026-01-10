@@ -217,10 +217,13 @@ class HotspotDataController extends Controller
             
             \Log::info('Aggregated stats for ' . count($barangayStats) . ' barangays from CSV');
             
+            // Load real population data from 2020 census
+            $populationData = $this->loadBarangayPopulations();
+            
             $barangays = [];
             foreach ($barangayStats as $name => $total) {
-                // Use default population of 50,000 for all barangays
-                $population = 50000;
+                // Look up real population with fuzzy matching
+                $population = $this->findBarangayPopulation($name, $populationData);
                 
                 $barangays[] = [
                     'name' => $name,
@@ -348,5 +351,80 @@ class HotspotDataController extends Controller
         $name = preg_replace('/^BARANGAY\s+/', '', $name);
         
         return trim($name);
+    }
+    
+    /**
+     * Load barangay population data from JSON file (2020 census)
+     */
+    private function loadBarangayPopulations()
+    {
+        $populationFile = storage_path('app/barangay_populations.json');
+        
+        if (file_exists($populationFile)) {
+            $data = json_decode(file_get_contents($populationFile), true);
+            if (is_array($data)) {
+                \Log::info('Loaded population data for ' . count($data) . ' barangays');
+                return $data;
+            }
+        }
+        
+        \Log::warning('Population data file not found: ' . $populationFile);
+        return [];
+    }
+    
+    /**
+     * Find population for a barangay with fuzzy matching
+     * Falls back to 5000 (average small barangay) if not found
+     */
+    private function findBarangayPopulation($barangayName, $populationData)
+    {
+        $name = strtoupper(trim($barangayName));
+        
+        // Try exact match first
+        if (isset($populationData[$name])) {
+            return (int)$populationData[$name];
+        }
+        
+        // Try without BARANGAY prefix
+        $shortName = preg_replace('/^BARANGAY\s+/i', '', $name);
+        if (isset($populationData[$shortName])) {
+            return (int)$populationData[$shortName];
+        }
+        
+        // Try with BARANGAY prefix added
+        $withPrefix = 'BARANGAY ' . $name;
+        if (isset($populationData[$withPrefix])) {
+            return (int)$populationData[$withPrefix];
+        }
+        
+        // Try removing parenthetical suffixes like (POB.) or (BRGY...)
+        $cleanName = preg_replace('/\s*\([^)]*\)\s*/', '', $name);
+        $cleanName = trim($cleanName);
+        if (isset($populationData[$cleanName])) {
+            return (int)$populationData[$cleanName];
+        }
+        
+        // Try fuzzy matching
+        $bestMatch = null;
+        $bestScore = 0;
+        foreach ($populationData as $popName => $pop) {
+            $normalizedPopName = strtoupper($popName);
+            $similarity = 0;
+            similar_text($name, $normalizedPopName, $similarity);
+            
+            if ($similarity > $bestScore && $similarity > 75) {
+                $bestScore = $similarity;
+                $bestMatch = $pop;
+            }
+        }
+        
+        if ($bestMatch !== null) {
+            return (int)$bestMatch;
+        }
+        
+        // Fallback: use 5000 (reasonable average for small barangays)
+        // This ensures crime rates are calculated more realistically
+        \Log::debug("No population found for: $barangayName, using fallback 5000");
+        return 5000;
     }
 }
