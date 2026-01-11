@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/alertdavao-logo.png",
-    "scheme": "alertdavao",
+    "scheme": [
+      "alertdavao",
+      "com.googleusercontent.apps.662961186057-mtki3cdvn002ndjho7soa6bdl0effe5b"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "owner": "imiyataox1s-organization",

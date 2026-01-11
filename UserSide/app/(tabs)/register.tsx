@@ -60,6 +60,11 @@ const Register = () => {
   const [otpCode, setOtpCode] = useState("");
   const [userIdForOtp, setUserIdForOtp] = useState<string | null>(null);
 
+  // Name collection modal state (for Google Sign-In when name not available)
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameFirstName, setNameFirstName] = useState("");
+  const [nameLastName, setNameLastName] = useState("");
+
   const router = useRouter();
   const { setUser } = useUser();
   const { request, response, promptAsync } = useGoogleAuth();
@@ -125,24 +130,30 @@ const Register = () => {
       const data = await response.json();
 
       if (response.ok) {
-        if (data.requiresPhone) {
-          console.log('📱 New Google User - Phone Number Required');
-          setGoogleInfo(data.googleInfo);
-          setShowPhoneModal(true);
+        // Case 1: New user but Google didn't provide name - need to collect it
+        if (data.requiresName) {
+          console.log('📝 Name required for Google registration');
+          setGoogleInfo({
+            googleId: data.googleInfo.googleId,
+            email: data.googleInfo.email,
+            profilePicture: data.googleInfo.profilePicture,
+          });
+          setShowNameModal(true);
           setIsLoading(false);
           return;
         }
 
-        if (data.requireOtp) {
-          console.log('🔐 OTP Required');
-          setUserIdForOtp(data.userId);
-          setShowOtpModal(true);
-          setIsLoading(false);
+        // Case 2: Login successful (existing or new user with Google name)
+        if (data.user) {
+          if (data.isNewUser) {
+            Alert.alert('Welcome!', 'Your account has been created successfully.');
+          }
+          await processLoginSuccess(data.user);
           return;
         }
 
-        const user = data.user || data;
-        await processLoginSuccess(user);
+        Alert.alert('Login Failed', 'Unexpected response from server');
+        setIsLoading(false);
       } else {
         Alert.alert('Login Failed', data.message || 'Google login failed');
         setIsLoading(false);
@@ -224,6 +235,46 @@ const Register = () => {
       }
     } catch (err) {
       Alert.alert('Error', 'Failed to verify OTP');
+      setIsLoading(false);
+    }
+  };
+
+  // [NEW] Handle name submission for Google registration
+  const handleSubmitName = async () => {
+    if (!nameFirstName.trim() || !nameLastName.trim()) {
+      Alert.alert('Error', 'Please enter both first and last name.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/google-complete-registration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          googleId: googleInfo.googleId,
+          email: googleInfo.email,
+          firstName: nameFirstName.trim(),
+          lastName: nameLastName.trim(),
+          profilePicture: googleInfo.profilePicture,
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.user) {
+        setShowNameModal(false);
+        setNameFirstName('');
+        setNameLastName('');
+        Alert.alert('Welcome!', 'Your account has been created successfully.');
+        await processLoginSuccess(data.user);
+      } else {
+        Alert.alert('Registration Failed', data.message || 'Failed to complete registration');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      console.error('Name submission error:', err);
+      Alert.alert('Error', 'Failed to complete registration');
       setIsLoading(false);
     }
   };
@@ -605,6 +656,56 @@ const Register = () => {
             <TouchableOpacity
               style={[localStyles.modalButton, { backgroundColor: '#ccc', marginTop: 10 }]}
               onPress={() => setShowOtpModal(false)}
+            >
+              <Text style={localStyles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Name Collection Modal (for Google Sign-In when name not provided) */}
+      <Modal
+        visible={showNameModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowNameModal(false)}
+      >
+        <View style={localStyles.modalContainer}>
+          <View style={localStyles.modalContent}>
+            <Text style={localStyles.modalTitle}>Complete Your Profile</Text>
+            <Text style={localStyles.modalSubtitle}>
+              Please enter your name to finish creating your account.
+            </Text>
+
+            <TextInput
+              style={[localStyles.input, { width: '100%', marginBottom: 10, padding: 12, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8 }]}
+              value={nameFirstName}
+              onChangeText={setNameFirstName}
+              placeholder="First Name"
+              autoCapitalize="words"
+            />
+
+            <TextInput
+              style={[localStyles.input, { width: '100%', marginBottom: 10, padding: 12, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8 }]}
+              value={nameLastName}
+              onChangeText={setNameLastName}
+              placeholder="Last Name"
+              autoCapitalize="words"
+            />
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { marginTop: 10, backgroundColor: '#1D3557', padding: 12, borderRadius: 8, alignItems: 'center' }]}
+              onPress={handleSubmitName}
+              disabled={isLoading}
+            >
+              <Text style={[localStyles.modalButtonText, { color: '#fff', fontWeight: 'bold' }]}>
+                {isLoading ? 'Creating Account...' : 'Continue'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { backgroundColor: '#ccc', marginTop: 10, padding: 12, borderRadius: 8, alignItems: 'center' }]}
+              onPress={() => setShowNameModal(false)}
             >
               <Text style={localStyles.modalButtonText}>Cancel</Text>
             </TouchableOpacity>

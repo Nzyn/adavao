@@ -15,10 +15,15 @@ export const useGoogleAuth = () => {
     // Check if running in Expo Go or standalone
     const isExpoGo = Constants.appOwnership === 'expo';
 
-    // Only set redirectUri for Expo Go - standalone apps handle this natively
-    const redirectUrl = isExpoGo ? makeRedirectUri({
-      scheme: 'alertdavao',
-    }) : undefined;
+    // Explicitly define schema for standalone to match Google's reverse client ID
+    const REVERSE_CLIENT_ID = 'com.googleusercontent.apps.662961186057-mtki3cdvn002ndjho7soa6bdl0effe5b';
+
+    // IMPORTANT: For Native Google Auth, the redirect URI often needs to use a SINGLE slash ':/' 
+    // rather than the double slash '://' that makeRedirectUri produces.
+    // We manually construct it here for the standalone build.
+    const redirectUrl = isExpoGo
+      ? makeRedirectUri({ scheme: 'alertdavao' })
+      : `${REVERSE_CLIENT_ID}:/`;
 
     console.log('🔐 Google Auth Config:', {
       webClientId: GOOGLE_WEB_CLIENT_ID,
@@ -28,13 +33,12 @@ export const useGoogleAuth = () => {
       isExpoGo: isExpoGo,
     });
 
-    // For standalone Android: only use androidClientId, no redirectUri needed
-    // For Expo Go: use webClientId with redirectUri
+    // Pass the explicit redirectUri
     const [request, response, promptAsync] = Google.useAuthRequest({
       clientId: isExpoGo ? GOOGLE_WEB_CLIENT_ID : undefined,
       androidClientId: GOOGLE_ANDROID_CLIENT_ID,
       scopes: ['profile', 'email'],
-      ...(redirectUrl && { redirectUri: redirectUrl }),
+      redirectUri: redirectUrl,
     });
 
     return {
