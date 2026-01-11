@@ -134,11 +134,21 @@ const Login = () => {
   }, []);
 
   useEffect(() => {
+    console.log('🔍 Google Auth Response changed:', response?.type, response);
     if (response?.type === 'success') {
+      console.log('✅ Google OAuth Success! Full response:', JSON.stringify(response, null, 2));
       const { authentication } = response;
       if (authentication?.accessToken) {
+        console.log('🔑 Got access token, calling handleGoogleSignIn...');
         handleGoogleSignIn(authentication.accessToken);
+      } else {
+        console.log('⚠️ No access token in authentication object');
       }
+    } else if (response?.type === 'error') {
+      console.log('❌ Google OAuth Error:', response.error);
+      Alert.alert('Google Sign-In Error', response.error?.message || 'Authentication failed');
+    } else if (response?.type === 'dismiss') {
+      console.log('🚪 Google OAuth Dismissed by user');
     }
   }, [response]);
 
