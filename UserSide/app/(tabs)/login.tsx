@@ -66,6 +66,11 @@ const Login = () => {
   const [otpCode, setOtpCode] = useState("");
   const [userIdForOtp, setUserIdForOtp] = useState<string | null>(null);
 
+  // Name collection modal state (for Google Sign-In when name not available)
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameFirstName, setNameFirstName] = useState("");
+  const [nameLastName, setNameLastName] = useState("");
+
   const [showPoliceStationLookup, setShowPoliceStationLookup] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const { setUser } = useUser();
@@ -172,18 +177,31 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-
-        // CHECK FOR REQUIRED OTP
-        if (data.requireOtp) {
-          console.log('� OTP Required for Google Login');
-          setUserIdForOtp(data.userId);
-          setShowOtpModal(true);
+        // Case 1: New user but Google didn't provide name - need to collect it
+        if (data.requiresName) {
+          console.log('📝 Name required for Google registration');
+          setGoogleInfo({
+            googleId: data.googleInfo.googleId,
+            email: data.googleInfo.email,
+            profilePicture: data.googleInfo.profilePicture,
+          });
+          setShowNameModal(true);
           setIsLoading(false);
           return;
         }
 
-        const user = data.user || data;
-        await processLoginSuccess(user);
+        // Case 2: Login successful (existing or new user with Google name)
+        if (data.user) {
+          if (data.isNewUser) {
+            Alert.alert('Welcome!', 'Your account has been created successfully.');
+          }
+          await processLoginSuccess(data.user);
+          return;
+        }
+
+        // Fallback for backward compatibility
+        Alert.alert('Login Failed', 'Unexpected response from server');
+        setIsLoading(false);
       } else {
         Alert.alert('Login Failed', data.message || 'Google login failed');
         setIsLoading(false);
@@ -239,7 +257,45 @@ const Login = () => {
     }
   };
 
-  // [NEW] Handle Google Registration with Phone
+  // [NEW] Handle name submission for Google registration
+  const handleSubmitName = async () => {
+    if (!nameFirstName.trim() || !nameLastName.trim()) {
+      Alert.alert('Error', 'Please enter both first and last name.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/google-complete-registration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          googleId: googleInfo.googleId,
+          email: googleInfo.email,
+          firstName: nameFirstName.trim(),
+          lastName: nameLastName.trim(),
+          profilePicture: googleInfo.profilePicture,
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.user) {
+        setShowNameModal(false);
+        setNameFirstName('');
+        setNameLastName('');
+        Alert.alert('Welcome!', 'Your account has been created successfully.');
+        await processLoginSuccess(data.user);
+      } else {
+        Alert.alert('Registration Failed', data.message || 'Failed to complete registration');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      console.error('Name submission error:', err);
+      Alert.alert('Error', 'Failed to complete registration');
+      setIsLoading(false);
+    }
+  };
   const handleGoogleRegisterWithPhone = async () => {
     if (!googleInfo) return;
 
@@ -550,8 +606,11 @@ const Login = () => {
             disabled={isLoading || !request}
             style={[localStyles.googleButton, (isLoading || !request) && { opacity: 0.5 }]}
           >
+            <View style={localStyles.googleIconContainer}>
+              <Text style={localStyles.googleG}>G</Text>
+            </View>
             <Text style={localStyles.googleButtonText}>
-              🔐 {isLoading ? 'Signing in...' : 'Sign in with Google'}
+              {isLoading ? 'Signing in...' : 'Sign in with Google'}
             </Text>
           </Pressable>
 
@@ -654,6 +713,56 @@ const Login = () => {
         visible={showPoliceStationLookup}
         onClose={() => setShowPoliceStationLookup(false)}
       />
+
+      {/* Name Collection Modal (for Google Sign-In when name not provided) */}
+      <Modal
+        visible={showNameModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowNameModal(false)}
+      >
+        <View style={localStyles.modalContainer}>
+          <View style={localStyles.modalContent}>
+            <Text style={localStyles.modalTitle}>Complete Your Profile</Text>
+            <Text style={localStyles.modalSubtitle}>
+              Please enter your name to finish creating your account.
+            </Text>
+
+            <TextInput
+              style={localStyles.input}
+              value={nameFirstName}
+              onChangeText={setNameFirstName}
+              placeholder="First Name"
+              autoCapitalize="words"
+            />
+
+            <TextInput
+              style={[localStyles.input, { marginTop: 10 }]}
+              value={nameLastName}
+              onChangeText={setNameLastName}
+              placeholder="Last Name"
+              autoCapitalize="words"
+            />
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { marginTop: 20 }]}
+              onPress={handleSubmitName}
+              disabled={isLoading}
+            >
+              <Text style={localStyles.modalButtonText}>
+                {isLoading ? 'Creating Account...' : 'Continue'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[localStyles.modalButton, { backgroundColor: '#ccc', marginTop: 10 }]}
+              onPress={() => setShowNameModal(false)}
+            >
+              <Text style={localStyles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -825,6 +934,21 @@ const localStyles = StyleSheet.create({
     fontSize: 15,
     color: '#374151',
     fontWeight: '500',
+    marginLeft: 10,
+  },
+  googleIconContainer: {
+    width: 20,
+    height: 20,
+    borderRadius: 2,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+  },
+  googleG: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4285F4',
   },
   emergencyBox: {
     flexDirection: 'row',

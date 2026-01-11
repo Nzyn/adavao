@@ -211,12 +211,22 @@ const handleVerifyEmail = async (req, res) => {
         <script>
           let seconds = 5;
           const countdownEl = document.getElementById('countdown');
+          const closeMessageEl = document.querySelector('.close-message');
           const timer = setInterval(() => {
             seconds--;
             countdownEl.textContent = seconds;
             if (seconds <= 0) {
               clearInterval(timer);
-              window.close();
+              // Try to close the window
+              try {
+                window.close();
+              } catch (e) {
+                // If close fails, show message
+              }
+              // After a brief delay, if still open, show manual close message
+              setTimeout(() => {
+                closeMessageEl.innerHTML = '<strong style="color: #10b981;">✓ Verification Complete!</strong><br>You can now close this tab and login to AlertDavao.';
+              }, 500);
             }
           }, 1000);
         </script>

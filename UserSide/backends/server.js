@@ -73,7 +73,7 @@ const verificationUpload = multer({
 });
 
 const handleRegister = require("./handleRegister");
-const { handleGoogleLogin, handleGoogleLoginWithToken, handleGoogleOtpVerify } = require("./handleGoogleAuth");
+const { handleGoogleLogin, handleGoogleLoginWithToken, handleGoogleOtpVerify, handleGoogleCompleteRegistration } = require("./handleGoogleAuth");
 const handleLogin = require("./handleLogin");
 const { handleVerifyEmail, handleResendVerification } = require("./handleEmailVerification");
 const { handleForgotPassword, handleVerifyResetToken, handleResetPassword } = require("./handlePasswordReset");
@@ -323,6 +323,7 @@ app.post("/google-login", handleGoogleLogin); // Google Sign-In (legacy)
 app.post("/google-login-token", handleGoogleLoginWithToken); // Google Sign-In with ID token verification (more secure)
 app.post("/api/auth/google", handleGoogleLoginWithToken); // ID token verification endpoint
 app.post("/google-verify-otp", handleGoogleOtpVerify); // [NEW] Verify OTP for Google Login
+app.post("/google-complete-registration", handleGoogleCompleteRegistration); // Complete Google registration with name
 
 // User Profile API Routes
 app.get("/api/test-connection", testConnection);

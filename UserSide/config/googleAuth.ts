@@ -12,24 +12,29 @@ export const GOOGLE_ANDROID_CLIENT_ID = Constants.expoConfig?.extra?.googleAndro
 
 export const useGoogleAuth = () => {
   try {
-    // For Expo Go: Use the standard Expo redirect URI
-    // For Android production: Falls back to userside:// scheme
-    const redirectUrl = makeRedirectUri({
-      preferredScheme: Constants.appOwnership === 'expo' ? 'https' : 'userside',
-    });
+    // Check if running in Expo Go or standalone
+    const isExpoGo = Constants.appOwnership === 'expo';
+
+    // Only set redirectUri for Expo Go - standalone apps handle this natively
+    const redirectUrl = isExpoGo ? makeRedirectUri({
+      scheme: 'alertdavao',
+    }) : undefined;
 
     console.log('🔐 Google Auth Config:', {
       webClientId: GOOGLE_WEB_CLIENT_ID,
       androidClientId: GOOGLE_ANDROID_CLIENT_ID,
       redirectUrl: redirectUrl,
       appOwnership: Constants.appOwnership,
+      isExpoGo: isExpoGo,
     });
 
+    // For standalone Android: only use androidClientId, no redirectUri needed
+    // For Expo Go: use webClientId with redirectUri
     const [request, response, promptAsync] = Google.useAuthRequest({
-      clientId: GOOGLE_WEB_CLIENT_ID, // Default/Web
-      androidClientId: GOOGLE_ANDROID_CLIENT_ID, // [NEW] Use Native Android Client ID
+      clientId: isExpoGo ? GOOGLE_WEB_CLIENT_ID : undefined,
+      androidClientId: GOOGLE_ANDROID_CLIENT_ID,
       scopes: ['profile', 'email'],
-      redirectUri: redirectUrl,
+      ...(redirectUrl && { redirectUri: redirectUrl }),
     });
 
     return {

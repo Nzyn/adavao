@@ -7,7 +7,7 @@ const CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GO
 const client = new OAuth2Client(CLIENT_ID);
 const { sendOtpInternal, verifyOtpInternal } = require('./handleOtp');
 
-// Handle Google Sign-In (Legacy - kept for older logic just in case, but updated)
+// Handle Google Sign-In - Simplified flow
 const handleGoogleLogin = async (req, res) => {
   const { googleId, email, firstName, lastName, profilePicture } = req.body;
 
@@ -23,7 +23,7 @@ const handleGoogleLogin = async (req, res) => {
     );
 
     if (existingUsers.length > 0) {
-      // User exists - log them in
+      // User exists - log them in directly (no OTP for Google Sign-In)
       const user = existingUsers[0];
 
       // Update google_id if not set
@@ -34,6 +34,9 @@ const handleGoogleLogin = async (req, res) => {
         );
       }
 
+      // Update last login
+      await db.query("UPDATE users_public SET last_login = NOW() WHERE id = $1", [user.id]);
+
       const { password, ...userWithoutPassword } = user;
 
       return res.status(200).json({
@@ -41,18 +44,35 @@ const handleGoogleLogin = async (req, res) => {
         user: userWithoutPassword
       });
     } else {
-      // NEW USER - REQUIRE PHONE NUMBER
-      // Do NOT create user yet. Return 202 Accepted (Processing) or 200 with flag.
-      return res.status(200).json({
-        message: "New user, phone number required",
-        requiresPhone: true,
-        googleInfo: {
-          googleId,
-          email,
-          firstName,
-          lastName,
-          profilePicture
-        }
+      // NEW USER - Check if we have first/last name from Google
+      if (!firstName || !lastName) {
+        // Need to collect name from user
+        return res.status(200).json({
+          message: "Name required to complete registration",
+          requiresName: true,
+          googleInfo: {
+            googleId,
+            email,
+            profilePicture
+          }
+        });
+      }
+
+      // Create new user with Google profile data (skip email verification - Google verified it)
+      const insertResult = await db.query(
+        `INSERT INTO users_public (google_id, email, firstname, lastname, profile_image, is_verified, email_verified, created_at) 
+         VALUES ($1, $2, $3, $4, $5, true, true, NOW()) 
+         RETURNING *`,
+        [googleId, email, firstName, lastName, profilePicture || null]
+      );
+
+      const newUser = insertResult[0][0];
+      const { password, ...userWithoutPassword } = newUser;
+
+      return res.status(201).json({
+        message: "Account created and logged in",
+        user: userWithoutPassword,
+        isNewUser: true
       });
     }
   } catch (err) {
@@ -228,9 +248,57 @@ const handleGoogleOtpVerify = async (req, res) => {
   }
 }
 
+// [NEW] Complete Google registration when name is required
+const handleGoogleCompleteRegistration = async (req, res) => {
+  const { googleId, email, firstName, lastName, profilePicture } = req.body;
+
+  if (!googleId || !email || !firstName || !lastName) {
+    return res.status(400).json({ message: "Google ID, email, first name, and last name are required" });
+  }
+
+  try {
+    // Check if user already exists (shouldn't but double-check)
+    const [existingUsers] = await db.query(
+      "SELECT * FROM users_public WHERE email = $1",
+      [email]
+    );
+
+    if (existingUsers.length > 0) {
+      // User already exists, just log them in
+      const user = existingUsers[0];
+      const { password, ...userWithoutPassword } = user;
+      return res.status(200).json({
+        message: "Login successful",
+        user: userWithoutPassword
+      });
+    }
+
+    // Create new user
+    const insertResult = await db.query(
+      `INSERT INTO users_public (google_id, email, firstname, lastname, profile_image, is_verified, email_verified, created_at) 
+       VALUES ($1, $2, $3, $4, $5, true, true, NOW()) 
+       RETURNING *`,
+      [googleId, email, firstName, lastName, profilePicture || null]
+    );
+
+    const newUser = insertResult[0][0];
+    const { password, ...userWithoutPassword } = newUser;
+
+    return res.status(201).json({
+      message: "Account created and logged in",
+      user: userWithoutPassword,
+      isNewUser: true
+    });
+  } catch (err) {
+    console.error("❌ Google complete registration error:", err);
+    res.status(500).json({ message: "Error completing registration", error: err.message });
+  }
+};
+
 module.exports = {
   handleGoogleLogin,
   handleGoogleLoginWithToken,
   handleGoogleOtpVerify,
+  handleGoogleCompleteRegistration,
   verifyGoogleToken
 };

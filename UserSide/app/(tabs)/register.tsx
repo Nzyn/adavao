@@ -484,12 +484,19 @@ const Register = () => {
         </View> */}
 
         {/* Register Button */}
-        <Button
-          title={isLoading ? "Registering..." : "Register"}
+        <TouchableOpacity
+          style={[
+            localStyles.registerButton,
+            (!isChecked || isLoading) && localStyles.registerButtonDisabled
+          ]}
           onPress={handleRegister}
           disabled={!isChecked || isLoading}
-          color={isChecked ? "#1D3557" : "#999"}
-        />
+          activeOpacity={0.8}
+        >
+          <Text style={localStyles.registerButtonText}>
+            {isLoading ? "REGISTERING..." : "REGISTER"}
+          </Text>
+        </TouchableOpacity>
 
         {/* Google Sign In Option */}
         <View style={localStyles.divider}>
@@ -503,8 +510,11 @@ const Register = () => {
           disabled={isLoading || !request}
           style={[localStyles.googleButton, (isLoading || !request) && { opacity: 0.5 }]}
         >
+          <View style={localStyles.googleIconContainer}>
+            <Text style={localStyles.googleG}>G</Text>
+          </View>
           <Text style={localStyles.googleButtonText}>
-            🔐 {isLoading ? 'Signing in...' : 'Sign in with Google'}
+            {isLoading ? 'Signing in...' : 'Sign in with Google'}
           </Text>
         </Pressable>
 
@@ -664,6 +674,38 @@ const localStyles = StyleSheet.create({
     fontSize: 15,
     color: '#374151',
     fontWeight: '500',
+    marginLeft: 10,
+  },
+  googleIconContainer: {
+    width: 20,
+    height: 20,
+    borderRadius: 2,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+  },
+  googleG: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4285F4',
+  },
+  registerButton: {
+    backgroundColor: '#1D3557',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  registerButtonDisabled: {
+    opacity: 0.6,
+  },
+  registerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 1,
   },
   modalContainer: {
     flex: 1,
