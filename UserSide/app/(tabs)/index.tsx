@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, Button, Animated, Platform, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, Button, Animated, Platform, ScrollView, BackHandler } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect, useRef } from 'react';
@@ -569,8 +569,10 @@ const App = () => {
               setFlagNotification(null);
               setNotifications([]);
 
-              // Redirect to login
-              router.replace('/(tabs)/login');
+              // Exit app completely to ensure clean session
+              // This forces a fresh start on reopen, preventing back button vulnerability
+              console.log('🚪 Exiting app after logout...');
+              BackHandler.exitApp();
             } catch (error) {
               console.error('❌ Error logging out:', error);
             }
