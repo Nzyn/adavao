@@ -686,13 +686,20 @@ class UserController extends Controller
 
     /**
      * Get flag status for a user (used by UserSide to show flagging info)
+     * Also auto-expires flags that have passed their expiration date (on-demand)
      */
     public function getFlagStatus(string $id): JsonResponse
     {
         try {
             $user = User::findOrFail($id);
             
-            // Get the most recent confirmed flag that hasn't expired
+            // STEP 1: Auto-expire any flags that have passed their expiration date
+            $expiredCount = $this->autoExpireFlags($id);
+            if ($expiredCount > 0) {
+                \Log::info("Auto-expired {$expiredCount} flag(s) for user {$id}");
+            }
+            
+            // STEP 2: Get the most recent confirmed flag that hasn't expired
             $latestFlag = DB::table('user_flags')
                 ->where('user_id', $id)
                 ->where('status', 'confirmed')
@@ -714,11 +721,14 @@ class UserController extends Controller
             return response()->json([
                 'success' => true,
                 'is_flagged' => $isFlagged,
+                'expired_in_this_check' => $expiredCount,
                 'flag_info' => $isFlagged ? [
                     'id' => $latestFlag->id,
                     'violation_type' => $latestFlag->violation_type,
                     'reason' => $latestFlag->description,
-                    'severity' => $latestFlag->severity,
+                    'severity' => $latestFlag->severity ?? null,
+                    'duration_days' => $latestFlag->duration_days ?? null,
+                    'expires_at' => $latestFlag->expires_at,
                     'created_at' => $latestFlag->created_at
                 ] : null,
                 'restriction_info' => $restriction ? [
@@ -741,6 +751,95 @@ class UserController extends Controller
                 'success' => false,
                 'message' => 'An error occurred while fetching flag status'
             ], 500);
+        }
+    }
+    
+    /**
+     * Auto-expire flags that have passed their expiration date.
+     * This runs on-demand when checking flag status.
+     * 
+     * @param string $userId
+     * @return int Number of expired flags
+     */
+    private function autoExpireFlags(string $userId): int
+    {
+        try {
+            // Find expired flags for this user
+            $expiredFlags = DB::table('user_flags')
+                ->where('user_id', $userId)
+                ->where('status', 'confirmed')
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', now())
+                ->get();
+            
+            if ($expiredFlags->isEmpty()) {
+                return 0;
+            }
+            
+            // Mark flags as expired
+            DB::table('user_flags')
+                ->where('user_id', $userId)
+                ->where('status', 'confirmed')
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', now())
+                ->update([
+                    'status' => 'expired',
+                    'updated_at' => now()
+                ]);
+            
+            // Deactivate expired restrictions
+            DB::table('user_restrictions')
+                ->where('user_id', $userId)
+                ->where('is_active', true)
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', now())
+                ->update([
+                    'is_active' => false,
+                    'lifted_at' => now(),
+                    'updated_at' => now()
+                ]);
+            
+            // Count remaining active flags
+            $remainingFlags = DB::table('user_flags')
+                ->where('user_id', $userId)
+                ->where('status', 'confirmed')
+                ->where(function($query) {
+                    $query->whereNull('expires_at')
+                          ->orWhere('expires_at', '>', now());
+                })
+                ->count();
+            
+            // Update user record
+            DB::table('users_public')
+                ->where('id', $userId)
+                ->update([
+                    'total_flags' => $remainingFlags,
+                    'restriction_level' => $remainingFlags > 0 ? 'warning' : 'none',
+                    'updated_at' => now()
+                ]);
+            
+            // Create notification for each expired flag
+            foreach ($expiredFlags as $flag) {
+                Notification::create([
+                    'user_id' => $userId,
+                    'type' => 'flag_expired',
+                    'message' => 'Good news! Your account restriction has expired. You can now submit reports and access all features normally.',
+                    'data' => [
+                        'flag_id' => $flag->id,
+                        'violation_type' => $flag->violation_type,
+                        'expired_at' => now()->toIso8601String(),
+                        'remaining_flags' => $remainingFlags,
+                    ]
+                ]);
+            }
+            
+            // Invalidate cache
+            Cache::forget('users_list');
+            
+            return $expiredFlags->count();
+        } catch (\Exception $e) {
+            \Log::error('Error in autoExpireFlags', ['error' => $e->getMessage()]);
+            return 0;
         }
     }
     
