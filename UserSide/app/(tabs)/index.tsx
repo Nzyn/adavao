@@ -14,6 +14,8 @@ import type { Notification } from '../../services/notificationService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useUser } from '../../contexts/UserContext';
 import { messageService } from '../../services/messageService';
+import { inactivityManager } from '../../services/inactivityManager';
+import { debugService } from '../../services/debugService';
 
 const App = () => {
   const { clearUser } = useUser();
@@ -87,6 +89,45 @@ const App = () => {
 
     checkAuthStatus();
   }, []);
+
+  // Fetch flag status from backend on userId change (triggers on-demand expiration)
+  useEffect(() => {
+    const fetchFlagStatusFromBackend = async () => {
+      if (!userId) return;
+
+      try {
+        console.log('🔄 Fetching flag status from backend for user:', userId);
+        const result = await debugService.checkFlagStatus(userId);
+
+        if (result.success) {
+          const status = result.flagStatus;
+          console.log('📊 Backend flag status:', status);
+
+          // Check for any flags that were auto-expired in this check
+          if (status.expiredInThisCheck > 0) {
+            console.log(`✨ ${status.expiredInThisCheck} flag(s) were auto-expired!`);
+          }
+
+          // Update local flag status based on backend response
+          if (status.isFlagged && status.activeFlags > 0) {
+            setFlagStatus({
+              totalFlags: status.activeFlags,
+              restrictionLevel: status.restrictionLevel || 'warning',
+            });
+          } else {
+            // User is not flagged (or flags have expired)
+            setFlagStatus(null);
+            setFlagNotification(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching flag status from backend:', error);
+        // Don't block the UI on error, just log it
+      }
+    };
+
+    fetchFlagStatusFromBackend();
+  }, [userId]);
 
   // Reference to stop polling when component unmounts
   const pollingStopRef = useRef<(() => void) | null>(null);
@@ -500,11 +541,16 @@ const App = () => {
           onConfirm={async () => {
             setShowLogoutDialog(false);
             try {
+              // Stop inactivity manager to prevent auto-logout interference
+              inactivityManager.stop();
+              console.log('✅ Inactivity manager stopped');
+
               // Check if remember me was saved
               const savedEmail = await AsyncStorage.getItem('rememberedEmail');
 
-              // Clear user data from AsyncStorage
+              // Clear all user data from AsyncStorage
               await AsyncStorage.removeItem('userData');
+              await AsyncStorage.removeItem('userToken');
               console.log('✅ User logged out - AsyncStorage cleared');
 
               // If no remember me, clear the saved email too
@@ -515,6 +561,13 @@ const App = () => {
               // Clear user context
               clearUser();
               console.log('✅ User context cleared');
+
+              // Reset local state
+              setIsLoggedIn(false);
+              setUserId('');
+              setFlagStatus(null);
+              setFlagNotification(null);
+              setNotifications([]);
 
               // Redirect to login
               router.replace('/(tabs)/login');
