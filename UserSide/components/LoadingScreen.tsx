@@ -11,7 +11,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Individual letter animations
   const letterAnims = useRef(
     Array.from({ length: 9 }, () => ({
@@ -28,7 +28,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
     rotateAnim.setValue(0);
     scaleAnim.setValue(0.5);
     opacityAnim.setValue(0);
-    
+
     letterAnims.forEach(anim => {
       anim.opacity.setValue(0);
       anim.translateY.setValue(-30);
@@ -39,7 +39,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
     const loopA = Animated.sequence([
       Animated.timing(letterAnim, {
         toValue: 1,
-        duration: 1500,
+        duration: 1000, // Reduced from 1500ms
         easing: Easing.bezier(0.4, 0.0, 0.2, 1),
         useNativeDriver: true,
       }),
@@ -49,51 +49,52 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
     const aLetterAnimations = Animated.parallel([
       Animated.timing(translateXAnim, {
         toValue: 0,
-        duration: 1500,
+        duration: 1000, // Reduced from 1500ms
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(rotateAnim, {
         toValue: 360,
-        duration: 1500,
+        duration: 1000, // Reduced from 1500ms
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(scaleAnim, {
         toValue: 1,
-        duration: 1500,
+        duration: 1000, // Reduced from 1500ms
         easing: Easing.elastic(1.2),
         useNativeDriver: true,
       }),
       Animated.timing(opacityAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 500, // Reduced from 800ms
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
     ]);
 
-    // Rest of letters animation
+    // Rest of letters animation (9 letters: lertDavao)
+    // Start at 1000ms, 150ms stagger = 1000 + (9-1)*150 + 300 = 2500ms total
     const restLettersAnimation = letterAnims.map((anim, index) =>
       Animated.parallel([
         Animated.timing(anim.opacity, {
           toValue: 1,
-          duration: 400,
-          delay: 1500 + index * 100, // Start after A letter, stagger by 100ms
+          duration: 300, // Reduced from 400ms
+          delay: 1000 + index * 150, // Start after A letter, stagger by 150ms
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(anim.translateY, {
           toValue: 0,
-          duration: 400,
-          delay: 1500 + index * 100,
+          duration: 300, // Reduced from 400ms
+          delay: 1000 + index * 150,
           easing: Easing.elastic(1.1),
           useNativeDriver: true,
         }),
         Animated.timing(anim.scale, {
           toValue: 1,
-          duration: 400,
-          delay: 1500 + index * 100,
+          duration: 300, // Reduced from 400ms
+          delay: 1000 + index * 150,
           easing: Easing.elastic(1.1),
           useNativeDriver: true,
         }),
@@ -110,7 +111,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
   useEffect(() => {
     if (visible) {
       startAnimation();
-      
+
       // Don't loop on initial load - let it play once and hold
       // The app will transition after animation completes
     }
@@ -143,7 +144,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
         >
           A
         </Animated.Text>
-        
+
         <View style={styles.restText}>
           {restLetters.map((letter, index) => (
             <Animated.Text
@@ -164,7 +165,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
           ))}
         </View>
       </View>
-      
+
       {/* Loading text with pulsing animation */}
       <Text style={styles.loadingText}>Preparing your experience...</Text>
     </View>

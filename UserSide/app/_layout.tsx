@@ -34,8 +34,8 @@ export default function RootLayout() {
         });
 
         // Wait for the AlertDavao animation to complete
-        // Animation timing: 1500ms (A letter) + 900ms (rest of letters) = 2400ms
-        // Adding 600ms buffer for smooth transition = 3000ms total
+        // Animation timing: 1000ms (A letter) + 1500ms (rest letters staggered) = 2500ms
+        // Adding 500ms buffer for smooth transition = 3000ms total
         await new Promise(resolve => setTimeout(resolve, 3000));
         setIsAppReady(true);
         await SplashScreen.hideAsync();
