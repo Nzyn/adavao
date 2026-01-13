@@ -143,12 +143,16 @@ const Login = () => {
         handleGoogleSignIn(authentication.accessToken);
       } else {
         console.log('⚠️ No access token in authentication object');
+        setIsLoading(false); // Reset loading if no token
+        Alert.alert('Sign-In Error', 'No access token received from Google. Please try again.');
       }
     } else if (response?.type === 'error') {
       console.log('❌ Google OAuth Error:', response.error);
+      setIsLoading(false); // Reset loading on error
       Alert.alert('Google Sign-In Error', response.error?.message || 'Authentication failed');
     } else if (response?.type === 'dismiss') {
       console.log('🚪 Google OAuth Dismissed by user');
+      setIsLoading(false); // Reset loading when dismissed
     }
   }, [response]);
 
