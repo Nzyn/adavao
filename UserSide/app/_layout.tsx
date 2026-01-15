@@ -22,10 +22,15 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [isAppReady, setIsAppReady] = useState(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(true);
 
   useEffect(() => {
     async function prepare() {
       try {
+        // IMPORTANT: Hide native splash IMMEDIATELY so LoadingScreen can show
+        // This ensures the custom animation is visible
+        await SplashScreen.hideAsync();
+
         // Preload fonts to prevent FontFaceObserver timeout
         await Font.loadAsync({
           ...Ionicons.font,
@@ -37,12 +42,14 @@ export default function RootLayout() {
         // Animation timing: 1000ms (A letter) + 1500ms (rest letters staggered) = 2500ms
         // Adding 500ms buffer for smooth transition = 3000ms total
         await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // Hide LoadingScreen and show app
+        setShowLoadingScreen(false);
         setIsAppReady(true);
-        await SplashScreen.hideAsync();
       } catch (e) {
         console.warn('Error during app initialization:', e);
+        setShowLoadingScreen(false);
         setIsAppReady(true);
-        await SplashScreen.hideAsync();
       }
     }
 
@@ -50,7 +57,7 @@ export default function RootLayout() {
   }, []);
 
   // Show loading screen until app is ready
-  if (!isAppReady) {
+  if (showLoadingScreen || !isAppReady) {
     return <LoadingScreen visible={true} />;
   }
 
