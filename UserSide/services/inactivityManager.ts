@@ -16,12 +16,12 @@ class InactivityManager {
       console.log('InactivityManager already running');
       return;
     }
-    
+
     this.isActive = true;
     this.lastActivity = Date.now();
-    
+
     console.log('Starting InactivityManager - timeout set to 5 minutes');
-    
+
     // Check for inactivity every 30 seconds
     this.checkInterval = setInterval(() => {
       this.checkInactivity();
@@ -37,7 +37,7 @@ class InactivityManager {
   stop() {
     console.log('Stopping InactivityManager');
     this.isActive = false;
-    
+
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
@@ -50,12 +50,12 @@ class InactivityManager {
   resetActivity() {
     const now = Date.now();
     const timeSinceLastActivity = now - this.lastActivity;
-    
+
     // Log only if it's been more than 10 seconds since last activity
     if (timeSinceLastActivity > 10000) {
       console.log(`User activity detected after ${Math.floor(timeSinceLastActivity / 1000)}s of inactivity`);
     }
-    
+
     this.lastActivity = now;
   }
 
@@ -75,7 +75,7 @@ class InactivityManager {
     if (!this.isActive) {
       return;
     }
-    
+
     const now = Date.now();
     const inactiveTime = now - this.lastActivity;
     const minutesInactive = Math.floor(inactiveTime / 60000);
@@ -91,20 +91,38 @@ class InactivityManager {
 
   private async performLogout() {
     try {
+      // Import Alert dynamically
+      const { Alert } = await import('react-native');
+
       // Clear user data
       await AsyncStorage.removeItem('userData');
       await AsyncStorage.removeItem('userToken');
-      
-      // Set flag to show logout notification
+
+      // Set flag to show logout notification (backup for app reopen)
       await AsyncStorage.setItem('inactivityLogout', 'true');
-      
+
       // Stop the inactivity manager
       this.stop();
-      
-      // Redirect to login
-      router.replace('/(tabs)/login');
+
+      // Show alert immediately
+      Alert.alert(
+        'Session Expired',
+        'You have been logged out due to inactivity (5 minutes). Please log in again.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Redirect to login after user acknowledges
+              router.replace('/(tabs)/login');
+            }
+          }
+        ],
+        { cancelable: false }
+      );
     } catch (error) {
       console.error('Error during auto-logout:', error);
+      // Fallback: redirect to login even if alert fails
+      router.replace('/(tabs)/login');
     }
   }
 }
