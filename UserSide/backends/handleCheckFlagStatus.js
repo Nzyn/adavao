@@ -36,7 +36,7 @@ const checkUserFlagStatus = async (req, res) => {
         created_at,
         updated_at
       FROM user_flags 
-      WHERE user_id = ?
+      WHERE user_id = $1
       ORDER BY created_at DESC`,
       [userId]
     );
@@ -62,7 +62,7 @@ const checkUserFlagStatus = async (req, res) => {
         created_at,
         lifted_at
       FROM user_restrictions 
-      WHERE user_id = ?
+      WHERE user_id = $1
       ORDER BY created_at DESC`,
       [userId]
     );
@@ -76,45 +76,47 @@ const checkUserFlagStatus = async (req, res) => {
         total_flags,
         restriction_level
       FROM users_public 
-      WHERE id = ?`,
+      WHERE id = $1`,
       [userId]
     );
 
-    const user = userRecord[0];
+    const user = userRecord[0] || null;
 
-    // Determine flag status
+    // Determine if user is flagged
     const isFlagged = activeFlags.length > 0;
     const hasActiveRestrictions = restrictions.some(r => r.is_active);
 
-    console.log(`   ✅ Flag Status: isFlagged=${isFlagged}, hasActiveRestrictions=${hasActiveRestrictions}`);
+    console.log(`   ✅ Flag check complete:`, {
+      isFlagged,
+      activeFlags: activeFlags.length,
+      hasActiveRestrictions,
+      userTotalFlags: user?.total_flags,
+      userRestrictionLevel: user?.restriction_level
+    });
 
     return res.json({
       success: true,
       flagStatus: {
         isFlagged,
         hasActiveRestrictions,
-        totalFlagsInDb: user?.total_flags || 0,
-        restrictionLevel: user?.restriction_level || 'none',
+        totalFlagsInDb: userFlags.length,
         activeFlags: activeFlags.length,
+        restrictionLevel: user?.restriction_level || 'none',
         totalFlagRecords: userFlags.length,
-        expiredInThisCheck: expiredResult.expiredCount
+        dismissedFlagRecords: userFlags.filter(f => f.status === 'dismissed').length,
+        expiredInThisCheck: expiredResult.expiredCount || 0
       },
       details: {
         flags: userFlags,
-        restrictions: restrictions,
-        user: user ? {
-          id: user.id,
-          name: `${user.firstname} ${user.lastname}`,
-          total_flags: user.total_flags,
-          restriction_level: user.restriction_level
-        } : null
+        restrictions,
+        user
       }
     });
   } catch (error) {
-    console.error(`Error checking flag status for user ${userId}:`, error);
+    console.error('Error checking flag status for user', userId, ':', error);
     return res.status(500).json({
       success: false,
-      message: 'Error checking flag status',
+      message: 'Failed to check flag status',
       error: error.message
     });
   }
@@ -130,7 +132,7 @@ const autoExpireFlags = async (userId) => {
     const [expiredFlags] = await db.query(
       `SELECT id, user_id, violation_type 
        FROM user_flags 
-       WHERE user_id = ? 
+       WHERE user_id = $1
          AND status = 'confirmed' 
          AND expires_at IS NOT NULL 
          AND expires_at <= NOW()`,
@@ -147,7 +149,7 @@ const autoExpireFlags = async (userId) => {
     await db.query(
       `UPDATE user_flags 
        SET status = 'expired', updated_at = NOW() 
-       WHERE user_id = ? 
+       WHERE user_id = $1
          AND status = 'confirmed' 
          AND expires_at IS NOT NULL 
          AND expires_at <= NOW()`,
@@ -158,7 +160,7 @@ const autoExpireFlags = async (userId) => {
     await db.query(
       `UPDATE user_restrictions 
        SET is_active = false, lifted_at = NOW(), updated_at = NOW() 
-       WHERE user_id = ? 
+       WHERE user_id = $1
          AND is_active = true 
          AND expires_at IS NOT NULL 
          AND expires_at <= NOW()`,
@@ -169,7 +171,7 @@ const autoExpireFlags = async (userId) => {
     const [remainingFlags] = await db.query(
       `SELECT COUNT(*) as count 
        FROM user_flags 
-       WHERE user_id = ? 
+       WHERE user_id = $1
          AND status = 'confirmed' 
          AND (expires_at IS NULL OR expires_at > NOW())`,
       [userId]
@@ -180,10 +182,10 @@ const autoExpireFlags = async (userId) => {
     // Update user record
     await db.query(
       `UPDATE users_public 
-       SET total_flags = ?, 
-           restriction_level = ?,
+       SET total_flags = $1, 
+           restriction_level = $2,
            updated_at = NOW() 
-       WHERE id = ?`,
+       WHERE id = $3`,
       [remainingCount, remainingCount > 0 ? 'warning' : 'none', userId]
     );
 
@@ -191,7 +193,7 @@ const autoExpireFlags = async (userId) => {
     for (const flag of expiredFlags) {
       await db.query(
         `INSERT INTO notifications (user_id, type, message, data, is_read, created_at, updated_at) 
-         VALUES (?, 'flag_expired', 'Good news! Your account restriction has expired. You can now submit reports and access all features normally.', ?, false, NOW(), NOW())`,
+         VALUES ($1, 'flag_expired', 'Good news! Your account restriction has expired. You can now submit reports and access all features normally.', $2, false, NOW(), NOW())`,
         [userId, JSON.stringify({
           flag_id: flag.id,
           violation_type: flag.violation_type,
