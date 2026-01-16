@@ -1,3 +1,0 @@
-Testing Coordinate: Lat 7.069615, Lng 125.598892
-Loaded GeoJSON features: 40
-❌ NO MATCH FOUND in any of the features in reference file.

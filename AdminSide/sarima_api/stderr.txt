@@ -1,4 +1,0 @@
-  File "D:\Codes\alertdavao\alertdavao\AdminSide\sarima_api\main.py", line 339
-    return PossibleCrimesResponse(
-                                 ^
-SyntaxError: '(' was never closed

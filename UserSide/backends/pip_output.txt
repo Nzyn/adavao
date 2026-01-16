@@ -1,8 +1,0 @@
-Testing Coordinate: Lat 7.069615, Lng 125.598892
-BARANGAY: BRGY 2-A
-TYPE: Polygon
-CHECKED: BRGY 2-A -> NO_MATCH
-BARANGAY: Barangay 2-A (Pob.)
-TYPE: Polygon
-CHECKED: Barangay 2-A (Pob.) -> NO_MATCH
-RESULT: TOTAL_FAILURE_NO_MATCHES
