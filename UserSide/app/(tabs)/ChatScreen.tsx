@@ -282,7 +282,11 @@ const ChatScreen = () => {
         >
             <View style={styles.container}>
                 {/* Header with Back Button and Title */}
-                <View style={styles.headerHistory}>
+                <View style={[styles.headerHistory, {
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#e5e7eb',
+                    paddingBottom: 12
+                }]}>
                     <TouchableOpacity onPress={() => router.push('/chatlist')}>
                         <Ionicons name="chevron-back" size={24} color="#000" />
                     </TouchableOpacity>
@@ -363,7 +367,12 @@ const ChatScreen = () => {
                             </Text>
                         </View>
                     )}
-                    <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'android' ? 70 : 10 }]}>
+                    <View style={[styles.inputContainer, {
+                        marginBottom: Platform.OS === 'android' ? 90 : 30,
+                        borderTopWidth: 1,
+                        borderTopColor: '#e5e7eb',
+                        paddingTop: 12
+                    }]}>
                         <TextInput
                             style={styles.chatInput}
                             placeholder="Write a message"
