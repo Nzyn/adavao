@@ -433,86 +433,96 @@ const App = () => {
         {/* Grid Container */}
         <View style={styles.grid}>
           {/* History */}
-          <Link href="/history" asChild>
-            <Pressable
-              style={pressStates.history ? styles.cardGridPressed : styles.cardGrid}
-              onPressIn={() => handlePressIn('history')}
-              onPressOut={() => handlePressOut('history')}
-            >
-              <View style={{ transform: [{ scale: pressStates.history ? 0.95 : 1 }] }}>
-                <Ionicons name="time-outline" size={40} color="#1D3557" />
-                <Text style={styles.cardText}>History</Text>
-              </View>
-            </Pressable>
-          </Link>
-
-          <Link href="/chatlist" asChild>
-            <Pressable
-              style={pressStates.chat ? styles.cardGridPressed : styles.cardGrid}
-              onPressIn={() => handlePressIn('chat')}
-              onPressOut={() => handlePressOut('chat')}
-            >
-              <View style={{ transform: [{ scale: pressStates.chat ? 0.95 : 1 }] }}>
-                <View style={{ position: 'relative' }}>
-                  <Ionicons name="chatbox-outline" size={40} color="#1D3557" />
-                  {unreadChatCount > 0 && (
-                    <View style={styles.chatBadge}>
-                      <Text style={styles.chatBadgeText}>
-                        {unreadChatCount}
-                      </Text>
-                    </View>
-                  )}
+          <FadeInView delay={100}>
+            <Link href="/history" asChild>
+              <Pressable
+                style={pressStates.history ? styles.cardGridPressed : styles.cardGrid}
+                onPressIn={() => handlePressIn('history')}
+                onPressOut={() => handlePressOut('history')}
+              >
+                <View style={{ transform: [{ scale: pressStates.history ? 0.95 : 1 }] }}>
+                  <Ionicons name="time-outline" size={40} color="#1D3557" />
+                  <Text style={styles.cardText}>History</Text>
                 </View>
-                <Text style={styles.cardText}>Chat</Text>
-              </View>
-            </Pressable>
-          </Link>
+              </Pressable>
+            </Link>
+          </FadeInView>
+
+          <FadeInView delay={200}>
+            <Link href="/chatlist" asChild>
+              <Pressable
+                style={pressStates.chat ? styles.cardGridPressed : styles.cardGrid}
+                onPressIn={() => handlePressIn('chat')}
+                onPressOut={() => handlePressOut('chat')}
+              >
+                <View style={{ transform: [{ scale: pressStates.chat ? 0.95 : 1 }] }}>
+                  <View style={{ position: 'relative' }}>
+                    <Ionicons name="chatbox-outline" size={40} color="#1D3557" />
+                    {unreadChatCount > 0 && (
+                      <View style={styles.chatBadge}>
+                        <Text style={styles.chatBadgeText}>
+                          {unreadChatCount}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.cardText}>Chat</Text>
+                </View>
+              </Pressable>
+            </Link>
+          </FadeInView>
 
           {/* Profile */}
-          <Link href="/profile" asChild>
-            <Pressable
-              style={pressStates.profile ? styles.cardGridPressed : styles.cardGrid}
-              onPressIn={() => handlePressIn('profile')}
-              onPressOut={() => handlePressOut('profile')}
-            >
-              <View style={{ transform: [{ scale: pressStates.profile ? 0.95 : 1 }] }}>
-                <Ionicons name="person-outline" size={40} color="#1D3557" />
-                <Text style={styles.cardText}>Profile</Text>
-              </View>
-            </Pressable>
-          </Link>
+          <FadeInView delay={300}>
+            <Link href="/profile" asChild>
+              <Pressable
+                style={pressStates.profile ? styles.cardGridPressed : styles.cardGrid}
+                onPressIn={() => handlePressIn('profile')}
+                onPressOut={() => handlePressOut('profile')}
+              >
+                <View style={{ transform: [{ scale: pressStates.profile ? 0.95 : 1 }] }}>
+                  <Ionicons name="person-outline" size={40} color="#1D3557" />
+                  <Text style={styles.cardText}>Profile</Text>
+                </View>
+              </Pressable>
+            </Link>
+          </FadeInView>
 
           {/* Guidelines */}
-          <Link href="/guidelines" asChild>
-            <Pressable
-              style={pressStates.guidelines ? styles.cardGridPressed : styles.cardGrid}
-              onPressIn={() => handlePressIn('guidelines')}
-              onPressOut={() => handlePressOut('guidelines')}
-            >
-              <View style={{ transform: [{ scale: pressStates.guidelines ? 0.95 : 1 }], alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={40}
-                  color="#1D3557"
-                />
-                <Text style={styles.cardText}>Guidelines</Text>
-              </View>
-            </Pressable>
-          </Link>
+          <FadeInView delay={400}>
+            <Link href="/guidelines" asChild>
+              <Pressable
+                style={pressStates.guidelines ? styles.cardGridPressed : styles.cardGrid}
+                onPressIn={() => handlePressIn('guidelines')}
+                onPressOut={() => handlePressOut('guidelines')}
+              >
+                <View style={{ transform: [{ scale: pressStates.guidelines ? 0.95 : 1 }], alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={40}
+                    color="#1D3557"
+                  />
+                  <Text style={styles.cardText}>Guidelines</Text>
+                </View>
+              </Pressable>
+            </Link>
+          </FadeInView>
 
           {/* Location */}
-          <Link href="/(tabs)/location" asChild>
-            <Pressable
-              style={pressStates.location ? styles.cardGridPressed : styles.cardGrid}
-              onPressIn={() => handlePressIn('location')}
-              onPressOut={() => handlePressOut('location')}
-            >
-              <View style={{ transform: [{ scale: pressStates.location ? 0.95 : 1 }] }}>
-                <Ionicons name="business-outline" size={40} color="#1D3557" />
-                <Text style={styles.cardText}>Station</Text>
-              </View>
-            </Pressable>
-          </Link>
+          <FadeInView delay={500}>
+            <Link href="/(tabs)/location" asChild>
+              <Pressable
+                style={pressStates.location ? styles.cardGridPressed : styles.cardGrid}
+                onPressIn={() => handlePressIn('location')}
+                onPressOut={() => handlePressOut('location')}
+              >
+                <View style={{ transform: [{ scale: pressStates.location ? 0.95 : 1 }] }}>
+                  <Ionicons name="business-outline" size={40} color="#1D3557" />
+                  <Text style={styles.cardText}>Station</Text>
+                </View>
+              </Pressable>
+            </Link>
+          </FadeInView>
 
           {/* Logout */}
           <Pressable
