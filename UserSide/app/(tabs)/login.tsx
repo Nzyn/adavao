@@ -210,7 +210,16 @@ const Login = () => {
           if (data.isNewUser) {
             Alert.alert('Welcome!', 'Your account has been created successfully.');
           }
-          await processLoginSuccess(data.user);
+          try {
+            await Promise.race([
+              processLoginSuccess(data.user),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Login timeout')), 10000))
+            ]);
+          } catch (loginError: any) {
+            console.error('processLoginSuccess error:', loginError);
+            Alert.alert('Login Error', loginError.message || 'Failed to complete login. Please try again.');
+            setIsLoading(false);
+          }
           return;
         }
 
