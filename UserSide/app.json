@@ -11,7 +11,7 @@
     ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "owner": "imiyataox1s-organization",
+    "owner": "jdans",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.imiyataox.alertdavao",
@@ -64,7 +64,7 @@
       "apiBaseUrl": "https://node-server-gk1u.onrender.com",
       "router": {},
       "eas": {
-        "projectId": "4fb5adfe-d7ad-41e6-ae53-a2b9a9dfe07a"
+        "projectId": "3118ce30-1192-46e5-9e48-8bb1b2b8bfe6"
       }
     }
   }

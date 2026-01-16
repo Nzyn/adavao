@@ -27,6 +27,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import PoliceStationLookup from '../../components/PoliceStationLookup';
 import { syncPoliceStations } from '../../services/policeStationService';
 import { Ionicons } from '@expo/vector-icons';
+import AnimatedButton from '../../components/AnimatedButton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 360;

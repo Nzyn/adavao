@@ -16,6 +16,7 @@ import { useUser } from '../../contexts/UserContext';
 import { messageService } from '../../services/messageService';
 import { inactivityManager } from '../../services/inactivityManager';
 import { debugService } from '../../services/debugService';
+import FadeInView from '../../components/FadeInView';
 
 const App = () => {
   const { clearUser } = useUser();
