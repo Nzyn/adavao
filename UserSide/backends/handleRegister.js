@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const db = require("./db");
 const { sendVerificationEmail } = require("./emailService");
 const { generateToken, getVerificationTokenExpiry, formatForMySQL } = require("./tokenUtils");
+const { encrypt } = require("./encryptionService");
 
 const handleRegister = async (req, res) => {
   const { firstname, lastname, email, contact, password } = req.body;
@@ -40,11 +41,14 @@ const handleRegister = async (req, res) => {
     const verificationToken = generateToken();
     const tokenExpiresAt = formatForMySQL(getVerificationTokenExpiry());
 
+    // Encrypt sensitive data (contact/phone number)
+    const encryptedContact = encrypt(contact);
+
     // Include NULL values for latitude and longitude, and add verification fields
     // Use users_public table for UserSide app users only
     const sql =
       "INSERT INTO users_public (firstname, lastname, email, contact, password, latitude, longitude, verification_token, token_expires_at, email_verified_at) VALUES ($1, $2, $3, $4, $5, NULL, NULL, $6, $7, NULL)";
-    await db.query(sql, [firstname, lastname, email, contact, hashedPassword, verificationToken, tokenExpiresAt]);
+    await db.query(sql, [firstname, lastname, email, encryptedContact, hashedPassword, verificationToken, tokenExpiresAt]);
 
     console.log('📧 Sending verification email to:', email);
 
