@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import FlagCountdown from './FlagCountdown';
 
 interface FlagData {
   totalFlags: number;
   restrictionLevel: string | null;
   message?: string;
+  expiresAt?: string | null;
 }
 
 interface FlagStatusBadgeProps {
@@ -15,8 +17,8 @@ interface FlagStatusBadgeProps {
   showLabel?: boolean;
 }
 
-const FlagStatusBadge: React.FC<FlagStatusBadgeProps> = ({ 
-  flagData, 
+const FlagStatusBadge: React.FC<FlagStatusBadgeProps> = ({
+  flagData,
   onPress,
   size = 'medium',
   showLabel = true
@@ -84,10 +86,10 @@ const FlagStatusBadge: React.FC<FlagStatusBadgeProps> = ({
         }}
       >
         <View style={styles.badgeContent}>
-          <Ionicons 
-            name={getRestrictionIcon(flagData.restrictionLevel) as any} 
-            size={sizeStyles.fontSize + 4} 
-            color="#fff" 
+          <Ionicons
+            name={getRestrictionIcon(flagData.restrictionLevel) as any}
+            size={sizeStyles.fontSize + 4}
+            color="#fff"
           />
           {size !== 'small' && flagData.totalFlags > 0 && (
             <Text style={[styles.flagCount, { fontSize: sizeStyles.fontSize }]}>
@@ -131,7 +133,7 @@ const FlagStatusBadge: React.FC<FlagStatusBadgeProps> = ({
                     <View style={styles.divider} />
                     <View style={styles.statusRow}>
                       <Text style={styles.statusLabel}>Restriction:</Text>
-                      <Text 
+                      <Text
                         style={[
                           styles.statusValue,
                           { color: restrictionColor, fontWeight: 'bold' }
@@ -152,6 +154,16 @@ const FlagStatusBadge: React.FC<FlagStatusBadgeProps> = ({
                     </View>
                   </>
                 )}
+
+                {/* Countdown Timer */}
+                {flagData.expiresAt && (
+                  <>
+                    <View style={styles.divider} />
+                    <View style={styles.messageContainer}>
+                      <FlagCountdown expiresAt={flagData.expiresAt} />
+                    </View>
+                  </>
+                )}
               </View>
 
               <View style={styles.infoBox}>
@@ -159,7 +171,7 @@ const FlagStatusBadge: React.FC<FlagStatusBadgeProps> = ({
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.infoTitle}>What does this mean?</Text>
                   <Text style={styles.infoText}>
-                    Your account has been flagged for violating community guidelines. 
+                    Your account has been flagged for violating community guidelines.
                     Restrictions may limit your ability to report incidents or use certain features.
                   </Text>
                 </View>
@@ -170,14 +182,14 @@ const FlagStatusBadge: React.FC<FlagStatusBadgeProps> = ({
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.guidelinesTitle}>How to resolve this?</Text>
                   <Text style={styles.guidelinesText}>
-                    Review our community guidelines and ensure you follow them. 
+                    Review our community guidelines and ensure you follow them.
                     You can appeal this decision through your profile settings.
                   </Text>
                 </View>
               </View>
             </ScrollView>
 
-            <Pressable 
+            <Pressable
               style={styles.closeModalButton}
               onPress={() => setShowDetails(false)}
             >

@@ -128,12 +128,12 @@ const checkUserFlagStatus = async (req, res) => {
  */
 const autoExpireFlags = async (userId) => {
   try {
-    // Find expired flags for this user
+    // Find expired flags for this user (both confirmed and dismissed)
     const [expiredFlags] = await db.query(
       `SELECT id, user_id, violation_type 
        FROM user_flags 
        WHERE user_id = $1
-         AND status = 'confirmed' 
+         AND status IN ('confirmed', 'dismissed') 
          AND expires_at IS NOT NULL 
          AND expires_at <= NOW()`,
       [userId]
@@ -145,12 +145,12 @@ const autoExpireFlags = async (userId) => {
 
     console.log(`   🔄 Found ${expiredFlags.length} expired flag(s) to process`);
 
-    // Mark flags as expired
+    // Mark flags as expired (both confirmed and dismissed)
     await db.query(
       `UPDATE user_flags 
        SET status = 'expired', updated_at = NOW() 
        WHERE user_id = $1
-         AND status = 'confirmed' 
+         AND status IN ('confirmed', 'dismissed') 
          AND expires_at IS NOT NULL 
          AND expires_at <= NOW()`,
       [userId]
@@ -167,12 +167,12 @@ const autoExpireFlags = async (userId) => {
       [userId]
     );
 
-    // Count remaining active flags
+    // Count remaining active flags (both confirmed and dismissed)
     const [remainingFlags] = await db.query(
       `SELECT COUNT(*) as count 
        FROM user_flags 
        WHERE user_id = $1
-         AND status = 'confirmed' 
+         AND status IN ('confirmed', 'dismissed') 
          AND (expires_at IS NULL OR expires_at > NOW())`,
       [userId]
     );
