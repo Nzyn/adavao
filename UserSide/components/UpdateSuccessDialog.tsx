@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface Props {
@@ -18,6 +18,8 @@ export default function UpdateSuccessDialog({
   onOk,
 }: Props) {
   const [displayMessage, setDisplayMessage] = useState(message);
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
@@ -30,13 +32,38 @@ export default function UpdateSuccessDialog({
       } else {
         setDisplayMessage(message);
       }
+
+      // Animate in
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 65,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Reset animations when hidden
+      slideAnim.setValue(50);
+      fadeAnim.setValue(0);
     }
   }, [visible, message]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <View style={styles.card}>
+    <Modal visible={visible} transparent animationType="none">
+      <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+        <Animated.View style={[
+          styles.card,
+          {
+            transform: [{ translateY: slideAnim }],
+            opacity: fadeAnim,
+          }
+        ]}>
           <View style={styles.iconContainer}>
             <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
           </View>
@@ -47,8 +74,8 @@ export default function UpdateSuccessDialog({
               <Text style={styles.okText}>{okText}</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 }
