@@ -569,12 +569,13 @@ const App = () => {
               setFlagNotification(null);
               setNotifications([]);
 
-              // Exit app completely to ensure clean session
-              // This forces a fresh start on reopen, preventing back button vulnerability
-              console.log('🚪 Exiting app after logout...');
-              BackHandler.exitApp();
+              // Redirect to login screen
+              console.log('🔄 Redirecting to login...');
+              router.replace('/(tabs)/login');
             } catch (error) {
               console.error('❌ Error logging out:', error);
+              // Fallback: still redirect to login
+              router.replace('/(tabs)/login');
             }
           }}
         />
