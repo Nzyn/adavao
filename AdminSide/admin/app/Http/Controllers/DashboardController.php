@@ -90,10 +90,11 @@ class DashboardController extends Controller
                     })
                     ->whereDate('created_at', \Carbon\Carbon::today())
                     ->count(),
-                'unreadMessages' => DB::table('messages')
-                    ->where('receiver_id', $user->id)
-                    ->where('is_read', 0)
-                    ->count()
+                'unreadMessages' => 0 // Temporarily disabled until is_read column is added
+                    // DB::table('messages')
+                    //     ->where('receiver_id', $user->id)
+                    //     ->where('is_read', 0)
+                    //     ->count()
             ];
         });
         
