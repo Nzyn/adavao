@@ -9,6 +9,10 @@ echo "🚀 Starting deployment..."
 echo "📦 Installing Composer dependencies..."
 composer install --no-dev --optimize-autoloader
 
+# Fix missing is_read column (emergency fix)
+echo "🔧 Applying database fixes..."
+php artisan db:fix-columns
+
 # Run database migrations
 echo "🗄️ Running database migrations..."
 php artisan migrate --force
