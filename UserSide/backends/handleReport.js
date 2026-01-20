@@ -254,37 +254,93 @@ async function submitReport(req, res) {
 
     // 🚨 URGENCY SCORING: Calculate priority for police operations (Item #11, #13)
     // Score range: 0-100 (higher = more urgent)
-    const CRITICAL_CRIMES = ['Murder', 'Homicide', 'Rape', 'Sexual Assault', 'Kidnapping', 'Armed Robbery'];
-    const HIGH_PRIORITY = ['Robbery', 'Physical Injury', 'Domestic Violence', 'Missing Person', 'Assault'];
-    const MEDIUM_PRIORITY = ['Theft', 'Burglary', 'Break-in', 'Carnapping', 'Threats', 'Vandalism'];
+    // When multiple crime types are selected, use the HIGHEST urgency level
+
+    const CRITICAL_CRIMES = [
+      'Murder', 'Homicide', 'Attempted Murder',
+      'Rape', 'Sexual Assault', 'Sexual Harassment',
+      'Kidnapping', 'Abduction',
+      'Armed Robbery', 'Robbery with Violence',
+      'Terrorism', 'Bomb Threat'
+    ];
+
+    const HIGH_PRIORITY = [
+      'Robbery', 'Hold-up',
+      'Physical Injury', 'Serious Physical Injury',
+      'Domestic Violence', 'Assault', 'Battery',
+      'Missing Person',
+      'Arson', 'Fire',
+      'Drug Trafficking', 'Illegal Drugs'
+    ];
+
+    const MEDIUM_PRIORITY = [
+      'Theft', 'Larceny',
+      'Burglary', 'Break-in', 'Housebreaking',
+      'Carnapping', 'Vehicle Theft',
+      'Threats', 'Intimidation',
+      'Vandalism', 'Property Damage',
+      'Fraud', 'Scam', 'Estafa'
+    ];
 
     let urgencyScore = 30; // Base score for all reports
+    let urgencyLevel = 'LOW';
 
-    // Check crime type severity
-    const hasCritical = crimeTypesArray.some(crime => CRITICAL_CRIMES.includes(crime));
-    const hasHigh = crimeTypesArray.some(crime => HIGH_PRIORITY.includes(crime));
-    const hasMedium = crimeTypesArray.some(crime => MEDIUM_PRIORITY.includes(crime));
+    // Check each crime type and find the highest priority
+    console.log(`📋 Analyzing crime types:`, crimeTypesArray);
 
+    const hasCritical = crimeTypesArray.some(crime => {
+      const isCritical = CRITICAL_CRIMES.some(criticalCrime =>
+        crime.toLowerCase().includes(criticalCrime.toLowerCase()) ||
+        criticalCrime.toLowerCase().includes(crime.toLowerCase())
+      );
+      if (isCritical) console.log(`🔴 CRITICAL crime detected: ${crime}`);
+      return isCritical;
+    });
+
+    const hasHigh = crimeTypesArray.some(crime => {
+      const isHigh = HIGH_PRIORITY.some(highCrime =>
+        crime.toLowerCase().includes(highCrime.toLowerCase()) ||
+        highCrime.toLowerCase().includes(crime.toLowerCase())
+      );
+      if (isHigh) console.log(`🟠 HIGH priority crime detected: ${crime}`);
+      return isHigh;
+    });
+
+    const hasMedium = crimeTypesArray.some(crime => {
+      const isMedium = MEDIUM_PRIORITY.some(mediumCrime =>
+        crime.toLowerCase().includes(mediumCrime.toLowerCase()) ||
+        mediumCrime.toLowerCase().includes(crime.toLowerCase())
+      );
+      if (isMedium) console.log(`🟡 MEDIUM priority crime detected: ${crime}`);
+      return isMedium;
+    });
+
+    // Assign score based on HIGHEST priority found
     if (hasCritical) {
       urgencyScore = 100; // Critical - immediate response
+      urgencyLevel = 'CRITICAL';
     } else if (hasHigh) {
       urgencyScore = 75; // High priority
+      urgencyLevel = 'HIGH';
     } else if (hasMedium) {
       urgencyScore = 50; // Medium priority
+      urgencyLevel = 'MEDIUM';
     }
 
     // Bonus points for having evidence (+10)
     if (req.file) {
       urgencyScore = Math.min(100, urgencyScore + 10);
+      console.log(`📸 Evidence bonus: +10 points`);
     }
 
     // Recency bonus: Reports within 1 hour get +5
     const hoursDiff = (now - incidentTime) / (1000 * 60 * 60);
     if (hoursDiff < 1) {
       urgencyScore = Math.min(100, urgencyScore + 5);
+      console.log(`⏱️ Recency bonus: +5 points (${hoursDiff.toFixed(1)}h ago)`);
     }
 
-    console.log(`🚨 Urgency Score: ${urgencyScore}/100 (${hasCritical ? 'CRITICAL' : hasHigh ? 'HIGH' : hasMedium ? 'MEDIUM' : 'LOW'})`);
+    console.log(`🚨 FINAL Urgency Score: ${urgencyScore}/100 (${urgencyLevel})`);
 
     // Create location record
     const lat = latitude ? parseFloat(latitude) : 0;
