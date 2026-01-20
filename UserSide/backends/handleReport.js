@@ -257,29 +257,29 @@ async function submitReport(req, res) {
     // When multiple crime types are selected, use the HIGHEST urgency level
 
     const CRITICAL_CRIMES = [
-      'Murder', 'Homicide', 'Attempted Murder',
-      'Rape', 'Sexual Assault', 'Sexual Harassment',
-      'Kidnapping', 'Abduction',
-      'Armed Robbery', 'Robbery with Violence',
-      'Terrorism', 'Bomb Threat'
+      'Murder',
+      'Homicide',
+      'Rape',
+      'Sexual Assault'
     ];
 
     const HIGH_PRIORITY = [
-      'Robbery', 'Hold-up',
-      'Physical Injury', 'Serious Physical Injury',
-      'Domestic Violence', 'Assault', 'Battery',
+      'Robbery',
+      'Physical Injury',
+      'Domestic Violence',
       'Missing Person',
-      'Arson', 'Fire',
-      'Drug Trafficking', 'Illegal Drugs'
+      'Harassment'
     ];
 
     const MEDIUM_PRIORITY = [
-      'Theft', 'Larceny',
-      'Burglary', 'Break-in', 'Housebreaking',
-      'Carnapping', 'Vehicle Theft',
-      'Threats', 'Intimidation',
-      'Vandalism', 'Property Damage',
-      'Fraud', 'Scam', 'Estafa'
+      'Theft',
+      'Burglary',
+      'Break-in',
+      'Carnapping',
+      'Motornapping',
+      'Threats',
+      'Fraud',
+      'Cybercrime'
     ];
 
     let urgencyScore = 30; // Base score for all reports
@@ -289,19 +289,12 @@ async function submitReport(req, res) {
     console.log(`📋 Analyzing crime types:`, crimeTypesArray);
 
     const hasCritical = crimeTypesArray.some(crime => {
-      const isCritical = CRITICAL_CRIMES.some(criticalCrime =>
-        crime.toLowerCase().includes(criticalCrime.toLowerCase()) ||
-        criticalCrime.toLowerCase().includes(crime.toLowerCase())
-      );
+      const isCritical = CRITICAL_CRIMES.includes(crime);
       if (isCritical) console.log(`🔴 CRITICAL crime detected: ${crime}`);
       return isCritical;
     });
 
-    const hasHigh = crimeTypesArray.some(crime => {
-      const isHigh = HIGH_PRIORITY.some(highCrime =>
-        crime.toLowerCase().includes(highCrime.toLowerCase()) ||
-        highCrime.toLowerCase().includes(crime.toLowerCase())
-      );
+    const hasHigh = crimeTypesArray.some(crime => {`r`n      const isHigh = HIGH_PRIORITY.includes(crime);
       if (isHigh) console.log(`🟠 HIGH priority crime detected: ${crime}`);
       return isHigh;
     });
@@ -921,3 +914,5 @@ module.exports = {
   getUserReports,
   getAllReports,
 };
+
+
