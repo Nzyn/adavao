@@ -400,6 +400,31 @@ export default function ReportCrime() {
         }
         console.log('✅ Description validated');
 
+        // ⚠️ Evidence validation - Required for most crime types
+        const EVIDENCE_OPTIONAL_CRIMES = [
+            'Threats', 'Harassment', 'Missing Person', 'Suspicious Activity', 'Noise Complaint'
+        ];
+
+        const requiresEvidence = !selectedCrimes.some(crime =>
+            EVIDENCE_OPTIONAL_CRIMES.includes(crime)
+        );
+
+        if (requiresEvidence && !selectedMedia) {
+            console.log('❌ Validation failed: Evidence required but not provided');
+            window.alert(
+                'Evidence Required: Please upload photo or video evidence of this incident.\n\n' +
+                'This helps police verify and respond faster to your report.\n\n' +
+                'Evidence is required for: ' + selectedCrimes.join(', ')
+            );
+            return;
+        }
+
+        if (selectedMedia) {
+            console.log('✅ Evidence provided');
+        } else {
+            console.log('ℹ️ Evidence optional for this crime type');
+        }
+
 
 
         // Check if user is logged in
@@ -802,7 +827,10 @@ export default function ReportCrime() {
                     multiline
                 />
 
-                <Text style={styles.label}>Photo/Video Evidence (optional)</Text>
+                <Text style={styles.label}>Photo/Video Evidence *</Text>
+                <Text style={{ fontSize: 12, color: '#666', marginBottom: 8, marginTop: -8 }}>
+                    Required for most crime types. Upload a photo or video of the incident, damage, or suspect.
+                </Text>
                 <TouchableOpacity style={[styles.mediaButton, isFlagged && { opacity: 0.6 }]} onPress={isFlagged ? undefined : pickMedia}>
                     <Ionicons name="camera-outline" size={24} color="#1D3557" />
                     <Text style={styles.mediaButtonText}>Select Photo/Video</Text>

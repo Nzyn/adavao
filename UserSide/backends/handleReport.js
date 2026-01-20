@@ -150,6 +150,65 @@ async function submitReport(req, res) {
       }
     }
 
+    // ⚠️ CRITICAL: Date Validation - Prevent Future Dates & Enforce 24-Hour Window
+    // This fixes the critical bug where users could report future incidents
+    console.log('🔍 Validating incident date:', incident_date);
+
+    const incidentTime = new Date(incident_date);
+    const now = new Date();
+
+    // Check if date is valid
+    if (isNaN(incidentTime.getTime())) {
+      await connection.rollback();
+      return res.status(422).json({
+        success: false,
+        message: "Invalid incident date format",
+        errors: {
+          incident_date: ["The incident date is not valid. Please try again."]
+        }
+      });
+    }
+
+    // Check if date is in the future
+    if (incidentTime > now) {
+      const futureMinutes = Math.round((incidentTime - now) / 60000);
+      console.log(`❌ Future date detected: ${futureMinutes} minutes in the future`);
+
+      await connection.rollback();
+      return res.status(422).json({
+        success: false,
+        message: "Cannot report future incidents",
+        errors: {
+          incident_date: [
+            "You cannot report an incident that hasn't happened yet. " +
+            "The incident date is in the future. Please check the date and time."
+          ]
+        }
+      });
+    }
+
+    // Check if incident is within 24 hours
+    const hoursDiff = (now - incidentTime) / (1000 * 60 * 60);
+
+    if (hoursDiff > 24) {
+      console.log(`❌ Incident too old: ${hoursDiff.toFixed(1)} hours ago`);
+
+      await connection.rollback();
+      return res.status(422).json({
+        success: false,
+        message: "Incident is too old to report through this app",
+        errors: {
+          incident_date: [
+            "This app is for reporting recent incidents within the last 24 hours. " +
+            `Your incident was ${Math.floor(hoursDiff)} hours ago. ` +
+            "For older incidents, please visit your nearest police station to file a formal report."
+          ]
+        }
+      });
+    }
+
+    console.log(`✅ Date validation passed: ${hoursDiff.toFixed(1)} hours ago`);
+
     // Parse crime types if it's a JSON string
     let crimeTypesArray;
     try {
@@ -161,6 +220,37 @@ async function submitReport(req, res) {
       crimeTypesArray = [crime_types];
     }
     const reportType = JSON.stringify(crimeTypesArray);
+
+    // ⚠️ EVIDENCE REQUIREMENT: Make evidence mandatory (with exceptions)
+    // This reduces fake reports and improves validation quality
+    const EVIDENCE_OPTIONAL_CRIMES = [
+      'Threats', 'Harassment', 'Missing Person', 'Suspicious Activity', 'Noise Complaint'
+    ];
+
+    const requiresEvidence = !crimeTypesArray.some(crime =>
+      EVIDENCE_OPTIONAL_CRIMES.includes(crime)
+    );
+
+    if (requiresEvidence && !req.file) {
+      console.log('❌ Evidence required but not provided for:', crimeTypesArray);
+      await connection.rollback();
+      return res.status(422).json({
+        success: false,
+        message: "Evidence is required for this type of report",
+        errors: {
+          media: [
+            "Please upload photo or video evidence of this incident. " +
+            "This helps police verify and respond faster to your report."
+          ]
+        }
+      });
+    }
+
+    if (req.file) {
+      console.log('✅ Evidence provided:', req.file.filename);
+    } else if (!requiresEvidence) {
+      console.log('ℹ️ Evidence optional for this crime type');
+    }
 
     // Create location record
     const lat = latitude ? parseFloat(latitude) : 0;

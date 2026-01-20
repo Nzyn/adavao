@@ -1,6 +1,7 @@
 // handleUserProfile.js - API handlers for user profile operations
 const db = require("./db");
 const { verifyOtpInternal } = require("./handleOtp");
+const { encrypt, decrypt } = require("./encryptionService");
 
 // Test MySQL connection
 const testConnection = async (req, res) => {
@@ -60,6 +61,10 @@ const getUserById = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Decrypt sensitive fields
+    if (user.address) user.address = decrypt(user.address);
+    if (user.contact) user.contact = decrypt(user.contact);
+
     console.log("✅ User profile fetched:", { id: user.id, name: `${user.firstname} ${user.lastname}`, role: user.role || 'user' });
 
     // 3. Structure the response to include 'station' object if applicable
@@ -93,25 +98,34 @@ const upsertUser = async (req, res) => {
 
   try {
     console.log("💾 Upserting user profile:", req.body);
-    console.log(`📍 Address field received: "${address}"`);
-    console.log(`🌍 Coordinates: lat=${latitude}, lng=${longitude}`);
+
+    // Encrypt sensitive fields before checking/saving
+    const encryptedAddress = address ? encrypt(address) : null;
+    const encryptedContact = contact ? encrypt(contact) : null;
+
+    // NOTE: We use the *plain* contact for OTP checks to match user input, 
+    // but we use *encrypted* contact for database storage.
 
     // Check if user exists in users_public table (UserSide app users only)
-    const [existing] = await db.query("SELECT id FROM users_public WHERE id = $1", [id]);
+    const [existing] = await db.query("SELECT id, contact FROM users_public WHERE id = $1", [id]);
 
     if (existing.length > 0) {
       // Update existing user - Check for sensitive changes (Phone Number)
       const userId = id;
-      const [currentUserRows] = await db.query("SELECT contact FROM users_public WHERE id = $1", [userId]);
-      const currentContact = currentUserRows[0]?.contact;
+      // We need to fetch and decrypt the current contact to compare
+      const currentEncryptedContact = existing[0]?.contact;
+      const currentContact = currentEncryptedContact ? decrypt(currentEncryptedContact) : null;
 
       // Normalize new contact for comparison
       let newContact = contact.trim().replace(/\s+/g, '');
       if (newContact.startsWith('0')) newContact = '+63' + newContact.slice(1);
 
+      let oldContactNormalized = currentContact ? currentContact.trim().replace(/\s+/g, '') : '';
+      if (oldContactNormalized.startsWith('0')) oldContactNormalized = '+63' + oldContactNormalized.slice(1);
+
       // If contact is changing, REQUIRE OTP
-      if (currentContact && newContact !== currentContact) {
-        console.log(`🔒 Sensitive Action: Changing phone from ${currentContact} to ${newContact}`);
+      if (oldContactNormalized && newContact !== oldContactNormalized) {
+        console.log(`🔒 Sensitive Action: Changing phone from ${oldContactNormalized} to ${newContact}`);
 
         if (!req.body.otp) {
           return res.status(400).json({
@@ -151,8 +165,8 @@ const upsertUser = async (req, res) => {
         firstname,
         lastname,
         email,
-        contact,
-        address,
+        encryptedContact,
+        encryptedAddress,
         latitude || null,
         longitude || null,
         station_id || null,
@@ -161,7 +175,6 @@ const upsertUser = async (req, res) => {
       ]);
 
       console.log(`✅ User ${id} updated successfully`);
-      console.log(`📍 Address saved: "${address}"`);
     } else {
       // Insert new user
       const query = `
@@ -174,8 +187,8 @@ const upsertUser = async (req, res) => {
         firstname,
         lastname,
         email,
-        contact,
-        address,
+        encryptedContact,
+        encryptedAddress,
         latitude || null,
         longitude || null,
         station_id || null,
@@ -183,7 +196,6 @@ const upsertUser = async (req, res) => {
       ]);
 
       console.log(`✅ User ${id} created successfully`);
-      console.log(`📍 Address saved: "${address}"`);
     }
 
     res.json({
@@ -248,6 +260,8 @@ const updateUserAddress = async (req, res) => {
   try {
     console.log(`📍 Updating address for user ${id}:`, address);
 
+    const encryptedAddress = address ? encrypt(address) : null;
+
     const query = `
       UPDATE users_public 
       SET address = $1, 
@@ -255,7 +269,7 @@ const updateUserAddress = async (req, res) => {
       WHERE id = $2 RETURNING id
     `;
 
-    const [result] = await db.query(query, [address, id]);
+    const [result] = await db.query(query, [encryptedAddress, id]);
 
     if (result.length === 0) {
       return res.status(404).json({ message: "User not found" });

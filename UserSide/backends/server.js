@@ -514,7 +514,17 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-  // console.log(`   Local Network: http://${require('ip').address()}:${PORT}`);
+const { encryptAllSensitiveData } = require('./encrypt_all_sensitive_data');
+
+console.log("🔒 Initializing encryption verification on startup...");
+encryptAllSensitiveData().then(() => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
+    // console.log(`   Local Network: http://${require('ip').address()}:${PORT}`);
+  });
+}).catch(err => {
+  console.error("⚠️ Encryption migration failed, but starting server anyway:", err);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
+  });
 });

@@ -91,57 +91,62 @@ const App = () => {
     checkAuthStatus();
   }, []);
 
-  // Fetch flag status from backend on userId change (triggers on-demand expiration)
-  useEffect(() => {
-    const fetchFlagStatusFromBackend = async () => {
-      if (!userId) return;
+  // Define the flag check function so it can be reused
+  const fetchFlagStatusFromBackend = async () => {
+    if (!userId) return;
 
-      try {
-        console.log('🔄 Fetching flag status from backend for user:', userId);
-        const result = await debugService.checkFlagStatus(userId);
+    try {
+      console.log('🔄 Fetching flag status from backend for user:', userId);
+      const result = await debugService.checkFlagStatus(userId);
 
-        if (result.success) {
-          const status = result.flagStatus;
-          console.log('📊 Backend flag status:', status);
+      if (result.success) {
+        const status = result.flagStatus;
 
-          // Check for any flags that were auto-expired in this check
-          if (status.expiredInThisCheck > 0) {
-            console.log(`✨ ${status.expiredInThisCheck} flag(s) were auto-expired!`);
-          }
+        // Check for any flags that were auto-expired in this check
+        if (status.expiredInThisCheck > 0) {
+          console.log(`✨ ${status.expiredInThisCheck} flag(s) were auto-expired!`);
+        }
 
-          // Update local flag status based on backend response
-          if (status.isFlagged && status.activeFlags > 0) {
+        // Update local flag status based on backend response
+        if (status.isFlagged && status.activeFlags > 0) {
+          // SAFETY CHECK: Verify if the flags are actually expired (in case backend didn't auto-expire)
+          const allFlagsExpired = result.details?.flags?.length > 0 && result.details.flags.every((f: any) =>
+            f.status === 'confirmed' && f.expires_at && new Date(f.expires_at) <= new Date()
+          );
+
+          if (allFlagsExpired) {
+            console.log('⚠️ Client-side override: All effective flags are expired. Clearing flag status.');
+            setFlagStatus(null);
+            setFlagNotification(null);
+          } else {
             setFlagStatus({
               totalFlags: status.activeFlags,
               restrictionLevel: status.restrictionLevel || 'warning',
             });
-          } else {
-            // User is not flagged (or flags have expired)
-            setFlagStatus(null);
-            setFlagNotification(null);
           }
+        } else {
+          // User is not flagged (or flags have expired)
+          setFlagStatus(null);
+          setFlagNotification(null);
         }
-      } catch (error) {
-        console.error('Error fetching flag status from backend:', error);
-        // Don't block the UI on error, just log it
       }
-    };
-
-    fetchFlagStatusFromBackend();
-  }, [userId]);
+    } catch (error) {
+      console.error('Error fetching flag status from backend:', error);
+    }
+  };
 
   // Reference to stop polling when component unmounts
   const pollingStopRef = useRef<(() => void) | null>(null);
 
-  // Load notifications when screen comes into focus or when userId changes
+  // Fetch flag status from backend on userId change AND on focus
   useFocusEffect(
     React.useCallback(() => {
       if (userId) {
+        fetchFlagStatusFromBackend();
         loadNotifications(userId);
         loadUnreadChatCount(userId);
 
-        // Start notification polling (checks every 3 seconds for new flagging notifications)
-        // Uses "ready" pattern to only show new notifications once
+        // Start notification polling code
         pollingStopRef.current = notificationService.startNotificationPolling(
           userId,
           (newNotification) => {
@@ -157,11 +162,10 @@ const App = () => {
             });
 
             // Auto-show toast for flag notifications (only once per session)
-            // The "ready" pattern in polling ensures this only triggers for truly new notifications
             if (newNotification.type === 'user_flagged' && !flagToastShownThisSession) {
               setShowNotifications(true);
               setFlagNotification(newNotification);
-              setFlagToastShownThisSession(true); // Mark as shown so it doesn't appear again this session
+              setFlagToastShownThisSession(true);
               // Update flag status
               if (newNotification.data) {
                 setFlagStatus({
@@ -173,19 +177,16 @@ const App = () => {
           },
           (hasFlagNotifications) => {
             // Handle flag status changes detected by polling
-            console.log('🔄 [POLL] Flag status changed - has flag notifications:', hasFlagNotifications);
-            console.log('🔄 [POLL] Previous flagStatus (ref):', flagStatusRef.current);
-
             if (!hasFlagNotifications && flagStatusRef.current) {
               console.log('🔄 [POLL] Reloading notifications for user:', userId);
               loadNotifications(userId);
+              // Also re-check flag status specifically
+              fetchFlagStatusFromBackend();
             }
           },
-          3000  // Poll every 3 seconds
+          3000
         );
       }
-
-      // Cleanup polling when component loses focus
       return () => {
         if (pollingStopRef.current) {
           pollingStopRef.current();
@@ -194,6 +195,12 @@ const App = () => {
       };
     }, [userId])
   );
+
+  // Use fetchFlagStatusFromBackend in useEffect as well for initial load
+  useEffect(() => {
+    if (userId) fetchFlagStatusFromBackend();
+  }, [userId]);
+
 
   // Load notifications for the user
   const loadNotifications = async (userId: string) => {
@@ -221,8 +228,7 @@ const App = () => {
       } else if (!flagNotif) {
         // No flag notification found - user might have been unflagged
         console.log('📬 No flag notification found - clearing flag status');
-        setFlagStatus(null);
-        setFlagNotification(null);
+        // Only clear if backend check also confirms, but here we just infer
       }
 
       // Check if there are new unread notifications
@@ -433,110 +439,126 @@ const App = () => {
         {/* Grid Container */}
         <View style={styles.grid}>
           {/* History */}
-          <FadeInView delay={100}>
-            <Link href="/history" asChild>
-              <Pressable
-                style={pressStates.history ? styles.cardGridPressed : styles.cardGrid}
-                onPressIn={() => handlePressIn('history')}
-                onPressOut={() => handlePressOut('history')}
-              >
-                <View style={{ transform: [{ scale: pressStates.history ? 0.95 : 1 }] }}>
-                  <Ionicons name="time-outline" size={40} color="#1D3557" />
-                  <Text style={styles.cardText}>History</Text>
-                </View>
-              </Pressable>
-            </Link>
+          {/* History */}
+          <FadeInView delay={100} style={{ width: '48%', marginBottom: 15 }}>
+            <Pressable
+              style={({ pressed }) => [
+                pressed ? styles.cardGridPressed : styles.cardGrid,
+                { width: '100%', marginBottom: 0 }
+              ]}
+              onPress={() => router.push('/history')}
+              onPressIn={() => handlePressIn('history')}
+              onPressOut={() => handlePressOut('history')}
+            >
+              <View style={{ transform: [{ scale: pressStates.history ? 0.95 : 1 }], alignItems: 'center' }}>
+                <Ionicons name="time-outline" size={40} color="#1D3557" />
+                <Text style={styles.cardText}>History</Text>
+              </View>
+            </Pressable>
           </FadeInView>
 
-          <FadeInView delay={200}>
-            <Link href="/chatlist" asChild>
-              <Pressable
-                style={pressStates.chat ? styles.cardGridPressed : styles.cardGrid}
-                onPressIn={() => handlePressIn('chat')}
-                onPressOut={() => handlePressOut('chat')}
-              >
-                <View style={{ transform: [{ scale: pressStates.chat ? 0.95 : 1 }] }}>
-                  <View style={{ position: 'relative' }}>
-                    <Ionicons name="chatbox-outline" size={40} color="#1D3557" />
-                    {unreadChatCount > 0 && (
-                      <View style={styles.chatBadge}>
-                        <Text style={styles.chatBadgeText}>
-                          {unreadChatCount}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.cardText}>Chat</Text>
+          {/* Chat */}
+          <FadeInView delay={200} style={{ width: '48%', marginBottom: 15 }}>
+            <Pressable
+              style={({ pressed }) => [
+                pressed ? styles.cardGridPressed : styles.cardGrid,
+                { width: '100%', marginBottom: 0 }
+              ]}
+              onPress={() => router.push('/chatlist')}
+              onPressIn={() => handlePressIn('chat')}
+              onPressOut={() => handlePressOut('chat')}
+            >
+              <View style={{ transform: [{ scale: pressStates.chat ? 0.95 : 1 }], alignItems: 'center' }}>
+                <View style={{ position: 'relative' }}>
+                  <Ionicons name="chatbox-outline" size={40} color="#1D3557" />
+                  {unreadChatCount > 0 && (
+                    <View style={styles.chatBadge}>
+                      <Text style={styles.chatBadgeText}>
+                        {unreadChatCount}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              </Pressable>
-            </Link>
+                <Text style={styles.cardText}>Chat</Text>
+              </View>
+            </Pressable>
           </FadeInView>
 
           {/* Profile */}
-          <FadeInView delay={300}>
-            <Link href="/profile" asChild>
-              <Pressable
-                style={pressStates.profile ? styles.cardGridPressed : styles.cardGrid}
-                onPressIn={() => handlePressIn('profile')}
-                onPressOut={() => handlePressOut('profile')}
-              >
-                <View style={{ transform: [{ scale: pressStates.profile ? 0.95 : 1 }] }}>
-                  <Ionicons name="person-outline" size={40} color="#1D3557" />
-                  <Text style={styles.cardText}>Profile</Text>
-                </View>
-              </Pressable>
-            </Link>
+          <FadeInView delay={300} style={{ width: '48%', marginBottom: 15 }}>
+            <Pressable
+              style={({ pressed }) => [
+                pressed ? styles.cardGridPressed : styles.cardGrid,
+                { width: '100%', marginBottom: 0 }
+              ]}
+              onPress={() => router.push('/profile')}
+              onPressIn={() => handlePressIn('profile')}
+              onPressOut={() => handlePressOut('profile')}
+            >
+              <View style={{ transform: [{ scale: pressStates.profile ? 0.95 : 1 }], alignItems: 'center' }}>
+                <Ionicons name="person-outline" size={40} color="#1D3557" />
+                <Text style={styles.cardText}>Profile</Text>
+              </View>
+            </Pressable>
           </FadeInView>
 
           {/* Guidelines */}
-          <FadeInView delay={400}>
-            <Link href="/guidelines" asChild>
-              <Pressable
-                style={pressStates.guidelines ? styles.cardGridPressed : styles.cardGrid}
-                onPressIn={() => handlePressIn('guidelines')}
-                onPressOut={() => handlePressOut('guidelines')}
-              >
-                <View style={{ transform: [{ scale: pressStates.guidelines ? 0.95 : 1 }], alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={40}
-                    color="#1D3557"
-                  />
-                  <Text style={styles.cardText}>Guidelines</Text>
-                </View>
-              </Pressable>
-            </Link>
+          <FadeInView delay={400} style={{ width: '48%', marginBottom: 15 }}>
+            <Pressable
+              style={({ pressed }) => [
+                pressed ? styles.cardGridPressed : styles.cardGrid,
+                { width: '100%', marginBottom: 0 }
+              ]}
+              onPress={() => router.push('/guidelines')}
+              onPressIn={() => handlePressIn('guidelines')}
+              onPressOut={() => handlePressOut('guidelines')}
+            >
+              <View style={{ transform: [{ scale: pressStates.guidelines ? 0.95 : 1 }], alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={40}
+                  color="#1D3557"
+                />
+                <Text style={styles.cardText}>Guidelines</Text>
+              </View>
+            </Pressable>
           </FadeInView>
 
           {/* Location */}
-          <FadeInView delay={500}>
-            <Link href="/(tabs)/location" asChild>
-              <Pressable
-                style={pressStates.location ? styles.cardGridPressed : styles.cardGrid}
-                onPressIn={() => handlePressIn('location')}
-                onPressOut={() => handlePressOut('location')}
-              >
-                <View style={{ transform: [{ scale: pressStates.location ? 0.95 : 1 }] }}>
-                  <Ionicons name="business-outline" size={40} color="#1D3557" />
-                  <Text style={styles.cardText}>Station</Text>
-                </View>
-              </Pressable>
-            </Link>
+          <FadeInView delay={500} style={{ width: '48%', marginBottom: 15 }}>
+            <Pressable
+              style={({ pressed }) => [
+                pressed ? styles.cardGridPressed : styles.cardGrid,
+                { width: '100%', marginBottom: 0 }
+              ]}
+              onPress={() => router.push('/(tabs)/location')}
+              onPressIn={() => handlePressIn('location')}
+              onPressOut={() => handlePressOut('location')}
+            >
+              <View style={{ transform: [{ scale: pressStates.location ? 0.95 : 1 }], alignItems: 'center' }}>
+                <Ionicons name="business-outline" size={40} color="#1D3557" />
+                <Text style={styles.cardText}>Station</Text>
+              </View>
+            </Pressable>
           </FadeInView>
 
           {/* Logout */}
-          <Pressable
-            style={pressStates.logout ? styles.cardGridPressed : styles.cardGrid}
-            onPress={() => setShowLogoutDialog(true)}
-            onPressIn={() => handlePressIn('logout')}
-            onPressOut={() => handlePressOut('logout')}
-          >
-            <View style={{ transform: [{ scale: pressStates.logout ? 0.95 : 1 }] }}>
-              <Ionicons name="log-out-outline" size={40} color="#1D3557" />
-              <Text style={styles.cardText}>Logout</Text>
-            </View>
-          </Pressable>
-
+          <FadeInView delay={600} style={{ width: '48%', marginBottom: 15 }}>
+            <Pressable
+              style={({ pressed }) => [
+                pressed ? styles.cardGridPressed : styles.cardGrid,
+                { width: '100%', marginBottom: 0 }
+              ]}
+              onPress={() => setShowLogoutDialog(true)}
+              onPressIn={() => handlePressIn('logout')}
+              onPressOut={() => handlePressOut('logout')}
+            >
+              <View style={{ transform: [{ scale: pressStates.logout ? 0.95 : 1 }], alignItems: 'center' }}>
+                <Ionicons name="log-out-outline" size={40} color="#1D3557" />
+                <Text style={styles.cardText}>Logout</Text>
+              </View>
+            </Pressable>
+          </FadeInView>
         </View>
 
         <ConfirmDialog
