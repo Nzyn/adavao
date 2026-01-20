@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -116,6 +117,21 @@ export default function ReportCrime() {
     const [barangayId, setBarangayId] = useState<number | null>(null);
     const [streetAddress, setStreetAddress] = useState('');
     const [description, setDescription] = useState('');
+
+    // Item #2: Report Templates
+    const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+    const REPORT_TEMPLATES: { [key: string]: string } = {
+        'Theft': 'Item stolen: ___\nLocation where it happened: ___\nApproximate time: ___\nSuspect description (if seen): ___\nEstimated value: ___',
+        'Robbery': 'What was taken: ___\nWeapon used (if any): ___\nNumber of suspects: ___\nSuspect description: ___\nDirection suspects fled: ___',
+        'Noise Complaint': 'Type of noise: ___\nDuration: ___\nFrequency (daily/weekly): ___\nSource of noise: ___',
+        'Suspicious Activity': 'Activity observed: ___\nNumber of people involved: ___\nVehicle description (if any): ___\nHow long has this been happening: ___',
+        'Missing Person': 'Name: ___\nAge: ___\nLast seen: ___\nWearing: ___\nDistinguishing features: ___',
+        'Physical Injury': 'Type of injury: ___\nHow it happened: ___\nSuspect name/description: ___\nWitnesses present: ___',
+        'Domestic Violence': 'Relationship to suspect: ___\nType of violence: ___\nInjuries sustained: ___\nIs this ongoing: ___',
+        'Burglary': 'Entry point: ___\nItems taken: ___\nTime discovered: ___\nSigns of forced entry: ___',
+        'Vandalism': 'Property damaged: ___\nType of damage: ___\nEstimated repair cost: ___\nWitnesses: ___',
+    };
 
     const [showLocationPicker, setShowLocationPicker] = useState(false);
     const [locationCoordinates, setLocationCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -234,6 +250,50 @@ export default function ReportCrime() {
     }, []);
 
     // Debug: Log when showLocationPicker changes
+    // Item #6: Auto-pin current location on mount
+    useEffect(() => {
+        const autoGetCurrentLocation = async () => {
+            try {
+                console.log('🗺️ Auto-pinning current location...');
+                const { status } = await Location.requestForegroundPermissionsAsync();
+
+                if (status === 'granted') {
+                    const location = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.High
+                    });
+
+                    const { latitude, longitude } = location.coords;
+                    console.log(`📍 Auto-pinned location: ${latitude}, ${longitude}`);
+
+                    setLocationCoordinates({ latitude, longitude });
+
+                    // Auto-reverse geocode to get address
+                    try {
+                        const response = await fetch(
+                            `${BACKEND_URL}/api/location/reverse?latitude=${latitude}&longitude=${longitude}`
+                        );
+                        const data = await response.json();
+
+                        if (data.success && data.location) {
+                            setLocation(data.location.display_name || '');
+                            setBarangay(data.location.barangay || '');
+                            setStreetAddress(data.location.street_address || '');
+                            console.log(`✅ Auto-location set: ${data.location.barangay}`);
+                        }
+                    } catch (error) {
+                        console.error('Error reverse geocoding:', error);
+                    }
+                } else {
+                    console.log('⚠️ Location permission not granted');
+                }
+            } catch (error) {
+                console.error('Error auto-pinning location:', error);
+            }
+        };
+
+        autoGetCurrentLocation();
+    }, []); // Run once on mount
+
     useEffect(() => {
         console.log('📍 showLocationPicker changed:', showLocationPicker);
     }, [showLocationPicker]);
@@ -788,6 +848,17 @@ export default function ReportCrime() {
                 </TouchableOpacity>
 
                 <Text style={styles.label}>Description *</Text>
+
+                {/* Item #2: Template Button */}
+                {selectedCrimes.length > 0 && Object.keys(REPORT_TEMPLATES).some(t => selectedCrimes.includes(t)) && (
+                    <TouchableOpacity
+                        style={styles.templateButton}
+                        onPress={() => setShowTemplateModal(true)}>
+                        <Ionicons name="document-text-outline" size={18} color="#1D3557" style={{ marginRight: 6 }} />
+                        <Text style={styles.templateButtonText}>📋 Use Template</Text>
+                    </TouchableOpacity>
+                )}
+
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     placeholder="Describe what happened in detail..."
