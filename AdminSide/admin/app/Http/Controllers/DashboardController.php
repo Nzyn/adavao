@@ -81,19 +81,24 @@ class DashboardController extends Controller
 
             return [
                 'urgentPending' => $getCount('pending') > 0 ? (function() use ($reportsQuery, $isSuperAdmin, $userRole, $user) {
-                    $q = clone $reportsQuery;
-                    $q->where('status', 'pending');
-                    $q->where('urgency_score', '>=', 70); // High or Critical
-                    
-                    if (!$isSuperAdmin) {
-                        if ($userRole === 'police') {
-                            $stationId = $user->station_id;
-                            if ($stationId) $q->where('assigned_station_id', $stationId);
-                        } else {
-                            $q->whereNotNull('assigned_station_id');
+                    try {
+                        $q = clone $reportsQuery;
+                        $q->where('status', 'pending');
+                        $q->where('urgency_score', '>=', 70); // High or Critical
+                        
+                        if (!$isSuperAdmin) {
+                            if ($userRole === 'police') {
+                                $stationId = $user->station_id;
+                                if ($stationId) $q->where('assigned_station_id', $stationId);
+                            } else {
+                                $q->whereNotNull('assigned_station_id');
+                            }
                         }
+                        return $q->count();
+                    } catch (\Exception $e) {
+                        // Fallback if column doesn't exist yet
+                        return 0;
                     }
-                    return $q->count();
                 })() : 0,
                 'totalReports' => $getCount(),
                 'pendingReports' => $getCount('pending'),
