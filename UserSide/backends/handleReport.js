@@ -294,16 +294,14 @@ async function submitReport(req, res) {
       return isCritical;
     });
 
-    const hasHigh = crimeTypesArray.some(crime => {`r`n      const isHigh = HIGH_PRIORITY.includes(crime);
+    const hasHigh = crimeTypesArray.some(crime => {
+      const isHigh = HIGH_PRIORITY.includes(crime);
       if (isHigh) console.log(`🟠 HIGH priority crime detected: ${crime}`);
       return isHigh;
     });
 
     const hasMedium = crimeTypesArray.some(crime => {
-      const isMedium = MEDIUM_PRIORITY.some(mediumCrime =>
-        crime.toLowerCase().includes(mediumCrime.toLowerCase()) ||
-        mediumCrime.toLowerCase().includes(crime.toLowerCase())
-      );
+      const isMedium = MEDIUM_PRIORITY.includes(crime);
       if (isMedium) console.log(`🟡 MEDIUM priority crime detected: ${crime}`);
       return isMedium;
     });
