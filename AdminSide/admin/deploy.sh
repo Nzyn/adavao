@@ -17,6 +17,10 @@ php artisan db:fix-columns
 echo "🗄️ Running database migrations..."
 php artisan migrate --force
 
+# Recalculate urgency scores
+echo "🔄 Updating urgency scores..."
+php artisan reports:recalculate-urgency
+
 # Clear and cache config
 echo "⚡ Optimizing application..."
 php artisan config:cache
