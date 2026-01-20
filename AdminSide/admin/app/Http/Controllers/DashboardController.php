@@ -9,10 +9,14 @@ use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         // Get the authenticated user
         $user = auth()->user();
+        
+        // Item #15: Date Range Filtering
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
         
         // Determine role using RBAC methods
         $userRole = 'guest';
@@ -26,123 +30,84 @@ class DashboardController extends Controller
                     $userRole = 'admin';
                 }
             } elseif (isset($user->role)) {
-                // Fallback to role property
                 $userRole = $user->role;
             }
         }
         
-        // Check if user is super admin (alertdavao.ph) directly
         $isSuperAdmin = ($userRole === 'super_admin');
-        
-        // Fetch dashboard statistics with caching (5 minutes)
-        // Cache key includes role and station to differentiate filtered views
         $stationId = $user->station_id ?? 'all';
-        $cacheKey = 'dashboard_stats_' . $userRole . '_' . $stationId;
         
-        $stats = Cache::remember($cacheKey, 300, function() use ($isSuperAdmin, $userRole, $user) {
-            if ($isSuperAdmin) {
-                // Super Admin Visibility: ALL Reports (Assigned + Unassigned)
-                return [
-                    'totalReports' => DB::table('reports')->count(),
-                    'pendingReports' => DB::table('reports')
-                        ->where('status', 'pending')
-                        ->count(),
-                    'investigatingReports' => DB::table('reports')
-                        ->where('status', 'investigating')
-                        ->count(),
-                    'resolvedReports' => DB::table('reports')
-                        ->where('status', 'resolved')
-                        ->count(),
-                    'reportsToday' => DB::table('reports')
-                        ->whereDate('date_reported', \Carbon\Carbon::today())
-                        ->count(),
-                    'unreadMessages' => 0 // Message count logic can be added if needed
-                ];
-            } elseif ($userRole === 'police') {
-                // Police Visibility: ONLY Assigned to their Station
-                $stationId = $user->station_id;
+        // Item #15: Include dates in cache key if filtering is active
+        $cacheKey = 'dashboard_stats_' . $userRole . '_' . $stationId;
+        if ($dateFrom || $dateTo) {
+            $cacheKey .= '_' . ($dateFrom ?? 'x') . '_' . ($dateTo ?? 'x');
+        }
+        
+        $stats = Cache::remember($cacheKey, 300, function() use ($isSuperAdmin, $userRole, $user, $dateFrom, $dateTo) {
+            $reportsQuery = DB::table('reports');
             
-                if ($stationId) {
-                    $totalReports = DB::table('reports')->where('assigned_station_id', $stationId)->count();
-                    
-                    // Reports Today (Station Assigned)
-                    $reportsToday = DB::table('reports')
-                        ->where('assigned_station_id', $stationId)
-                        ->whereDate('date_reported', \Carbon\Carbon::today())
-                        ->count();
-                        
-                    // Unread Messages for this user (assuming message system uses user_id)
-                    // Messages table structure check needed, assuming 'receiver_id' and 'is_read'
-                    // If message system is complex, simplistic count might need adjustment
-                    // Try-catch to handle missing is_read column in production
-                    try {
-                        $unreadMessages = DB::table('messages')
-                            ->where('receiver_id', $user->id)
-                            ->where('is_read', 0)
-                            ->count();
-                    } catch (\Exception $e) {
-                        // Column may not exist in production, default to 0
-                        \Log::warning('is_read column missing in messages table: ' . $e->getMessage());
-                        $unreadMessages = 0;
-                    }
-
-                    return [
-                        'totalReports' => $totalReports,
-                        'pendingReports' => DB::table('reports')
-                            ->where('assigned_station_id', $stationId)
-                            ->where('status', 'pending')
-                            ->count(),
-                        'investigatingReports' => DB::table('reports')
-                            ->where('assigned_station_id', $stationId)
-                            ->where('status', 'investigating')
-                            ->count(),
-                        'resolvedReports' => DB::table('reports')
-                            ->where('assigned_station_id', $stationId)
-                            ->where('status', 'resolved')
-                            ->count(),
-                        'reportsToday' => $reportsToday,
-                        'unreadMessages' => $unreadMessages
-                    ];
-                } else {
-                    return [
-                        'totalReports' => 0, 'pendingReports' => 0, 'investigatingReports' => 0, 'resolvedReports' => 0,
-                        'reportsToday' => 0, 'unreadMessages' => 0
-                    ];
-                }
-            } else {
-                // Other Admin Visibility: ONLY Assigned Reports (Any Station)
-                return [
-                    'totalReports' => DB::table('reports')->whereNotNull('assigned_station_id')->count(),
-                    'pendingReports' => DB::table('reports')
-                        ->whereNotNull('assigned_station_id')
-                        ->where('status', 'pending')
-                        ->count(),
-                    'investigatingReports' => DB::table('reports')
-                        ->whereNotNull('assigned_station_id')
-                        ->where('status', 'investigating')
-                        ->count(),
-                    'resolvedReports' => DB::table('reports')
-                        ->whereNotNull('assigned_station_id')
-                        ->where('status', 'resolved')
-                        ->count(),
-                    'reportsToday' => 0,
-                    'unreadMessages' => 0
-                ];
+            // Apply Date Filter if present
+            if ($dateFrom) {
+                $reportsQuery->whereDate('created_at', '>=', $dateFrom);
             }
+            if ($dateTo) {
+                $reportsQuery->whereDate('created_at', '<=', $dateTo);
+            }
+            
+            // Helper to get count based on base query constraints
+            $getCount = function($status = null) use ($reportsQuery, $isSuperAdmin, $userRole, $user) {
+                $q = clone $reportsQuery;
+                
+                if ($status) {
+                    $q->where('status', $status);
+                }
+                
+                if (!$isSuperAdmin) {
+                    if ($userRole === 'police') {
+                        $stationId = $user->station_id;
+                        if ($stationId) {
+                            $q->where('assigned_station_id', $stationId);
+                        } else {
+                            return 0; 
+                        }
+                    } else {
+                        // Admin: Only assigned reports
+                        $q->whereNotNull('assigned_station_id');
+                    }
+                }
+                
+                return $q->count();
+            };
+
+            return [
+                'totalReports' => $getCount(),
+                'pendingReports' => $getCount('pending'),
+                'investigatingReports' => $getCount('investigating'),
+                'resolvedReports' => $getCount('resolved'),
+                'reportsToday' => DB::table('reports')
+                    ->when($userRole === 'police' && $user->station_id, function($q) use ($user) {
+                        return $q->where('assigned_station_id', $user->station_id);
+                    })
+                    ->whereDate('created_at', \Carbon\Carbon::today())
+                    ->count(),
+                'unreadMessages' => DB::table('messages')
+                    ->where('receiver_id', $user->id)
+                    ->where('is_read', 0)
+                    ->count()
+            ];
         });
         
-        // Extract stats from cache
+        // Extract stats
         $totalReports = $stats['totalReports'];
         $pendingReports = $stats['pendingReports'];
         $investigatingReports = $stats['investigatingReports'];
         $resolvedReports = $stats['resolvedReports'];
-        // New stats for police (default to 0 if not present)
-        $reportsToday = $stats['reportsToday'] ?? 0;
-        $unreadMessages = $stats['unreadMessages'] ?? 0;
+        $reportsToday = $stats['reportsToday'];
+        $unreadMessages = $stats['unreadMessages'];
         
         $totalUsers = DB::table('users_public')->count();
         
-        // Count police officers via RBAC (user_admin -> user_admin_roles -> roles)
+        // Count police officers
         $totalPoliceOfficers = DB::table('user_admin')
             ->join('user_admin_roles', 'user_admin.id', '=', 'user_admin_roles.user_admin_id')
             ->join('roles', 'user_admin_roles.role_id', '=', 'roles.role_id')
@@ -163,15 +128,17 @@ class DashboardController extends Controller
         return view('welcome', compact(
             'userRole',
             'totalReports',
-            'pendingReports',
+            'pendingReports', // Passed to view for Items 16 & 17
             'investigatingReports',
-            'resolvedReports',
+            'resolvedReports', // Passed to view for Items 16 & 17
             'reportsToday',
             'unreadMessages',
             'totalUsers',
             'totalPoliceOfficers',
             'flaggedUsersCount',
-            'pendingVerificationsCount'
+            'pendingVerificationsCount',
+            'dateFrom', // Passed for Item 15
+            'dateTo'    // Passed for Item 15
         ));
     }
 }

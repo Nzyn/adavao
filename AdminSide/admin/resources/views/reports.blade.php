@@ -62,6 +62,68 @@
             pointer-events: none;
         }
 
+        /* Date Range Filter Styles */
+        .filter-form {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: white;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+        }
+        
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .filter-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+        
+        .filter-input {
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.875rem;
+            color: #374151;
+        }
+        
+        .filter-btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .filter-btn:hover {
+            background-color: #2563eb;
+        }
+        
+        .reset-link {
+            font-size: 0.875rem;
+            color: #6b7280;
+            text-decoration: none;
+            padding: 0.5rem;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .reset-link:hover {
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+
         /* Custom Station Selector Styles */
         .station-selector-ui {
             border: 1px solid #e5e7eb;
@@ -1147,6 +1209,26 @@
             <h1>Reports</h1>
             <p>Manage and view all incident reports</p>
         </div>
+
+        <!-- ITEM 15: DATE RANGE FILTER -->
+        <form action="{{ route('reports') }}" method="GET" style="display: flex; gap: 0.5rem; align-items: center; background: white; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            @if(request('status'))
+                <input type="hidden" name="status" value="{{ request('status') }}">
+            @endif
+
+            <div style="display: flex; flex-direction: column;">
+                <label style="font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">From</label>
+                <input type="date" name="date_from" value="{{ request('date_from') }}" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; color: #374151;">
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <label style="font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">To</label>
+                <input type="date" name="date_to" value="{{ request('date_to') }}" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; color: #374151;">
+            </div>
+            <button type="submit" style="background: #3b82f6; color: white; border: none; padding: 0 1rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; cursor: pointer; margin-left: 0.5rem; height: 38px; transition: background 0.2s;">Filter</button>
+            @if(request('date_from') || request('date_to') || request('status'))
+                <a href="{{ route('reports') }}" style="color: #6b7280; text-decoration: none; font-size: 0.8rem; margin-left: 0.5rem; padding: 0.5rem; border-radius: 4px; background: #f3f4f6;">Reset</a>
+            @endif
+        </form>
 
         <div class="search-box">
             <svg class="search-icon" viewBox="0 0 24 24">

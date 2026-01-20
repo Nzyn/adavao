@@ -166,6 +166,14 @@ class ReportController extends Controller
             $query->where('reports.status', $request->status);
         }
 
+        // Item #15: Date Range Filtering for Reports List
+        if ($request->has('date_from') && $request->date_from) {
+            $query->whereDate('reports.created_at', '>=', $request->date_from);
+        }
+        if ($request->has('date_to') && $request->date_to) {
+            $query->whereDate('reports.created_at', '<=', $request->date_to);
+        }
+
         // ROLE CHECK: Police role takes precedence over admin
         $user = auth()->user();
         $isAdmin = false;
@@ -234,7 +242,8 @@ class ReportController extends Controller
         
         $reports = $query->select('reports.*')
                          ->orderBy('reports.created_at', 'desc')
-                         ->paginate(10);
+                         ->paginate(10)
+                         ->withQueryString();
         
         \Log::info('Reports query result', [
             'total' => $reports->total(),
@@ -346,6 +355,51 @@ class ReportController extends Controller
                 'is_anonymous' => 'boolean',
                 'media' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,mp4,mov,avi,webm|max:25600', // 25MB
             ]);
+
+            // Item 3: Anonymous Reporting Rate Limiting
+            // Limit to 1 report every 10 minutes per IP address for anonymous users
+            if ($request->boolean('is_anonymous')) {
+                $ip = $request->ip();
+                $tenMinutesAgo = \Carbon\Carbon::now()->subMinutes(10);
+                
+                // Check if this IP has submitted an anonymous report in the last 10 minutes
+                $recentReport = Report::where('is_anonymous', true)
+                    ->where('created_at', '>=', $tenMinutesAgo)
+                    ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.ip_address')) = ?", [$ip])
+                    ->first();
+                
+                // Alternative check if we are not storing IP in metadata yet (backward compatibility or simpler logic)
+                // Since we might not have 'metadata' column yet, we can check by user_id if we were tracking it, 
+                // but for true anonymous we rely on IP. 
+                // If the 'metadata' column doesn't exist, we might need a cache-based lock.
+                // Let's use Cache for a simpler, schema-agnostic approach.
+                
+                $cacheKey = 'anonymous_report_limit_' . str_replace([':', '.'], '_', $ip);
+                if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+                     return response()->json([
+                        'success' => false,
+                        'message' => 'Rate Limit Exceeded: Please wait 10 minutes before submitting another anonymous report.'
+                    ], 429);
+                }
+                
+                // Store in cache for 10 minutes
+                \Illuminate\Support\Facades\Cache::put($cacheKey, true, 600);
+            }
+
+            // Item 10: Backend Sensitive Content Detection
+            $sensitiveWords = ['fuck', 'shit', 'bitch', 'asshole', 'gago', 'putangina', 'leche', 'bobo', 'tanga', 'piste', 'yawa', 'inutil'];
+            $textToCheck = strtolower($request->title . ' ' . $request->description);
+            
+            foreach ($sensitiveWords as $word) {
+                // Use word boundary check or simple contains? Simple contains for now to match frontend.
+                // Note: str_contains is PHP 8.0+. safely use stripos.
+                if (stripos($textToCheck, $word) !== false) {
+                     return response()->json([
+                        'success' => false,
+                        'message' => 'Report contains inappropriate language ("' . $word . '"). Please revise content to maintain community guidelines.'
+                    ], 422);
+                }
+            }
 
             // Create or get the location record
             $location = \App\Models\Location::create([

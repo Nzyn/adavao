@@ -448,6 +448,18 @@ export default function ReportCrime() {
         }
         console.log('✅ Crime types validated');
 
+
+        // Item 10: Sensitive Content Detection
+        const sensitiveWords = ['fuck', 'shit', 'bitch', 'asshole', 'gago', 'putangina', 'leche', 'bobo', 'tanga', 'piste', 'yawa', 'inutil'];
+        const textToCheck = (description || '').toLowerCase();
+        const foundSensitive = sensitiveWords.filter(word => textToCheck.includes(word));
+
+        if (foundSensitive.length > 0) {
+            console.log('❌ Validation failed: Sensitive content detected');
+            window.alert('Sensitive Content Detected\n\nYour report contains inappropriate language ("' + foundSensitive[0] + '").\n\nPlease remove it to maintain community guidelines.');
+            return;
+        }
+
         if (!description.trim()) {
             console.log('❌ Validation failed: No description');
             window.alert('Missing Information: Please describe what happened in detail.');

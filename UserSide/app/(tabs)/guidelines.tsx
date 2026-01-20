@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, Button, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, ScrollView, Button, TouchableOpacity, Platform, Pressable, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import styles from "./styles"; // import your global styles
@@ -7,43 +7,34 @@ import Checkbox from 'expo-checkbox';
 import UpdateSuccessDialog from '../../components/UpdateSuccessDialog';
 
 const Guidelines = () => {
-    // 📊 Performance Timing - Start
+    // 📊 Performance Timing
     const pageStartTime = useRef(Date.now());
     React.useEffect(() => {
         const loadTime = Date.now() - pageStartTime.current;
         console.log(`📊 [Guidelines] Page Load Time: ${loadTime}ms`);
     }, []);
-    // 📊 Performance Timing - End
 
     const scrollViewRef = useRef<ScrollView>(null);
     const crimeTypesSectionRef = useRef<View>(null);
     const { scrollToSection } = useLocalSearchParams<{ scrollToSection?: string }>();
 
-    const handlePress = () => {
-        console.log("Agreed to Guidelines pressed!");
-    };
     const [isChecked, setChecked] = useState(false);
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
     // Helper function to scroll to element on web
     const scrollToElementWeb = () => {
         try {
             console.log('🌐 Attempting web scroll...');
-
-            // Get the actual DOM element
             const crimeTypesElement = Array.from(document.querySelectorAll('*')).find(el => {
                 const text = el.textContent || '';
-                return text.includes('6. Crime Types for Reporting') &&
-                    !text.includes('Prohibited Submissions'); // Make sure it's the right section
+                return text.includes('3. Reporting Categories') && !text.includes('Prohibited Submissions');
             });
 
             if (crimeTypesElement) {
                 console.log('✅ Found crime types element on web');
-
-                // Find the scrollable container (ScrollView on web renders as a div)
                 let scrollContainer = crimeTypesElement.closest('[class*="ScrollView"]');
                 if (!scrollContainer) {
-                    // Fallback: find any scrollable parent
                     let parent = crimeTypesElement.parentElement;
                     while (parent && parent !== document.body) {
                         const style = window.getComputedStyle(parent);
@@ -56,21 +47,14 @@ const Guidelines = () => {
                 }
 
                 if (scrollContainer) {
-                    console.log('📜 Found scroll container, scrolling to element');
                     const offset = crimeTypesElement.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop;
-                    scrollContainer.scrollTo({
-                        top: offset,
-                        behavior: 'smooth'
-                    });
+                    scrollContainer.scrollTo({ top: offset, behavior: 'smooth' });
                 } else {
-                    console.log('📍 Using scrollIntoView fallback');
                     crimeTypesElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
                 return true;
-            } else {
-                console.warn('⚠️ Crime types element not found');
-                return false;
             }
+            return false;
         } catch (error) {
             console.warn('❌ Error in web scroll:', error);
             return false;
@@ -81,26 +65,15 @@ const Guidelines = () => {
     const scrollToElementNative = () => {
         try {
             console.log('📱 Attempting native scroll...');
-
-            if (!crimeTypesSectionRef.current || !scrollViewRef.current) {
-                console.warn('❌ Refs not available');
-                return false;
-            }
+            if (!crimeTypesSectionRef.current || !scrollViewRef.current) return false;
 
             crimeTypesSectionRef.current?.measureLayout(
                 scrollViewRef.current?.getInnerViewNode?.(),
                 (x, y) => {
-                    console.log('📍 Measured Y position:', y);
-                    const offset = y - 20; // Small offset for better UX
-                    scrollViewRef.current?.scrollTo({
-                        y: Math.max(0, offset),
-                        animated: true
-                    });
+                    const offset = y - 20;
+                    scrollViewRef.current?.scrollTo({ y: Math.max(0, offset), animated: true });
                 },
-                (error) => {
-                    console.warn('⚠️ Failed to measure crime types section:', error);
-                    return false;
-                }
+                (error) => console.warn('⚠️ Failed to measure:', error)
             );
             return true;
         } catch (error) {
@@ -109,200 +82,175 @@ const Guidelines = () => {
         }
     };
 
-    // Scroll to Section 6 when the parameter is detected
+    // Effect for scroll
     useEffect(() => {
         if (scrollToSection === 'crime-types') {
-            console.log('🎯 Scroll parameter detected:', scrollToSection);
-            console.log('📱 Platform:', Platform.OS);
-
             setTimeout(() => {
-                if (Platform.OS === 'web') {
-                    scrollToElementWeb();
-                } else {
-                    // Native: iOS, Android
-                    scrollToElementNative();
-                }
+                if (Platform.OS === 'web') scrollToElementWeb();
+                else scrollToElementNative();
             }, 300);
         }
     }, [scrollToSection]);
+
     return (
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
-            {/* Fixed Header with Back Button and Title */}
+        <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+            {/* Header */}
             <View style={[styles.headerHistory, {
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                zIndex: 1000,
-                backgroundColor: '#fff',
-                borderBottomWidth: 1,
-                borderBottomColor: '#e5e7eb'
+                position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1000,
+                backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb',
+                height: Platform.OS === 'ios' ? 100 : 80, paddingTop: Platform.OS === 'ios' ? 40 : 20
             }]}>
-                <TouchableOpacity onPress={() => router.push('/')}>
-                    <Ionicons name="chevron-back" size={24} color="#000" />
+                <TouchableOpacity onPress={() => router.push('/')} style={{ position: 'absolute', left: 20, bottom: 15, padding: 5 }}>
+                    <Ionicons name="chevron-back" size={24} color="#1e293b" />
                 </TouchableOpacity>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={styles.textTitle}>
-                        <Text style={styles.alertWelcome}>Alert</Text>
-                        <Text style={styles.davao}>Davao</Text>
-                    </Text>
-                    <Text style={styles.subheadingCenter}>Guidelines</Text>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 15 }}>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b' }}>Community Guidelines</Text>
+                    <Text style={{ fontSize: 12, color: '#64748b' }}>Safety & Privacy Standards</Text>
                 </View>
-                <View style={{ width: 24 }} />
             </View>
 
-            {/* Scrollable Content */}
             <ScrollView
                 ref={scrollViewRef}
-                style={{ flex: 1, marginTop: 80 }}
-                contentContainerStyle={{ paddingBottom: 50 }}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={true}
-                scrollEnabled={true}
-                nestedScrollEnabled={true}
-                bounces={true}
+                style={{ flex: 1, marginTop: Platform.OS === 'ios' ? 100 : 80 }}
+                contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
             >
-                <View>
-
-                    {/* Welcome */}
-                    <Text style={styles.normalTxtJustify}>User Guidelines for Incident Reporting
-                        This mobile application is provided to facilitate the timely reporting of incidents and promote community safety.
-                        Users are expected to submit reports responsibly and in accordance with the guidelines outlined below.</Text>
-
-                    <Text>1. Acceptable Use of the Application The application is intended for reporting the following types of incidents:</Text>
-                    <Text style={styles.normalTxtJustify}>
-                        Physical crimes or suspicious activities
-                        Emergency or urgent public safety concerns
-                        Community disturbances (e.g., theft, vandalism)
-                        Safety-related issues requiring police presence</Text>
-
-                    <Text style={styles.normalTxtJustify}>Users are encouraged to provide clear, factual, and accurate information to assist authorities in responding appropriately.</Text>
-
-                    <Text>Users are encouraged to provide clear, factual, and accurate information to assist authorities in responding appropriately.</Text>
-                    <Text style={styles.normalTxt}>
-                        Scandal-related or sensitive matters (e.g., private or explicit content, defamatory materials, cases involving minors) {'\n'}
-
-                        These reports require confidential handling and official documentation, which must be conducted in person at the nearest police station or designated cybercrime unit.
-                    </Text>
-
-                    <Text>3. Prohibited Submissions </Text>
-                    <Text style={styles.normalTxtJustify}>The following types of content must not be uploaded to the app as proof of an incident:</Text>
-                    <Text style={styles.normalTxt}>
-                        • Leaked or unauthorized recordings {'\n'}
-                        • Content involving minors or individuals whose identity must be protected {'\n'}
-                        • Uploading such materials through the app may violate data privacy and legal standards. {'\n'}
-                    </Text>
-
-                    <Text>4. Commitment to Data Privacy</Text>
-                    <Text style={styles.normalTxtJustify}>All reports and user data submitted through this platform are handled with the highest standard of confidentiality and care. The system complies with Republic Act No. 10173, also known as the Data Privacy Act of 2012, ensuring the protection of personal data against unauthorized access, disclosure, and misuse. {'\n'}
-                        Users can be assured that: {'\n'}
-                        • Personal information is used only for legitimate law enforcement purposes. {'\n'}
-                        • Reports are transmitted securely and encrypted. {'\n'}
-                        • No sensitive content is stored without user consent or outside legal protocols {'\n'}
-                    </Text>
-
-                    <Text>5. Legal Notice on Misuse</Text>
-                    <Text style={styles.normalTxtJustify}>Misuse of this application—including false reporting, uploading prohibited content, or malicious intent—may result in legal consequences, including criminal liability under existing Philippine laws. {'\n'}</Text>
-
-                    <View ref={crimeTypesSectionRef} collapsable={false}>
-                        <Text>6. Crime Types for Reporting</Text>
-                        <Text style={styles.normalTxtJustify}>The following categories are accepted for incident reporting through this application. Please select the most appropriate category when submitting your report. {'\n'}</Text>
-
-                        <Text style={styles.normalTxt}>
-                            <Text style={{ fontWeight: 'bold' }}>1. Theft {'\n'}</Text>
-                            <Text>Definition: Unauthorized taking of personal property without the use of force or intimidation. {'\n'}
-                                Example: Stealing a mobile phone from a table or unattended bag. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>2. Robbery {'\n'}</Text>
-                            <Text>Definition: Taking property from a person through the use of force, intimidation, or threats. {'\n'}
-                                Example: A person forcibly grabbing your bag while threatening you. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>3. Burglary {'\n'}</Text>
-                            <Text>Definition: Unlawful entry into a building or property with the intent to commit a crime. {'\n'}
-                                Example: Entering a closed shop at night to steal items. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>4. Break-in {'\n'}</Text>
-                            <Text>Definition: Forcibly entering a property without permission, regardless of intent to steal. {'\n'}
-                                Example: Breaking a door or window to enter someone's home. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>5. Carnapping {'\n'}</Text>
-                            <Text>Definition: Taking or stealing a motor vehicle without the owner's consent. {'\n'}
-                                Example: A parked motorcycle taken from a parking area. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>6. Fraud {'\n'}</Text>
-                            <Text>Definition: Obtaining money, property, or advantage through deception or misrepresentation. {'\n'}
-                                Example: Paying for an online item that never arrives because the seller was fake. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>7. Cybercrime {'\n'}</Text>
-                            <Text>Definition: Crimes committed through computers, digital devices, or the internet. {'\n'}
-                                Example: Hacking, online scams, phishing, or unauthorized access to accounts. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>8. Physical Injury {'\n'}</Text>
-                            <Text>Definition: Inflicting bodily harm on another individual. {'\n'}
-                                Example: Punching someone, resulting in bruises or wounds. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>9. Homicide {'\n'}</Text>
-                            <Text>Definition: Causing the death of another person, whether intentional or unintentional. {'\n'}
-                                Example: Killing someone during a violent altercation. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>10. Threats {'\n'}</Text>
-                            <Text>Definition: Expressing intent to inflict harm, violence, or damage to a person or property. {'\n'}
-                                Example: Sending a message saying, "I will hurt you" or similar statements. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>11. Domestic Violence {'\n'}</Text>
-                            <Text>Definition: Physical, emotional, or psychological abuse within a household or intimate relationship. {'\n'}
-                                Example: A partner or family member causing harm or intimidation at home. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>12. Harassment {'\n'}</Text>
-                            <Text>Definition: Repeated unwanted behavior that causes fear, distress, or emotional discomfort. {'\n'}
-                                Example: Persistent unwanted messages or being followed by someone. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>13. Sexual Assault {'\n'}</Text>
-                            <Text>Definition: Any non-consensual sexual act, contact, or behavior. {'\n'}
-                                Example: Unwanted touching or forcing someone into sexual activity. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>14. Missing Person {'\n'}</Text>
-                            <Text>Definition: An individual whose location is unknown and who cannot be contacted. {'\n'}
-                                Example: A family member not returning home and unreachable by phone. {'\n\n'}</Text>
-
-                            <Text style={{ fontWeight: 'bold' }}>15. Others {'\n'}</Text>
-                            <Text>Definition: Any incident or crime not covered by the listed categories. {'\n'}
-                                Example: Reporting specialized or unique situations that do not fall under standard crime types. {'\n'}</Text>
-                        </Text>
+                {/* Intro Card */}
+                <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            <Ionicons name="shield-checkmark" size={24} color="#3b82f6" />
+                        </View>
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b' }}>Responsible Reporting</Text>
                     </View>
-
-                    {/* Checkbox + Agree */}
-                    <View style={styles.checkboxRow}>
-                        <Checkbox value={isChecked} onValueChange={setChecked} color={isChecked ? "#1D3557" : undefined} />
-                        <Text style={styles.termsCheckboxText}>I have read and agreed to the Guidelines</Text>
-                    </View>
-
-                    {/* Button (disabled until checked) */}
-                    <Button
-                        title="I Understand"
-                        onPress={() => {
-                            setShowSuccessDialog(true);
-                        }}
-                        disabled={!isChecked}
-                        color="#1D3557"
-                    />
-                    <Text>{'\n'}</Text>
+                    <Text style={{ fontSize: 14, lineHeight: 22, color: '#475569' }}>
+                        AlertDavao is designed to facilitate timely incident reporting. Your contributions help keep our community safe. Please report responsibly.
+                    </Text>
                 </View>
 
-                {/* Success Dialog */}
-                <UpdateSuccessDialog
-                    visible={showSuccessDialog}
-                    title="Guidelines Accepted!"
-                    message="You have successfully accepted the guidelines. Thank you for helping us maintain a safe community."
-                    okText="OK"
-                    onOk={() => {
-                        setShowSuccessDialog(false);
-                        router.push('/');
-                    }}
-                />
-            </ScrollView>
-        </View>
+                {/* Acceptable Use */}
+                <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 16 }}>1. What to Report</Text>
+                    {[
+                        { icon: 'alert-circle', color: '#f59e0b', text: 'Physical crimes or suspicious activities' },
+                        { icon: 'medical', color: '#ef4444', text: 'Emergency or public safety concerns' },
+                        { icon: 'people', color: '#8b5cf6', text: 'Community disturbances (theft, vandalism)' }
+                    ].map((item, index) => (
+                        <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <Ionicons name={item.icon as any} size={20} color={item.color} style={{ marginRight: 12 }} />
+                            <Text style={{ fontSize: 14, color: '#334155', flex: 1 }}>{item.text}</Text>
+                        </View>
+                    ))}
+                </View>
 
+                {/* Prohibited Content */}
+                <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#ef4444', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 16 }}>2. Prohibited Submissions</Text>
+                    <Text style={{ fontSize: 14, lineHeight: 22, color: '#475569', marginBottom: 12 }}>
+                        Do NOT upload content involving minors, lewd material, or unauthorized private recordings.
+                    </Text>
+                    <View style={{ backgroundColor: '#fef2f2', padding: 12, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 13, color: '#b91c1c', fontWeight: '500' }}>
+                            <Ionicons name="warning" size={14} color="#b91c1c" /> Violation may result in account suspension and legal action.
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Privacy Policy Teaser (Item 9) */}
+                <TouchableOpacity onPress={() => setShowPrivacyModal(true)} style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 4 }}>Data Privacy</Text>
+                        <Text style={{ fontSize: 13, color: '#64748b' }}>Read how we protect your personal information.</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+                </TouchableOpacity>
+
+                {/* Crime Types Section */}
+                <View ref={crimeTypesSectionRef} collapsable={false} style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 16 }}>3. Reporting Categories</Text>
+                    {[
+                        { title: 'Theft', desc: 'Unauthorized taking of property without force.' },
+                        { title: 'Robbery', desc: 'Taking property with force or intimidation.' },
+                        { title: 'Physical Injury', desc: 'Harm inflicted on an individual.' },
+                        { title: 'Cybercrime', desc: 'Online scams, hacking, or harassment.' },
+                        { title: 'Domestic Violence', desc: 'Abuse within a household.' },
+                        { title: 'Missing Person', desc: 'Individual whose location is unknown.' },
+                    ].map((crime, index) => (
+                        <View key={index} style={{ marginBottom: 16 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#334155' }}>{crime.title}</Text>
+                            <Text style={{ fontSize: 13, color: '#64748b' }}>{crime.desc}</Text>
+                        </View>
+                    ))}
+                    <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic', marginTop: 8 }}>+ and other categories listed in report form.</Text>
+                </View>
+
+                {/* Checkbox */}
+                <Pressable onPress={() => setChecked(!isChecked)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, padding: 10 }}>
+                    <Checkbox value={isChecked} onValueChange={setChecked} color={isChecked ? "#3b82f6" : undefined} style={{ borderRadius: 6 }} />
+                    <Text style={{ marginLeft: 12, fontSize: 14, color: '#334155', fontWeight: '500' }}>I have read and agree to these Guidelines</Text>
+                </Pressable>
+
+                {/* Button */}
+                <TouchableOpacity
+                    onPress={() => setShowSuccessDialog(true)}
+                    disabled={!isChecked}
+                    style={{
+                        backgroundColor: isChecked ? "#3b82f6" : "#94a3b8",
+                        paddingVertical: 16, borderRadius: 12, alignItems: 'center',
+                        shadowColor: isChecked ? "#3b82f6" : "transparent", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8
+                    }}
+                >
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Accept & Continue</Text>
+                </TouchableOpacity>
+
+            </ScrollView>
+
+            {/* Privacy Policy Modal (Item 9) */}
+            <Modal visible={showPrivacyModal} animationType="slide" presentationStyle="pageSheet">
+                <View style={{ flex: 1, backgroundColor: '#fff' }}>
+                    <View style={{ padding: 20, paddingTop: 60, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 20, fontWeight: '700', color: '#0f172a' }}>Privacy Policy</Text>
+                        <TouchableOpacity onPress={() => setShowPrivacyModal(false)} style={{ padding: 8, backgroundColor: '#f1f5f9', borderRadius: 20 }}>
+                            <Ionicons name="close" size={20} color="#64748b" />
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView contentContainerStyle={{ padding: 24 }}>
+                        <Text style={{ fontSize: 14, color: '#475569', lineHeight: 24, marginBottom: 20 }}>
+                            This Privacy Policy explains how AlertDavao collects, uses, and protects your personal information in compliance with the Data Privacy Act of 2012 (Republic Act No. 10173).
+                        </Text>
+
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 12 }}>1. Data Collection</Text>
+                        <Text style={{ fontSize: 14, color: '#475569', lineHeight: 24, marginBottom: 20 }}>
+                            We collect personal data (Name, Contact, Location) strictly for legitimate law enforcement and emergency response purposes.
+                        </Text>
+
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 12 }}>2. Data Usage</Text>
+                        <Text style={{ fontSize: 14, color: '#475569', lineHeight: 24, marginBottom: 20 }}>
+                            Your data is used to verify reports, coordinate police response, and maintain community safety records. It is never sold to third parties.
+                        </Text>
+
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 12 }}>3. Security Measures</Text>
+                        <Text style={{ fontSize: 14, color: '#475569', lineHeight: 24, marginBottom: 20 }}>
+                            All data transmission is encrypted. Access to sensitive information is restricted to authorized personnel only.
+                        </Text>
+
+                        <View style={{ height: 40 }} />
+                    </ScrollView>
+                </View>
+            </Modal>
+
+            {/* Success Dialog */}
+            <UpdateSuccessDialog
+                visible={showSuccessDialog}
+                title="Guidelines Accepted"
+                message="Thank you for your commitment to keeping Davao City safe."
+                okText="Go to Dashboard"
+                onOk={() => {
+                    setShowSuccessDialog(false);
+                    router.push('/');
+                }}
+            />
+        </View>
     );
 };
 

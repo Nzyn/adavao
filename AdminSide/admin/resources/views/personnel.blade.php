@@ -419,6 +419,26 @@
         <p>Manage police officers and personnel records</p>
     </div>
     
+    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+        <select id="stationFilter" onchange="filterPersonnel()" style="padding: 0.75rem; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 0.875rem; color: #374151; min-width: 150px;">
+            <option value="">All Stations</option>
+            @php
+                $stations = \App\Models\PoliceStation::orderBy('station_name')->get();
+            @endphp
+            @foreach($stations as $station)
+                <option value="{{ $station->station_name }}">{{ $station->station_name }}</option>
+            @endforeach
+            <option value="Unassigned">Unassigned</option>
+        </select>
+        
+        <select id="statusFilter" onchange="filterPersonnel()" style="padding: 0.75rem; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 0.875rem; color: #374151; min-width: 120px;">
+            <option value="">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="On-Leave">On-Leave</option>
+        </select>
+    </div>
+
     <div class="search-box">
         <svg class="search-icon" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8"/>
@@ -429,7 +449,7 @@
             class="search-input" 
             placeholder="Search personnel..." 
             id="searchInput"
-            onkeyup="searchPersonnel()"
+            onkeyup="filterPersonnel()"
         >
     </div>
 </div>
@@ -709,18 +729,64 @@ async function assignStationToOfficer() {
     });
 }
 
-function searchPersonnel() {
+function filterPersonnel() {
     const input = document.getElementById('searchInput');
     const filter = input.value.toUpperCase();
+    const stationFilter = document.getElementById('stationFilter').value.toUpperCase();
+    const statusFilter = document.getElementById('statusFilter').value.toUpperCase();
+    
     const table = document.getElementById('personnelTable');
     const tr = table.getElementsByTagName('tr');
     
     for (let i = 1; i < tr.length; i++) {
-        let txtValue = tr[i].textContent || tr[i].innerText;
-        if (txtValue.toUpperCase().indexOf(filter) > -1) {
-            tr[i].style.display = '';
+        const tds = tr[i].getElementsByTagName('td');
+        if (tds.length < 3) continue; // Skip header or malformed rows
+
+        let textMatch = false;
+        let stationMatch = false;
+        let statusMatch = false;
+        
+        // 1. Check Text Search
+        const rowText = tr[i].textContent || tr[i].innerText;
+        if (rowText.toUpperCase().indexOf(filter) > -1) {
+            textMatch = true;
+        }
+        
+        // 2. Check Station (Column 3)
+        const stationText = tds[3].textContent || tds[3].innerText;
+        if (stationFilter === "" || stationText.toUpperCase().includes(stationFilter)) {
+            stationMatch = true;
+        }
+        
+        // 3. Check Status (Column 8)
+        const statusText = tds[8].textContent || tds[8].innerText;
+        // Strict match for status to avoid partial (e.g. "Active" in "Inactive")
+        // But the filter values are "Active", "Inactive", "On-Leave"
+        // And the cell contains text with whitespace.
+        // Simple includes is risky for "Active" vs "Inactive".
+        // Better to check if stationFilter is "INACTIVE" vs "ACTIVE".
+        // Actually, "Active" is inside "Inactive".
+        // Let's use exact trim match if possible, or refined includes.
+        
+        if (statusFilter === "") {
+            statusMatch = true;
         } else {
-            tr[i].style.display = 'none';
+             const cellStatus = statusText.trim().toUpperCase();
+             // Check if the cell status *contains* the filter status, but safer.
+             // OR just use includes. "Active" will match "Inactive".
+             // We can check if statusFilter is "ACTIVE" and cellStatus is "INACTIVE", exclude.
+             
+             if (statusFilter === 'ACTIVE' && cellStatus.includes('INACTIVE')) {
+                 statusMatch = false;
+             } else if (cellStatus.includes(statusFilter)) {
+                 statusMatch = true;
+             }
+        }
+
+        if (textMatch && stationMatch && statusMatch) {
+            tr[i].style.display = "";
+        } else {
+            tr[i].style.display = "none";
         }
     }
 }

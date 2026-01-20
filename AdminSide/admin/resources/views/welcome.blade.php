@@ -556,84 +556,168 @@
 @endsection
 
 @section('content')
-    <div class="content-header">
-        @if($userRole === 'police')
-            <h1 class="content-title">Police Station Dashboard</h1>
-            <p class="content-subtitle">Manage reports for your assigned station</p>
-        @else
-            <h1 class="content-title">Dashboard Overview</h1>
-            <p class="content-subtitle">System-wide statistics and overview</p>
-        @endif
+    <div class="content-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            @if($userRole === 'police')
+                <h1 class="content-title">Police Station Dashboard</h1>
+                <p class="content-subtitle">Manage reports for your assigned station</p>
+            @else
+                <h1 class="content-title">Dashboard Overview</h1>
+                <p class="content-subtitle">System-wide statistics and overview</p>
+            @endif
+        </div>
+
+        <!-- ITEM 15: DATE RANGE FILTER -->
+        <form action="{{ route('dashboard') }}" method="GET" style="display: flex; gap: 0.5rem; align-items: center; background: white; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <div style="display: flex; flex-direction: column;">
+                <label style="font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">From</label>
+                <input type="date" name="date_from" value="{{ $dateFrom ?? '' }}" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; color: #374151;">
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <label style="font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">To</label>
+                <input type="date" name="date_to" value="{{ $dateTo ?? '' }}" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; color: #374151;">
+            </div>
+            <button type="submit" style="background: #3b82f6; color: white; border: none; padding: 0 1rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; cursor: pointer; margin-left: 0.5rem; height: 38px; transition: background 0.2s;">Filter</button>
+            @if(request('date_from') || request('date_to'))
+                <a href="{{ route('dashboard') }}" style="color: #6b7280; text-decoration: none; font-size: 0.8rem; margin-left: 0.5rem; padding: 0.5rem; border-radius: 4px; background: #f3f4f6;">Reset</a>
+            @endif
+        </form>
     </div>
                 
-                <!-- Statistics Cards -->
-                <div class="stats-grid" @if($userRole !== 'police') style="grid-template-columns: repeat(4, 1fr);" @endif>
-                    @if($userRole === 'police')
-                        <!-- Police Officer Stats: Custom View -->
-                        <a href="{{ route('reports') }}" class="stat-card total">
-                            <div class="stat-title">Total Reports</div>
-                            <div class="stat-value">{{ $totalReports }}</div>
-                        </a>
-                        <a href="{{ route('reports') }}" class="stat-card" style="border-left-color: #3b82f6;">
-                            <div class="stat-title">Reports Today</div>
-                            <div class="stat-value">{{ $reportsToday }}</div>
-                        </a>
-                        <a href="{{ route('messages') }}" class="stat-card pending" style="border-left-color: #f59e0b;">
-                            <div class="stat-title">Unread Messages</div>
-                            <div class="stat-value">{{ $unreadMessages }}</div>
-                        </a>
-                    @else
-                        <!-- ADMIN DASHBOARD: Summary Grid -->
-                        
-                        <!-- 1. Reports - Blue #3b82f6 -->
-                        <a href="{{ route('reports') }}" class="stat-card" style="border-left-color: #3b82f6;">
-                            <div class="stat-title">Reports</div>
-                            <div class="stat-value">{{ $totalReports }}</div>
-                        </a>
-                        
-                        <!-- 2. Messages - Amber #f59e0b -->
-                        <a href="{{ route('messages') }}" class="stat-card" style="border-left-color: #f59e0b;">
-                            <div class="stat-title">Messages</div>
-                            <div class="stat-value">{{ $unreadMessages }}</div>
-                        </a>
-                        
-                        <!-- 3. Users - Green #10b981 -->
-                        <a href="{{ route('users') }}" class="stat-card" style="border-left-color: #10b981;">
-                            <div class="stat-title">Users</div>
-                            <div class="stat-value">{{ $totalUsers }}</div>
-                        </a>
-                        
-                        <!-- 4. Flagged Users - Red #ef4444 -->
-                        <a href="{{ route('flagged-users') }}" class="stat-card" style="border-left-color: #ef4444;">
-                            <div class="stat-title">Flagged Users</div>
-                            <div class="stat-value">{{ $flaggedUsersCount }}</div>
-                        </a>
-                        
-                        <!-- 5. Personnel - Indigo #6366f1 -->
-                        <a href="{{ route('personnel') }}" class="stat-card" style="border-left-color: #6366f1;">
-                            <div class="stat-title">Personnel</div>
-                            <div class="stat-value">{{ $totalPoliceOfficers }}</div>
-                        </a>
-                        
-                        <!-- 6. Verification - Purple #8b5cf6 -->
-                        <a href="{{ route('verification') }}" class="stat-card" style="border-left-color: #8b5cf6;">
-                            <div class="stat-title">Verification</div>
-                            <div class="stat-value">{{ $pendingVerificationsCount }}</div>
-                        </a>
-                        
-                        <!-- 7. Statistics - Teal #14b8a6 -->
-                        <a href="{{ route('statistics') }}" class="stat-card" style="border-left-color: #14b8a6;">
-                            <div class="stat-title">Statistics</div>
-                            <div class="stat-value" style="font-size: 1.25rem;">View Analytics</div>
-                        </a>
-                        
-                        <!-- 8. View Map - Pink #ec4899 -->
-                        <a href="{{ route('view-map') }}" class="stat-card" style="border-left-color: #ec4899;">
-                            <div class="stat-title">Crime Map</div>
-                            <div class="stat-value" style="font-size: 1.25rem;">Open Live Map</div>
-                        </a>
-                    @endif
+    <!-- Statistics Cards -->
+    @php
+        $queryParams = [];
+        if(isset($dateFrom) && $dateFrom) $queryParams['date_from'] = $dateFrom;
+        if(isset($dateTo) && $dateTo) $queryParams['date_to'] = $dateTo;
+    @endphp
+
+    <!-- SECTION: REPORT STATUSES (Items 16 & 17) -->
+    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+        <!-- Total Reports -->
+        <a href="{{ route('reports', $queryParams) }}" class="stat-card total">
+            <div class="stat-title">Total Reports</div>
+            <div class="stat-value">{{ $totalReports }}</div>
+            @if(isset($dateFrom) || isset($dateTo))
+                <div style="font-size: 0.7rem; color: #6b7280; margin-top: 4px;">Filtered by Date</div>
+            @else
+                <div style="font-size: 0.7rem; color: #6b7280; margin-top: 4px;">All Time</div>
+            @endif
+        </a>
+
+        <!-- Pending Reports -->
+        <a href="{{ route('reports', array_merge(['status' => 'pending'], $queryParams)) }}" class="stat-card pending" style="border-left-color: #f59e0b;">
+            <div class="stat-title">Pending Reports</div>
+            <div class="stat-value">{{ $pendingReports }}</div>
+            <div style="font-size: 0.7rem; color: #d97706; font-weight: 600; margin-top: 4px;">Requires Action</div>
+        </a>
+
+        <!-- Investigating Reports -->
+        <a href="{{ route('reports', array_merge(['status' => 'investigating'], $queryParams)) }}" class="stat-card" style="border-left-color: #3b82f6;">
+            <div class="stat-title">Investigating</div>
+            <div class="stat-value">{{ $investigatingReports }}</div>
+            <div style="font-size: 0.7rem; color: #2563eb; font-weight: 600; margin-top: 4px;">In Progress</div>
+        </a>
+
+        <!-- Resolved Reports -->
+        <a href="{{ route('reports', array_merge(['status' => 'resolved'], $queryParams)) }}" class="stat-card verified" style="border-left-color: #10b981;">
+            <div class="stat-title">Resolved</div>
+            <div class="stat-value">{{ $resolvedReports }}</div>
+            <div style="font-size: 0.7rem; color: #059669; font-weight: 600; margin-top: 4px;">Completed</div>
+        </a>
+    </div>
+
+    @if($userRole !== 'police')
+        <!-- ADMIN DASHBOARD: System Overview -->
+        <h2 class="section-title">System Overview</h2>
+        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+            
+            <!-- Messages -->
+            <a href="{{ route('messages') }}" class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-title">Messages</div>
+                <div class="stat-value">{{ $unreadMessages }}</div>
+            </a>
+            
+            <!-- Users -->
+            <a href="{{ route('users') }}" class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-title">Users</div>
+                <div class="stat-value">{{ $totalUsers }}</div>
+            </a>
+            
+            <!-- Flagged Users -->
+            <a href="{{ route('flagged-users') }}" class="stat-card" style="border-left-color: #ef4444;">
+                <div class="stat-title">Flagged Users</div>
+                <div class="stat-value">{{ $flaggedUsersCount }}</div>
+            </a>
+            
+            <!-- Verification -->
+            <a href="{{ route('verification') }}" class="stat-card" style="border-left-color: #ec4899;">
+                <div class="stat-title">Verification</div>
+                <div class="stat-value">{{ $pendingVerificationsCount }}</div>
+            </a>
+
+            <!-- Personnel -->
+            <a href="{{ route('personnel') }}" class="stat-card" style="border-left-color: #6366f1;">
+                <div class="stat-title">Personnel</div>
+                <div class="stat-value">{{ $totalPoliceOfficers }}</div>
+            </a>
+            
+            <!-- Statistics -->
+            <a href="{{ route('statistics') }}" class="stat-card" style="border-left-color: #14b8a6;">
+                <div class="stat-title">Statistics</div>
+                <div class="stat-value" style="font-size: 1.25rem;">View Analytics</div>
+            </a>
+            
+            <!-- View Map -->
+            <a href="{{ route('view-map') }}" class="stat-card" style="border-left-color: #ec4899;">
+                <div class="stat-title">Crime Map</div>
+                <div class="stat-value" style="font-size: 1.25rem;">Open Live Map</div>
+            </a>
+        </div>
+        
+        <!-- ITEM 19: CRIME FORECAST INSIGHTS -->
+        <div class="dashboard-grid" style="margin-top: 2rem;">
+            <div class="priority-section" style="border-color: #8b5cf6;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 class="section-title" style="margin-bottom: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg style="width: 24px; height: 24px; color: #8b5cf6;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        AI Forecast Insights
+                    </h2>
+                    <span style="background: #f3f4f6; color: #6b7280; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">SARIMA Model</span>
                 </div>
+                
+                <div id="forecast-loading" style="text-align: center; padding: 2rem; color: #6b7280;">
+                    <div style="display: inline-block; width: 24px; height: 24px; border: 3px solid #e5e7eb; border-top-color: #8b5cf6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <p style="margin-top: 0.5rem; font-size: 0.875rem;">Generating predictive analytics...</p>
+                </div>
+                
+                <div id="forecast-content" style="display: none;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                        <!-- Trend Card -->
+                        <div style="background: #f9fafb; padding: 1rem; border-radius: 8px; border: 1px solid #e5e7eb;">
+                            <h3 style="font-size: 0.875rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem; text-transform: uppercase;">Next Month Prediction</h3>
+                            <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                                <span id="forecast-count" style="font-size: 2rem; font-weight: 700; color: #1f2937;">--</span>
+                                <span style="font-size: 0.875rem; color: #6b7280;">incidents predicted</span>
+                            </div>
+                            <p style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">Estimated total incidents for the upcoming month based on historical data patterns.</p>
+                        </div>
+                        
+                        <!-- Recommendation Card -->
+                        <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe;">
+                            <h3 style="font-size: 0.875rem; font-weight: 600; color: #1e40af; margin-bottom: 0.5rem; text-transform: uppercase;">Recommendation</h3>
+                            <p id="forecast-recommendation" style="font-size: 0.9rem; color: #1e3a8a; line-height: 1.5;">Analyzing forecast data...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="forecast-error" style="display: none; text-align: center; padding: 1rem; color: #ef4444; background: #fef2f2; border-radius: 8px; margin-top: 1rem;">
+                    Unable to generate forecast. AI Model may be offline.
+                </div>
+            </div>
+        </div>
+    @else
+        <!-- Police Specific Card Extensions if needed (Keeping it simple for now) -->
+    @endif
                 
                 @if($userRole === 'police')
                 <!-- Priority Cases and Map (POLICE ONLY) -->
@@ -673,6 +757,58 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <!-- Leaflet MarkerCluster JavaScript -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if(document.getElementById('forecast-content')) {
+            setTimeout(fetchForecast, 1000); // Small delay to allow UI to settle
+        }
+    });
+
+    function fetchForecast() {
+        // Fetch forecast for next 1 month
+        fetch('/api/statistics/forecast?horizon=1')
+            .then(response => response.json())
+            .then(data => {
+                const loadingEl = document.getElementById('forecast-loading');
+                const contentEl = document.getElementById('forecast-content');
+                const countEl = document.getElementById('forecast-count');
+                const recEl = document.getElementById('forecast-recommendation');
+                
+                if(loadingEl) loadingEl.style.display = 'none';
+
+                if(data.status === 'success' && data.data && data.data.length > 0) {
+                    if(contentEl) contentEl.style.display = 'block';
+                    
+                    // Forecast value is usually a float, round it
+                    const predictedValue = Math.round(data.data[0]);
+                    if(countEl) countEl.innerText = predictedValue;
+                    
+                    // Generate recommendation based on value
+                    if(recEl) {
+                        let recommendation = '';
+                        if(predictedValue > 50) {
+                            recommendation = 'Expected high incident volume. Recommend increasing patrol frequency in hotspot barangays and ensuring officer availability during peak hours.';
+                        } else if(predictedValue > 20) {
+                             recommendation = 'Moderate incident volume expected. Maintain standard patrol schedules with focus on known theft hotspots.';
+                        } else {
+                             recommendation = 'Low incident volume expected. Good opportunity for community engagement and preventive education campaigns.';
+                        }
+                        recEl.innerText = recommendation;
+                    }
+                } else {
+                    throw new Error('No forecast data or API offline');
+                }
+            })
+            .catch(err => {
+                console.error('Forecast Error:', err);
+                const loadingEl = document.getElementById('forecast-loading');
+                const errorEl = document.getElementById('forecast-error');
+                if(loadingEl) loadingEl.style.display = 'none';
+                if(errorEl) errorEl.style.display = 'block';
+            });
+    }
+</script>
 
 <script>
     // Global variables for mini map
