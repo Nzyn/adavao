@@ -162,7 +162,11 @@ class MapController extends Controller
             'bindings' => $query->getBindings()
         ]);
         
-        $reports = $query->inRandomOrder()->limit(8000)->get();
+        // Sort by urgency score (highest first), then by date (newest first)
+        $reports = $query->orderByRaw('COALESCE(urgency_score, 0) DESC')
+                         ->orderBy('created_at', 'DESC')
+                         ->limit(8000)
+                         ->get();
         
         \Log::info('Map Query Result Count: ' . $reports->count());
         

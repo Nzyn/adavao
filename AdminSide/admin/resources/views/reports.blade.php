@@ -1130,11 +1130,12 @@
                     <th class="sortable" data-column="0" style="width: 80px;" onclick="sortTable(0)">Report ID</th>
                     <th class="sortable" data-column="1" style="width: 120px;" onclick="sortTable(1)">User</th>
                     <th class="sortable" data-column="2" style="width: 100px;" onclick="sortTable(2)">Type</th>
-                    <th class="sortable" data-column="3" style="width: 150px;" onclick="sortTable(3)">Title</th>
-                    <th class="sortable" data-column="4" style="width: 90px;" onclick="sortTable(4)">User Status</th>
-                     <th class="sortable" data-column="5" style="width: 120px;" onclick="sortTable(5)">Date Reported</th>
-                     <th class="sortable" data-column="6" style="width: 120px;" onclick="sortTable(6)">Updated At</th>
-                     <th class="sortable" data-column="7" style="width: 130px;" onclick="sortTable(7)">Report Status</th>
+                    <th class="sortable" data-column="3" style="width: 100px;" onclick="sortTable(3)">Urgency</th>
+                    <th class="sortable" data-column="4" style="width: 150px;" onclick="sortTable(4)">Title</th>
+                    <th class="sortable" data-column="5" style="width: 90px;" onclick="sortTable(5)">User Status</th>
+                     <th class="sortable" data-column="6" style="width: 120px;" onclick="sortTable(6)">Date Reported</th>
+                     <th class="sortable" data-column="7" style="width: 120px;" onclick="sortTable(7)">Updated At</th>
+                     <th class="sortable" data-column="8" style="width: 130px;" onclick="sortTable(8)">Report Status</th>
                      <th style="width: 140px;">Validity</th>
                      <th style="width: 120px;">Action</th>
                 </tr>
@@ -1165,6 +1166,31 @@
                                         }
                                     @endphp
                                     {{ \Illuminate\Support\Str::limit($reportType, 20) }}
+                                </td>
+                                <td>
+                                    @php
+                                        $urgencyScore = $report->urgency_score ?? 0;
+                                        if ($urgencyScore >= 90) {
+                                            $urgencyClass = 'critical';
+                                            $urgencyLabel = 'CRITICAL';
+                                            $urgencyIcon = '🔴';
+                                        } elseif ($urgencyScore >= 70) {
+                                            $urgencyClass = 'high';
+                                            $urgencyLabel = 'HIGH';
+                                            $urgencyIcon = '🟠';
+                                        } elseif ($urgencyScore >= 50) {
+                                            $urgencyClass = 'medium';
+                                            $urgencyLabel = 'MEDIUM';
+                                            $urgencyIcon = '🟡';
+                                        } else {
+                                            $urgencyClass = 'low';
+                                            $urgencyLabel = 'LOW';
+                                            $urgencyIcon = '⚪';
+                                        }
+                                    @endphp
+                                    <span class="urgency-badge urgency-{{ $urgencyClass }}" title="Urgency Score: {{ $urgencyScore }}">
+                                        {{ $urgencyIcon }} {{ $urgencyLabel }}
+                                    </span>
                                 </td>
                                 <td>{{ \Illuminate\Support\Str::limit($report->title, 30) }}</td>
                                 <td>
