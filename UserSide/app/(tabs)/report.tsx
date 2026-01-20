@@ -379,12 +379,7 @@ export default function ReportCrime() {
         });
 
         // Validation - Check all required fields
-        if (!title.trim()) {
-            console.log('❌ Validation failed: No title');
-            window.alert('Missing Information: Please enter a title for your report.');
-            return;
-        }
-        console.log('✅ Title validated');
+        // Title validation removed - will be auto-generated
 
         if (selectedCrimes.length === 0) {
             console.log('❌ Validation failed: No crime types');
@@ -522,9 +517,8 @@ export default function ReportCrime() {
 
             const incidentDateTime = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 
-            // Prepare report data
+            // Prepare report data (title will be auto-generated on backend)
             const reportData = {
-                title: title.trim(),
                 crimeTypes: selectedCrimes,
                 description: description.trim(),
                 incidentDate: incidentDateTime,
@@ -545,7 +539,6 @@ export default function ReportCrime() {
             };
 
             console.log('📋 Report Data:');
-            console.log('   Title:', reportData.title);
             console.log('   Crime Types:', reportData.crimeTypes);
             console.log('   Location:', reportData.location);
             console.log('   Coordinates:', { lat: reportData.latitude, lng: reportData.longitude });
@@ -618,31 +611,7 @@ export default function ReportCrime() {
                     <View style={{ width: 24 }} />
                 </View>
 
-                <Text style={styles.label}>Title *</Text>
-                <TextInput
-                    style={[styles.input, titleError && { borderColor: '#ef4444' }]}
-                    placeholder="e.g., Wallet stolen near market"
-                    value={title}
-                    onChangeText={(text) => {
-                        if (text.length <= 255) {
-                            setTitle(text);
-                            setTitleError('');
-                        } else {
-                            setTitleError('The title is too long. Please provide a concise version.');
-                        }
-                    }}
-                    maxLength={255}
-                />
-                {titleError ? (
-                    <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4, marginBottom: 8 }}>
-                        ⚠️ {titleError}
-                    </Text>
-                ) : null}
-                {title.length > 200 && !titleError ? (
-                    <Text style={{ color: '#f59e0b', fontSize: 12, marginTop: 4, marginBottom: 8 }}>
-                        {255 - title.length} characters remaining
-                    </Text>
-                ) : null}
+                {/* Title removed - will be auto-generated from crime type + location + date */}
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                     <Text style={styles.subheading}>Select the type of </Text>

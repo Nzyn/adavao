@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 let BACKEND_URL = CONFIG_BACKEND_URL;
 
 export interface ReportSubmissionData {
-  title: string;
+  title?: string; // Optional - will be auto-generated on backend if not provided
   crimeTypes: string[];
   description: string;
   incidentDate: string;
@@ -37,8 +37,8 @@ export const reportService = {
       // Create FormData for multipart upload (supports file upload)
       const formData = new FormData();
 
-      // Add basic report fields
-      formData.append('title', reportData.title);
+      // Add basic report fields (title auto-generated on backend)
+      // formData.append('title', reportData.title); // Removed - auto-generated
       // Convert all crime types to lowercase for backend compatibility
       const lowerCrimeTypes = reportData.crimeTypes.map(type => type.toLowerCase());
       formData.append('crime_types', JSON.stringify(lowerCrimeTypes));

@@ -114,13 +114,13 @@ async function submitReport(req, res) {
     });
 
     // Validation
-    if (!title || !crime_types || !description || !incident_date || !user_id) {
+    // Title is now optional - will be auto-generated if not provided
+    if (!crime_types || !description || !incident_date || !user_id) {
       await connection.rollback();
       return res.status(422).json({
         success: false,
         message: "Missing required fields",
         errors: {
-          title: !title ? ["Title is required"] : [],
           crime_types: !crime_types ? ["Crime type is required"] : [],
           description: !description ? ["Description is required"] : [],
           incident_date: !incident_date ? ["Incident date is required"] : [],
@@ -384,6 +384,23 @@ async function submitReport(req, res) {
     // Create report record
     const isAnon = is_anonymous === "1" || is_anonymous === true || is_anonymous === "true";
 
+    // 📝 AUTO-GENERATE TITLE if not provided
+    // Format: "[Crime Type] - [Barangay] - [Date]"
+    // Example: "Theft - Poblacion District - Jan 21, 2026"
+    let reportTitle = title;
+
+    if (!reportTitle || reportTitle.trim() === '') {
+      const primaryCrimeType = crimeTypesArray[0]; // Use first crime type
+      const dateObj = new Date(incident_date);
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const formattedDate = `${monthNames[dateObj.getMonth()]} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+
+      reportTitle = `${primaryCrimeType} - ${barangayName} - ${formattedDate}`;
+      console.log(`📝 Auto-generated title: "${reportTitle}"`);
+    } else {
+      console.log(`📝 Using provided title: "${reportTitle}"`);
+    }
+
     // 🔐 ENCRYPT SENSITIVE DATA (AES-256-CBC)
     // As per capstone requirement: encrypt incident reports for confidentiality
     console.log("🔐 Encrypting report description (AES-256-CBC):");
@@ -401,7 +418,7 @@ async function submitReport(req, res) {
       `INSERT INTO reports 
        (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, created_at, updated_at) 
        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, NOW(), NOW()) RETURNING report_id`,
-      [user_id, locationId, title, reportType, encryptedDescription, incident_date, isAnon, stationId]
+      [user_id, locationId, reportTitle, reportType, encryptedDescription, incident_date, isAnon, stationId]
     );
 
     const reportId = reportResult[0].report_id;
