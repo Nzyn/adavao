@@ -515,6 +515,7 @@ app.use('*', (req, res) => {
 
 // Start server
 const { encryptAllSensitiveData } = require('./encrypt_all_sensitive_data');
+const { runMigrations } = require('./runMigrations');
 
 console.log("🔒 Initializing encryption verification on startup...");
 encryptAllSensitiveData().then(() => {
