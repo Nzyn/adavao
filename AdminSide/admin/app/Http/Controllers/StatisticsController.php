@@ -123,15 +123,28 @@ class StatisticsController extends Controller
             // Ensure API is running
             $this->autoStartSarimaApi();
             
-            $forecastData = $this->_getForecast($horizon, $crimeType);
+            // Get full response from API (scalable)
+            $apiResponse = $this->_getForecast($horizon, $crimeType);
             
-            return response()->json([
+            // Base response structure
+            $response = [
                 'status' => 'success',
-                'data' => $forecastData,
                 'horizon' => $horizon,
                 'model' => 'SARIMA(0,1,1)(0,1,1)[12]',
                 'source' => 'Live SARIMA API'
-            ]);
+            ];
+
+            // If API returns a direct array (legacy/simple mode), assume it's data
+            // If API returns an assoc array with keys, merge it (scalable mode)
+            if (isset($apiResponse['data'])) {
+                 // API follows standard { data: [...], other_metrics: ... }
+                 $response = array_merge($response, $apiResponse);
+            } else {
+                 // API returns raw list of points
+                 $response['data'] = $apiResponse;
+            }
+            
+            return response()->json($response);
         } catch (\Exception $e) {
              return response()->json([
                 'status' => 'error',
@@ -144,7 +157,7 @@ class StatisticsController extends Controller
     private function _getForecast($horizon, $crimeType = null) 
     {
         // Cache key must include crime type
-        $cacheKey = "sarima_forecast_{$horizon}";
+        $cacheKey = "sarima_forecast_full_{$horizon}";
         if ($crimeType) {
             $cacheKey .= "_" . md5($crimeType);
         }
@@ -158,10 +171,11 @@ class StatisticsController extends Controller
             $response = Http::get("{$this->sarimaApiUrl}/forecast", $params);
             
             if ($response->successful()) {
-                return $response->json()['data'];
+                // Return EVERYTHING the API sends, not just ['data']
+                return $response->json();
             }
             
-            throw new \Exception('Failed to fetch forecast from API');
+            throw new \Exception('Failed to fetch forecast from API: ' . $response->status());
         });
     }
 
