@@ -591,38 +591,46 @@
         if(isset($dateTo) && $dateTo) $queryParams['date_to'] = $dateTo;
     @endphp
 
-    <!-- SECTION: REPORT STATUSES (Items 16 & 17) -->
+    <!-- SECTION: POLICE CENTRAL ADMIN DASHBOARD (Action-Oriented) -->
     <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
-        <!-- Total Reports -->
-        <a href="{{ route('reports', $queryParams) }}" class="stat-card total">
-            <div class="stat-title">Total Reports</div>
-            <div class="stat-value">{{ $totalReports }}</div>
-            @if(isset($dateFrom) || isset($dateTo))
-                <div style="font-size: 0.7rem; color: #6b7280; margin-top: 4px;">Filtered by Date</div>
-            @else
-                <div style="font-size: 0.7rem; color: #6b7280; margin-top: 4px;">All Time</div>
-            @endif
+        
+        <!-- 1. CRITICAL ATTENTION (Highest Priority) -->
+        <a href="{{ route('reports', array_merge(['status' => 'pending'], $queryParams)) }}" class="stat-card" style="border-left-color: #ef4444; background: #fef2f2;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div class="stat-title" style="color: #ef4444; font-weight: 700;">CRITICAL ATTENTION</div>
+                <span style="background: #ef4444; color: white; font-size: 0.6rem; padding: 2px 6px; border-radius: 99px; font-weight: 700;">URGENT</span>
+            </div>
+            <div class="stat-value" style="color: #b91c1c;">{{ $urgentPending ?? 0 }}</div>
+            <div style="font-size: 0.75rem; color: #7f1d1d; margin-top: 4px; font-weight: 500;">
+                High Priority Pending Cases
+            </div>
         </a>
 
-        <!-- Pending Reports -->
-        <a href="{{ route('reports', array_merge(['status' => 'pending'], $queryParams)) }}" class="stat-card pending" style="border-left-color: #f59e0b;">
-            <div class="stat-title">Pending Reports</div>
-            <div class="stat-value">{{ $pendingReports }}</div>
-            <div style="font-size: 0.7rem; color: #d97706; font-weight: 600; margin-top: 4px;">Requires Action</div>
+        <!-- 2. NEW REPORTS TODAY (Operational Tempo) -->
+        <a href="{{ route('reports', $queryParams) }}" class="stat-card" style="border-left-color: #3b82f6;">
+            <div class="stat-title" style="color: #1d4ed8;">NEW TODAY</div>
+            <div class="stat-value" style="color: #1e3a8a;">{{ $reportsToday }}</div>
+            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
+                Incoming Reports (24h)
+            </div>
         </a>
 
-        <!-- Investigating Reports -->
-        <a href="{{ route('reports', array_merge(['status' => 'investigating'], $queryParams)) }}" class="stat-card" style="border-left-color: #3b82f6;">
-            <div class="stat-title">Investigating</div>
-            <div class="stat-value">{{ $investigatingReports }}</div>
-            <div style="font-size: 0.7rem; color: #2563eb; font-weight: 600; margin-top: 4px;">In Progress</div>
+        <!-- 3. ACTIVE INVESTIGATIONS (Current Load) -->
+        <a href="{{ route('reports', array_merge(['status' => 'investigating'], $queryParams)) }}" class="stat-card" style="border-left-color: #f59e0b;">
+            <div class="stat-title" style="color: #b45309;">ACTIVE CASES</div>
+            <div class="stat-value" style="color: #78350f;">{{ $activeInvestigations }}</div>
+            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
+                Under Investigation
+            </div>
         </a>
 
-        <!-- Resolved Reports -->
-        <a href="{{ route('reports', array_merge(['status' => 'resolved'], $queryParams)) }}" class="stat-card verified" style="border-left-color: #10b981;">
-            <div class="stat-title">Resolved</div>
-            <div class="stat-value">{{ $resolvedReports }}</div>
-            <div style="font-size: 0.7rem; color: #059669; font-weight: 600; margin-top: 4px;">Completed</div>
+        <!-- 4. SOLVED THIS MONTH (Performance/Success) -->
+        <a href="{{ route('reports', array_merge(['status' => 'resolved'], $queryParams)) }}" class="stat-card" style="border-left-color: #10b981;">
+            <div class="stat-title" style="color: #047857;">SOLVED (MONTH)</div>
+            <div class="stat-value" style="color: #064e3b;">{{ $solvedThisMonth }}</div>
+            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
+                Cases Closed in {{ \Carbon\Carbon::now()->format('F') }}
+            </div>
         </a>
     </div>
 

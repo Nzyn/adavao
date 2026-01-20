@@ -80,21 +80,45 @@ class DashboardController extends Controller
             };
 
             return [
+                'urgentPending' => $getCount('pending') > 0 ? (function() use ($reportsQuery, $isSuperAdmin, $userRole, $user) {
+                    $q = clone $reportsQuery;
+                    $q->where('status', 'pending');
+                    $q->where('urgency_score', '>=', 70); // High or Critical
+                    
+                    if (!$isSuperAdmin) {
+                        if ($userRole === 'police') {
+                            $stationId = $user->station_id;
+                            if ($stationId) $q->where('assigned_station_id', $stationId);
+                        } else {
+                            $q->whereNotNull('assigned_station_id');
+                        }
+                    }
+                    return $q->count();
+                })() : 0,
                 'totalReports' => $getCount(),
                 'pendingReports' => $getCount('pending'),
                 'investigatingReports' => $getCount('investigating'),
                 'resolvedReports' => $getCount('resolved'),
+                'activeInvestigations' => $getCount('investigating'),
                 'reportsToday' => DB::table('reports')
                     ->when($userRole === 'police' && $user->station_id, function($q) use ($user) {
                         return $q->where('assigned_station_id', $user->station_id);
                     })
+                    ->when($dateFrom, function($q) use ($dateFrom) {
+                         // Apply date filter if set, otherwise "Today" logic is usually implied by context but here we want literally TODAY unless overridden
+                         if($dateFrom) return $q->whereDate('created_at', '>=', $dateFrom);
+                    })
                     ->whereDate('created_at', \Carbon\Carbon::today())
                     ->count(),
+                'solvedThisMonth' => DB::table('reports')
+                    ->when($userRole === 'police' && $user->station_id, function($q) use ($user) {
+                        return $q->where('assigned_station_id', $user->station_id);
+                    })
+                    ->where('status', 'resolved')
+                    ->whereMonth('updated_at', \Carbon\Carbon::now()->month)
+                    ->whereYear('updated_at', \Carbon\Carbon::now()->year)
+                    ->count(),
                 'unreadMessages' => 0 // Temporarily disabled until is_read column is added
-                    // DB::table('messages')
-                    //     ->where('receiver_id', $user->id)
-                    //     ->where('is_read', 0)
-                    //     ->count()
             ];
         });
         
@@ -105,6 +129,9 @@ class DashboardController extends Controller
         $resolvedReports = $stats['resolvedReports'];
         $reportsToday = $stats['reportsToday'];
         $unreadMessages = $stats['unreadMessages'];
+        $urgentPending = $stats['urgentPending'] ?? 0;
+        $activeInvestigations = $stats['activeInvestigations'] ?? 0;
+        $solvedThisMonth = $stats['solvedThisMonth'] ?? 0;
         
         $totalUsers = DB::table('users_public')->count();
         
@@ -129,17 +156,20 @@ class DashboardController extends Controller
         return view('welcome', compact(
             'userRole',
             'totalReports',
-            'pendingReports', // Passed to view for Items 16 & 17
+            'pendingReports',
             'investigatingReports',
-            'resolvedReports', // Passed to view for Items 16 & 17
+            'resolvedReports',
             'reportsToday',
             'unreadMessages',
             'totalUsers',
             'totalPoliceOfficers',
             'flaggedUsersCount',
             'pendingVerificationsCount',
-            'dateFrom', // Passed for Item 15
-            'dateTo'    // Passed for Item 15
+            'urgentPending',
+            'activeInvestigations',
+            'solvedThisMonth',
+            'dateFrom',
+            'dateTo'
         ));
     }
 }
