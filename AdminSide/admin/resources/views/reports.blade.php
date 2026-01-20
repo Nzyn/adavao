@@ -412,6 +412,41 @@
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
         }
 
+        /* Urgency Badge Styles */
+        .urgency-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .urgency-critical {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .urgency-high {
+            background-color: #fed7aa;
+            color: #9a3412;
+            border: 1px solid #fdba74;
+        }
+
+        .urgency-medium {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde047;
+        }
+
+        .urgency-low {
+            background-color: #f3f4f6;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
+        }
+
         .action-btn {
             display: inline-flex;
             align-items: center;
