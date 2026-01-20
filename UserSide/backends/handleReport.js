@@ -252,6 +252,40 @@ async function submitReport(req, res) {
       console.log('ℹ️ Evidence optional for this crime type');
     }
 
+    // 🚨 URGENCY SCORING: Calculate priority for police operations (Item #11, #13)
+    // Score range: 0-100 (higher = more urgent)
+    const CRITICAL_CRIMES = ['Murder', 'Homicide', 'Rape', 'Sexual Assault', 'Kidnapping', 'Armed Robbery'];
+    const HIGH_PRIORITY = ['Robbery', 'Physical Injury', 'Domestic Violence', 'Missing Person', 'Assault'];
+    const MEDIUM_PRIORITY = ['Theft', 'Burglary', 'Break-in', 'Carnapping', 'Threats', 'Vandalism'];
+
+    let urgencyScore = 30; // Base score for all reports
+
+    // Check crime type severity
+    const hasCritical = crimeTypesArray.some(crime => CRITICAL_CRIMES.includes(crime));
+    const hasHigh = crimeTypesArray.some(crime => HIGH_PRIORITY.includes(crime));
+    const hasMedium = crimeTypesArray.some(crime => MEDIUM_PRIORITY.includes(crime));
+
+    if (hasCritical) {
+      urgencyScore = 100; // Critical - immediate response
+    } else if (hasHigh) {
+      urgencyScore = 75; // High priority
+    } else if (hasMedium) {
+      urgencyScore = 50; // Medium priority
+    }
+
+    // Bonus points for having evidence (+10)
+    if (req.file) {
+      urgencyScore = Math.min(100, urgencyScore + 10);
+    }
+
+    // Recency bonus: Reports within 1 hour get +5
+    const hoursDiff = (now - incidentTime) / (1000 * 60 * 60);
+    if (hoursDiff < 1) {
+      urgencyScore = Math.min(100, urgencyScore + 5);
+    }
+
+    console.log(`🚨 Urgency Score: ${urgencyScore}/100 (${hasCritical ? 'CRITICAL' : hasHigh ? 'HIGH' : hasMedium ? 'MEDIUM' : 'LOW'})`);
+
     // Create location record
     const lat = latitude ? parseFloat(latitude) : 0;
     const lng = longitude ? parseFloat(longitude) : 0;
