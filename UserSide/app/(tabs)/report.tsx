@@ -1146,6 +1146,64 @@ export default function ReportCrime() {
                 )}
             </ScrollView>
 
+            {/* Item #2: Template Selection Modal */}
+            <Modal
+                visible={showTemplateModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowTemplateModal(false)}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1D3557' }}>Select Template</Text>
+                            <TouchableOpacity onPress={() => setShowTemplateModal(false)}>
+                                <Ionicons name="close" size={28} color="#666" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView>
+                            {selectedCrimes.filter(crime => REPORT_TEMPLATES[crime]).map(crime => (
+                                <TouchableOpacity
+                                    key={crime}
+                                    style={{
+                                        backgroundColor: '#F5F5F5',
+                                        padding: 16,
+                                        borderRadius: 8,
+                                        marginBottom: 12,
+                                        borderWidth: 1,
+                                        borderColor: '#ddd'
+                                    }}
+                                    onPress={() => {
+                                        setDescription(REPORT_TEMPLATES[crime]);
+                                        setShowTemplateModal(false);
+                                    }}>
+                                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#1D3557', marginBottom: 8 }}>{crime}</Text>
+                                    <Text style={{ fontSize: 12, color: '#666', lineHeight: 18 }} numberOfLines={3}>
+                                        {REPORT_TEMPLATES[crime]}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+
+                            <TouchableOpacity
+                                style={{
+                                    backgroundColor: '#E3F2FD',
+                                    padding: 16,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: '#1D3557',
+                                    alignItems: 'center'
+                                }}
+                                onPress={() => {
+                                    setDescription('');
+                                    setShowTemplateModal(false);
+                                }}>
+                                <Text style={{ fontSize: 14, fontWeight: '600', color: '#1D3557' }}>Write Custom Description</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Location Picker Modal - Moved outside ScrollView */}
             {showLocationPicker && (
                 <EnhancedLocationPicker
