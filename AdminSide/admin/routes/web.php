@@ -19,6 +19,16 @@ use App\Http\Controllers\HotspotDataController;
 use App\Http\Controllers\ProfileController;
 
 
+// Temporary route to force migration on Render
+Route::get('/force-migrate', function() {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        return "Migration run successfully: <br><pre>" . \Illuminate\Support\Facades\Artisan::output() . "</pre>";
+    } catch (\Exception $e) {
+        return "Migration failed including Users Public fix: " . $e->getMessage();
+    }
+});
+
 Route::get('/debug-me', function() {
     $user = auth()->user();
     if (!$user) return 'Not logged in';
