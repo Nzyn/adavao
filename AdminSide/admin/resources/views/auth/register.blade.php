@@ -441,7 +441,7 @@
                     </svg>
                     Sign Up with Google
                 </button>
-                <button type="submit" class="submit-btn" id="registerBtn" disabled>Sign Up</button>
+                <button type="submit" class="submit-btn" id="registerBtn">Sign Up</button>
 
                 <div class="login-link">
                     Already have an account? <a href="{{ route('login') }}">Login</a>
