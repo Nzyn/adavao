@@ -27,8 +27,6 @@ class UserAdminObserver
                     DB::table('user_admin_roles')->insert([
                         'user_admin_id' => $userAdmin->id,
                         'role_id' => $policeRole->role_id,
-                        'assigned_at' => now(),
-                        'assigned_by' => auth()->id() ?? 1,
                     ]);
                     
                     \Log::info('Auto-assigned police role to new UserAdmin', [
