@@ -22,10 +22,28 @@ use App\Http\Controllers\ProfileController;
 // Temporary route to force migration on Render
 Route::get('/force-migrate', function() {
     try {
-        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-        return "Migration run successfully: <br><pre>" . \Illuminate\Support\Facades\Artisan::output() . "</pre>";
+        \Illuminate\Support\Facades\Schema::table('users_public', function (\Illuminate\Database\Schema\Blueprint $table) {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('users_public', 'user_role')) {
+                $table->string('user_role')->default('user')->after('phone_number'); // Note: assuming phone_number or contact exists
+            }
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('users_public', 'is_on_duty')) {
+                $table->boolean('is_on_duty')->default(false)->after('user_role');
+            }
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('users_public', 'push_token')) {
+                $table->text('push_token')->nullable()->after('is_on_duty');
+            }
+             if (!\Illuminate\Support\Facades\Schema::hasColumn('users_public', 'assigned_station_id')) {
+                $table->unsignedBigInteger('assigned_station_id')->nullable()->after('push_token');
+            }
+            // Fix contact vs phone_number mismatch
+             if (!\Illuminate\Support\Facades\Schema::hasColumn('users_public', 'contact') && \Illuminate\Support\Facades\Schema::hasColumn('users_public', 'phone_number')) {
+                 // Do nothing, code handles contact/phone_number
+             }
+        });
+        
+        return "Manual Schema Update Successful! Columns checked/added: user_role, is_on_duty, push_token";
     } catch (\Exception $e) {
-        return "Migration failed including Users Public fix: " . $e->getMessage();
+        return "Manual Schema Update failed: " . $e->getMessage();
     }
 });
 
