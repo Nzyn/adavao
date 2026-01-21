@@ -715,8 +715,7 @@
 
         // Override the captcha component's validateCaptcha after the captcha component has loaded
         // This ensures captchaValid is set when the user enters the correct captcha
-        // Initial button update
-        updateRegisterButton();
+        // updateRegisterButton();
     </script>
 </body>
 </html>
