@@ -674,6 +674,7 @@
                 formData.append('contact', contactValue);
                 formData.append('password', passwordValue);
                 formData.append('password_confirmation', passwordConfirmValue);
+                formData.append('user_role', document.getElementById('user_role').value);
                 formData.append('terms', termsCheckbox.checked ? 'on' : '');
                 formData.append('recaptcha_token', document.getElementById('recaptcha_token').value);
 
