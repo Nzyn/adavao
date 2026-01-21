@@ -348,6 +348,27 @@
                      </div>
                 </div>
 
+                <div class="form-group full-width" style="margin-bottom: 1rem;">
+                    <label for="user_role" class="form-label">Officer Type <span style="color: red;">*</span></label>
+                    <select 
+                        id="user_role" 
+                        name="user_role" 
+                        class="form-input @error('user_role') error @enderror" 
+                        required
+                        style="cursor: pointer;"
+                    >
+                        <option value="">-- Select Officer Type --</option>
+                        <option value="police" selected>Station Officer (Desk/Office Duty)</option>
+                        <option value="patrol_officer">Patrol Officer (Mobile/Field Duty)</option>
+                    </select>
+                    <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                        Station Officers work at police stations. Patrol Officers respond to field dispatches.
+                    </small>
+                    @error('user_role')
+                        <span class="error-message">{{ $message }}</span>
+                    @enderror
+                </div>
+
                 <div class="form-group full-width password-row">
                     <label for="password" class="form-label">Password <span style="color: red;">*</span></label>
                     <input 

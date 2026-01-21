@@ -1210,6 +1210,15 @@
             <p>Manage and view all incident reports</p>
         </div>
 
+        <!-- Urgent Fix Button -->
+        @if(auth()->user() && (method_exists(auth()->user(), 'hasRole') && (auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))))
+        <a href="{{ route('reports.recalculateUrgency') }}" 
+           onclick="return confirm('Recalculate all urgency scores? This checks all report types and updates the score.')"
+           style="background: #f59e0b; color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;">
+            <span>⚠️</span> Fix Urgency Scores
+        </a>
+        @endif
+
         <!-- ITEM 15: DATE RANGE FILTER -->
         <form action="{{ route('reports') }}" method="GET" style="display: flex; gap: 0.5rem; align-items: center; background: white; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
             @if(request('status'))
@@ -1364,6 +1373,18 @@
                                             <path d="m9 18 6-6-6-6" />
                                         </svg>
                                     </button>
+                                    
+                                    <!-- Dispatch Button -->
+                                    @if(($report->status === 'pending' || $report->status === 'investigating') && !$report->is_anonymous)
+                                    <button 
+                                        class="action-btn" 
+                                        title="Dispatch Patrol"
+                                        onclick="openDispatchModal({{ $report->report_id }})"
+                                        style="background: #3b82f6; color: white; margin-left: 4px;"
+                                    >
+                                        🚓
+                                    </button>
+                                    @endif
                                 </td>
                             </tr>
                 @empty
@@ -3322,5 +3343,234 @@ function generatePDF(report) {
         // Initial check to set baseline
         checkForNewReports();
         // ========== END NEW REPORT NOTIFICATION SYSTEM ==========
+
+        // ========== VALIDITY UPDATE FUNCTION ==========
+        function updateValidity(reportId, newValidity) {
+            // If selecting "invalid", show rejection modal instead
+            if (newValidity === 'invalid') {
+                openRejectionModal(reportId);
+                // Reset the select to its original value
+                event.target.value = event.target.dataset.originalValidity;
+                return;
+            }
+
+            // For other validity values, update directly
+            fetch(`/reports/${reportId}/validity`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({ validity: newValidity })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the data attribute
+                    event.target.dataset.originalValidity = newValidity;
+                    // Show success message (optional)
+                    console.log('Validity updated successfully');
+                } else {
+                    alert('Failed to update validity');
+                    // Reset to original value
+                    event.target.value = event.target.dataset.originalValidity;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating validity');
+                // Reset to original value
+                event.target.value = event.target.dataset.originalValidity;
+            });
+        }
+        // ========== END VALIDITY UPDATE FUNCTION ==========
+
+        // ========== REJECTION REASON MODAL ==========
+        function openRejectionModal(reportId) {
+            const modal = document.getElementById('rejectionModal');
+            const form = document.getElementById('rejectionForm');
+            form.action = `/reports/${reportId}/validity`;
+            modal.style.display = 'flex';
+        }
+
+        function closeRejectionModal() {
+            document.getElementById('rejectionModal').style.display = 'none';
+            document.getElementById('rejectionReasonInput').value = '';
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('rejectionModal');
+            if (event.target === modal) {
+                closeRejectionModal();
+            }
+        });
+        // ========== END REJECTION REASON MODAL ==========
+    </script>
+
+    <!-- Rejection Reason Modal -->
+    <div id="rejectionModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Reject Report</h2>
+                <button class="modal-close" onclick="closeRejectionModal()" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: #666; font-size: 14px;">
+                    Please provide a reason for rejecting this report. This will be sent to the user via email.
+                </p>
+                <form id="rejectionForm" method="POST">
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="validity" value="invalid">
+                    <textarea 
+                        id="rejectionReasonInput"
+                        name="rejection_reason" 
+                        required
+                        rows="5"
+                        placeholder="Enter rejection reason (e.g., 'Insufficient evidence', 'Duplicate report', 'Outside jurisdiction')..."
+                        style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; resize: vertical;"
+                    ></textarea>
+                    <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+                        <button type="button" onclick="closeRejectionModal()" style="padding: 10px 20px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                            Cancel
+                        </button>
+                        <button type="submit" style="padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                            Reject Report
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dispatch Modal -->
+    <div id="dispatchModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>🚓 Dispatch Patrol Officer</h2>
+                <button class="modal-close" onclick="closeDispatchModal()" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: #666; font-size: 14px;">
+                    Assign a patrol officer to respond to this report. The officer will receive a notification immediately.
+                </p>
+                <form id="dispatchForm" method="POST">
+                    @csrf
+                    <input type="hidden" name="report_id" id="dispatch_report_id">
+                    
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Select Patrol Officer:</label>
+                        <select 
+                            name="patrol_officer_id" 
+                            id="dispatch_officer_select"
+                            required
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
+                        >
+                            <option value="">-- Loading officers... --</option>
+                        </select>
+                        <small style="color: #666; font-size: 12px;">Only on-duty officers are shown</small>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Notes (Optional):</label>
+                        <textarea 
+                            name="notes"
+                            rows="3"
+                            placeholder="Additional instructions for the patrol officer..."
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; resize: vertical; font-size: 14px;"
+                        ></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button type="button" onclick="closeDispatchModal()" style="padding: 10px 20px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                            Cancel
+                        </button>
+                        <button type="submit" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                            🚓 Dispatch Now
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Dispatch Modal Functions
+    function openDispatchModal(reportId) {
+        document.getElementById('dispatch_report_id').value = reportId;
+        
+        // Load on-duty officers
+        fetch('/api/on-duty-officers')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('dispatch_officer_select');
+                select.innerHTML = '<option value="">-- Select Officer --</option>';
+                
+                if (data.officers && data.officers.length > 0) {
+                    data.officers.forEach(officer => {
+                        const option = document.createElement('option');
+                        option.value = officer.id;
+                        option.textContent = `${officer.name} - ${officer.station_name || 'No Station'}`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">No officers on duty</option>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading officers:', error);
+                const select = document.getElementById('dispatch_officer_select');
+                select.innerHTML = '<option value="">Error loading officers</option>';
+            });
+        
+        document.getElementById('dispatchModal').style.display = 'flex';
+    }
+
+    function closeDispatchModal() {
+        document.getElementById('dispatchModal').style.display = 'none';
+        document.getElementById('dispatchForm').reset();
+    }
+
+    // Handle dispatch form submission
+    document.addEventListener('DOMContentLoaded', function() {
+        const dispatchForm = document.getElementById('dispatchForm');
+        if (dispatchForm) {
+            dispatchForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const data = {
+                    report_id: formData.get('report_id'),
+                    patrol_officer_id: formData.get('patrol_officer_id'),
+                    notes: formData.get('notes')
+                };
+                
+                fetch('/dispatches', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('✅ Dispatch created successfully! Officer has been notified.');
+                        closeDispatchModal();
+                        location.reload();
+                    } else {
+                        alert('❌ Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('❌ Failed to create dispatch');
+                });
+            });
+        }
+    });
     </script>
 @endsection

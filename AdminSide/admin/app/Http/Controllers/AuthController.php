@@ -88,6 +88,12 @@ class AuthController extends Controller
         $verificationToken = Str::random(64);
         $tokenExpiresAt = Carbon::now()->addHours(24);
 
+        // Validate user_role
+        $userRole = $request->input('user_role', 'police');
+        if (!in_array($userRole, ['police', 'patrol_officer'])) {
+            $userRole = 'police'; // Default to police if invalid
+        }
+
         // Create user_admin with verification token (email not verified yet)
         $userAdmin = UserAdmin::create([
             'firstname' => $request->firstname,
@@ -100,6 +106,26 @@ class AuthController extends Controller
             'email_verified_at' => null, // Not verified yet
         ]);
 
+        // If patrol officer, also create entry in users_public table
+        if ($userRole === 'patrol_officer') {
+            try {
+                \DB::table('users_public')->insert([
+                    'firstname' => $request->firstname,
+                    'lastname' => $request->lastname,
+                    'email' => $request->email,
+                    'phone_number' => $request->contact,
+                    'password' => Hash::make($request->password),
+                    'user_role' => 'patrol_officer',
+                    'is_on_duty' => false,
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ]);
+                \Log::info('Patrol officer account created in users_public', ['email' => $request->email]);
+            } catch (\Exception $e) {
+                \Log::error('Failed to create patrol officer in users_public: ' . $e->getMessage());
+            }
+        }
+
         // Generate verification URL
         $verificationUrl = route('email.verify', ['token' => $verificationToken]);
 
@@ -107,8 +133,12 @@ class AuthController extends Controller
         try {
             $userAdmin->notify(new EmailVerification($verificationUrl, $userAdmin->firstname));
             
-            return redirect()->route('login')->with('success', 
-                'Registration successful! Please check your email (' . $userAdmin->email . ') for a verification link to activate your account. The link will expire in 24 hours.');
+            $successMessage = 'Registration successful! Please check your email (' . $userAdmin->email . ') for a verification link to activate your account. The link will expire in 24 hours.';
+            if ($userRole === 'patrol_officer') {
+                $successMessage .= ' Your patrol officer account has been created. You can login to the mobile app after verification.';
+            }
+            
+            return redirect()->route('login')->with('success', $successMessage);
         } catch (\Exception $e) {
             // Delete user if email fails to send
             $userAdmin->delete();

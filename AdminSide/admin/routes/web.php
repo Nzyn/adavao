@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\DispatchController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VerificationController;
 // use App\Http\Controllers\BarangayController;
@@ -83,6 +84,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
     Route::get('/reports', [ReportController::class, 'index'])->name('reports');
+    Route::get('/reports/recalculate-urgency', [ReportController::class, 'recalculateUrgencyScores'])->name('reports.recalculateUrgency');
     Route::put('/reports/{id}/status', [ReportController::class, 'updateStatus'])->name('reports.updateStatus');
     Route::put('/reports/{id}/validity', [ReportController::class, 'updateValidity'])->name('reports.updateValidity');
     Route::get('/reports/{id}/details', [ReportController::class, 'getDetails'])->name('reports.details');
@@ -92,6 +94,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/reports/{id}/request-reassignment', [ReportController::class, 'requestReassignment'])->name('reports.requestReassignment')->middleware('role:police');
     Route::get('/api/reassignment-requests', [ReportController::class, 'getReassignmentRequests'])->name('api.reassignmentRequests')->middleware('role:admin,police');
     Route::post('/reassignment-requests/{id}/review', [ReportController::class, 'reviewReassignmentRequest'])->name('reports.reviewReassignment')->middleware('role:admin');
+
+    // Patrol Dispatch Routes
+    Route::get('/dispatches', [DispatchController::class, 'index'])->name('dispatches');
+    Route::post('/dispatches', [DispatchController::class, 'store'])->name('dispatches.store');
+    Route::put('/dispatches/{id}/status', [DispatchController::class, 'updateStatus'])->name('dispatches.updateStatus');
+    Route::put('/dispatches/{id}/assign', [DispatchController::class, 'assign'])->name('dispatches.assign');
+    Route::delete('/dispatches/{id}', [DispatchController::class, 'cancel'])->name('dispatches.cancel');
+    Route::get('/dispatches/analytics', [DispatchController::class, 'analytics'])->name('dispatches.analytics');
+    Route::get('/api/on-duty-officers', [DispatchController::class, 'getOnDutyOfficers'])->name('api.onDutyOfficers');
 
     // Barangay management routes (commented out - controller missing)
     // Route::get('/barangays', [BarangayController::class, 'index'])->name('barangays.index');

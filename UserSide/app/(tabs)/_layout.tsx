@@ -29,7 +29,9 @@ export default function TabLayout() {
           const isForgotPasswordScreen = pathname === '/forgot-password' || pathname === '/(tabs)/forgot-password';
 
           // If not on auth screens and no userData, redirect to login
-          if (!isLoginScreen && !isRegisterScreen && !isForgotPasswordScreen && !userData) {
+          const isReportScreen = pathname === '/report' || pathname === '/(tabs)/report';
+
+          if (!isLoginScreen && !isRegisterScreen && !isForgotPasswordScreen && !isReportScreen && !userData) {
             console.log('🔒 Auth guard: No user data, redirecting to login');
             router.replace('/(tabs)/login');
           }

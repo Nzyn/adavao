@@ -785,22 +785,44 @@
                 
                 if(loadingEl) loadingEl.style.display = 'none';
 
-                if(data.status === 'success' && data.data && data.data.length > 0) {
-                    if(contentEl) contentEl.style.display = 'block';
+                if(data.status === 'success' && data.data) {
+                    // Check if data is array and has elements
+                    let rawValue = 0;
+                    if (Array.isArray(data.data) && data.data.length > 0) {
+                        rawValue = data.data[0];
+                        // Handle if the API returns an array of arrays [[12.5]]
+                        if (Array.isArray(rawValue)) rawValue = rawValue[0];
+                    } else if (typeof data.data === 'number') {
+                        rawValue = data.data; // Handle single number response
+                    }
+
+                    const predictedValue = Math.round(parseFloat(rawValue));
                     
-                    // Forecast value is usually a float, round it
-                    const predictedValue = Math.round(data.data[0]);
+                    if(isNaN(predictedValue)) {
+                        console.error('Forecast value is NaN. Raw:', rawValue, 'Data:', data);
+                        throw new Error('Invalid forecast value');
+                    }
+
+                    if(contentEl) contentEl.style.display = 'block';
                     if(countEl) countEl.innerText = predictedValue;
                     
-                    // Generate recommendation based on value
+                    // Generate SPECIFIC & CONCISE recommendation
                     if(recEl) {
                         let recommendation = '';
-                        if(predictedValue > 50) {
-                            recommendation = 'Expected high incident volume. Recommend increasing patrol frequency in hotspot barangays and ensuring officer availability during peak hours.';
-                        } else if(predictedValue > 20) {
-                             recommendation = 'Moderate incident volume expected. Maintain standard patrol schedules with focus on known theft hotspots.';
+                        // Future-proofing: Check if API provides a specific recommendation
+                        if (data.recommendation) {
+                            recommendation = data.recommendation;
                         } else {
-                             recommendation = 'Low incident volume expected. Good opportunity for community engagement and preventive education campaigns.';
+                            // Fallback logic with specific directives
+                            if(predictedValue > 50) {
+                                recommendation = '⚠️ SURGE ALERT: Deploy tactical units to high-density hotspots. Cancel leaves if necessary.';
+                            } else if(predictedValue > 30) {
+                                recommendation = 'HIGH ACTIVITY: Intensify visibility in commercial zones (18:00-02:00). Check warrant lists.';
+                            } else if(predictedValue > 15) {
+                                recommendation = 'MODERATE: Focus patrols on residential theft hotspots. conduct checkpoints at key excess points.';
+                            } else {
+                                recommendation = 'NORMAL: Maintain standard beat patrols. Focus on community engagement and intelligence gathering.';
+                            }
                         }
                         recEl.innerText = recommendation;
                     }

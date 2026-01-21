@@ -289,19 +289,22 @@ async function submitReport(req, res) {
     console.log(`📋 Analyzing crime types:`, crimeTypesArray);
 
     const hasCritical = crimeTypesArray.some(crime => {
-      const isCritical = CRITICAL_CRIMES.includes(crime);
+      // Case insensitive check
+      const isCritical = CRITICAL_CRIMES.some(c => c.toLowerCase() === crime.toLowerCase().trim());
       if (isCritical) console.log(`🔴 CRITICAL crime detected: ${crime}`);
       return isCritical;
     });
 
     const hasHigh = crimeTypesArray.some(crime => {
-      const isHigh = HIGH_PRIORITY.includes(crime);
+      // Case insensitive check
+      const isHigh = HIGH_PRIORITY.some(c => c.toLowerCase() === crime.toLowerCase().trim());
       if (isHigh) console.log(`🟠 HIGH priority crime detected: ${crime}`);
       return isHigh;
     });
 
     const hasMedium = crimeTypesArray.some(crime => {
-      const isMedium = MEDIUM_PRIORITY.includes(crime);
+      // Case insensitive check
+      const isMedium = MEDIUM_PRIORITY.some(c => c.toLowerCase() === crime.toLowerCase().trim());
       if (isMedium) console.log(`🟡 MEDIUM priority crime detected: ${crime}`);
       return isMedium;
     });
@@ -325,7 +328,7 @@ async function submitReport(req, res) {
     }
 
     // Recency bonus: Reports within 1 hour get +5
-    const hoursDiff = (now - incidentTime) / (1000 * 60 * 60);
+    // Note: hoursDiff was calculated earlier for validation
     if (hoursDiff < 1) {
       urgencyScore = Math.min(100, urgencyScore + 5);
       console.log(`⏱️ Recency bonus: +5 points (${hoursDiff.toFixed(1)}h ago)`);
@@ -496,10 +499,10 @@ async function submitReport(req, res) {
 
     // Note: stationId can be NULL if coordinates don't fall within any polygon
     const [reportResult] = await connection.query(
-      `INSERT INTO reports 
-       (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, created_at, updated_at) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, NOW(), NOW()) RETURNING report_id`,
-      [user_id, locationId, reportTitle, reportType, encryptedDescription, incident_date, isAnon, stationId]
+      `INSERT INTO reports
+      (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, urgency_score, created_at, updated_at) 
+       VALUES($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, NOW(), NOW()) RETURNING report_id`,
+      [user_id, locationId, reportTitle, reportType, encryptedDescription, incident_date, isAnon, stationId, urgencyScore]
     );
 
     const reportId = reportResult[0].report_id;
@@ -535,12 +538,12 @@ async function submitReport(req, res) {
         } else {
           console.error("❌ Cloudinary upload failed:", uploadResult.error);
           // Fallback to local path (will be lost on redeploy)
-          mediaUrl = `/evidence/${req.file.filename}`;
+          mediaUrl = `/ evidence / ${req.file.filename}`;
           console.log("⚠️ Using local fallback path:", mediaUrl);
         }
       } else {
         console.log("⚠️ Cloudinary not configured, using local storage (will be lost on redeploy!)");
-        mediaUrl = `/evidence/${req.file.filename}`;
+        mediaUrl = `/ evidence / ${req.file.filename}`;
       }
 
       console.log("   Media URL:", mediaUrl);
@@ -582,8 +585,8 @@ async function submitReport(req, res) {
       console.log("   User Agent:", userAgent);
 
       await connection.query(
-        `INSERT INTO report_ip_tracking (report_id, ip_address, user_agent, submitted_at) 
-         VALUES ($1, $2, $3, NOW())`,
+        `INSERT INTO report_ip_tracking(report_id, ip_address, user_agent, submitted_at) 
+         VALUES($1, $2, $3, NOW())`,
         [reportId, clientIp, userAgent]
       );
 
@@ -653,22 +656,22 @@ async function getUserReports(req, res) {
     const [reports] = await db.query(
       `SELECT 
         r.report_id,
-        r.title,
-        r.report_type::text,
-        r.description,
-        r.status,
-        r.is_anonymous,
-        r.date_reported,
-        r.created_at,
-        r.assigned_station_id as station_id,
-        l.latitude,
-        l.longitude,
-        l.barangay,
-        l.reporters_address,
-        ps.station_name,
-        ps.address as station_address,
-        ps.contact_number,
-        STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
+      r.title,
+      r.report_type:: text,
+      r.description,
+      r.status,
+      r.is_anonymous,
+      r.date_reported,
+      r.created_at,
+      r.assigned_station_id as station_id,
+      l.latitude,
+      l.longitude,
+      l.barangay,
+      l.reporters_address,
+      ps.station_name,
+      ps.address as station_address,
+      ps.contact_number,
+      STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN police_stations ps ON r.assigned_station_id = ps.station_id
@@ -680,7 +683,7 @@ async function getUserReports(req, res) {
         AND l.longitude IS NOT NULL
         AND l.latitude != 0
         AND l.longitude != 0
-      GROUP BY r.report_id, r.title, r.report_type::text, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, ps.station_name, ps.address, ps.contact_number
+      GROUP BY r.report_id, r.title, r.report_type:: text, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, ps.station_name, ps.address, ps.contact_number
       ORDER BY r.created_at DESC`,
       [userId]
     );
@@ -772,27 +775,27 @@ async function getAllReports(req, res) {
     // Build query with role-based filtering
     let query = `SELECT 
         r.report_id,
-        r.title,
-        r.report_type::text,
-        r.description,
-        r.status,
-        r.is_anonymous,
-        r.date_reported,
-        r.created_at,
-        r.user_id,
-        r.assigned_station_id as station_id,
-        l.latitude,
-        l.longitude,
-        l.barangay,
-        l.reporters_address,
-        u.firstname,
-        u.lastname,
-        u.email,
-        u.role as user_role,
-        ps.station_name,
-        ps.address as station_address,
-        ps.contact_number,
-        STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
+      r.title,
+      r.report_type:: text,
+      r.description,
+      r.status,
+      r.is_anonymous,
+      r.date_reported,
+      r.created_at,
+      r.user_id,
+      r.assigned_station_id as station_id,
+      l.latitude,
+      l.longitude,
+      l.barangay,
+      l.reporters_address,
+      u.firstname,
+      u.lastname,
+      u.email,
+      u.role as user_role,
+      ps.station_name,
+      ps.address as station_address,
+      ps.contact_number,
+      STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN users_public u ON r.user_id = u.id
@@ -815,14 +818,14 @@ async function getAllReports(req, res) {
       queryParams.push(userStationId);
       console.log(`👮 Police user requesting reports - filtering by station_id: ${userStationId}`);
     } else if (userRole === 'admin') {
-      console.log(`👨‍💼 Admin user requesting reports - showing all reports (assigned and unassigned)`);
+      console.log(`👨‍💼 Admin user requesting reports - showing all reports(assigned and unassigned)`);
     } else if (userRole === 'user' && requestingUserId) {
       query += ` AND r.user_id = $1`;
       queryParams.push(requestingUserId);
       console.log(`👤 Regular user requesting reports - filtering by user_id: ${requestingUserId}`);
     }
 
-    query += ` GROUP BY r.report_id, r.title, r.report_type::text, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.user_id, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, u.role, ps.station_name, ps.address, ps.contact_number ORDER BY r.created_at DESC`;
+    query += ` GROUP BY r.report_id, r.title, r.report_type:: text, r.description, r.status, r.is_anonymous, r.date_reported, r.created_at, r.user_id, r.assigned_station_id, l.latitude, l.longitude, l.barangay, l.reporters_address, u.firstname, u.lastname, u.email, u.role, ps.station_name, ps.address, ps.contact_number ORDER BY r.created_at DESC`;
 
     const [reports] = await db.query(query, queryParams);
 
@@ -843,12 +846,12 @@ async function getAllReports(req, res) {
       let decryptedAddress = report.reporters_address;
 
       if (canDecrypt(userRole)) {
-        console.log(`🔓 Decrypting report ${report.report_id} for authorized role: ${userRole}`);
+        console.log(`🔓 Decrypting report ${report.report_id} for authorized role: ${userRole} `);
         decryptedDescription = decrypt(report.description);
         decryptedBarangay = report.barangay ? decrypt(report.barangay) : null;
         decryptedAddress = report.reporters_address ? decrypt(report.reporters_address) : null;
       } else {
-        console.log(`🔒 Keeping report ${report.report_id} encrypted for role: ${userRole}`);
+        console.log(`🔒 Keeping report ${report.report_id} encrypted for role: ${userRole} `);
       }
 
       // Parse report_type from JSON string to array

@@ -14,7 +14,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
@@ -107,6 +107,7 @@ export default function ReportCrime() {
     // 📊 Performance Timing - End
 
     const { user } = useUser();
+    const params = useLocalSearchParams();
     const [title, setTitle] = useState('');
     const [titleError, setTitleError] = useState('');
     const [selectedCrimes, setSelectedCrimes] = useState<string[]>([]);
@@ -135,7 +136,7 @@ export default function ReportCrime() {
 
     const [showLocationPicker, setShowLocationPicker] = useState(false);
     const [locationCoordinates, setLocationCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
-    const [isAnonymous, setIsAnonymous] = useState(false);
+    const [isAnonymous, setIsAnonymous] = useState(params.anonymous === 'true');
     const [selectedMedia, setSelectedMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
     const [showMediaViewer, setShowMediaViewer] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -498,8 +499,8 @@ export default function ReportCrime() {
         console.log('👤 Current user from context:', user);
         console.log('🆔 User ID:', user?.id);
 
-        if (!user || !user.id) {
-            console.log('❌ Validation failed: User not logged in');
+        if (!isAnonymous && (!user || !user.id)) {
+            console.log('❌ Validation failed: User not logged in and not anonymous');
             window.alert('Authentication Required: You must be logged in to submit a report.');
             console.error('User not logged in:', user);
             return;
@@ -607,7 +608,7 @@ export default function ReportCrime() {
                     fileSize: selectedMedia.fileSize ?? undefined,
                     type: selectedMedia.type ?? undefined
                 } : null,
-                userId: user.id,
+                userId: user?.id || '0',
             };
 
             console.log('📋 Report Data:');
@@ -652,6 +653,13 @@ export default function ReportCrime() {
 
     return (
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
+            {/* Anonymous Warning Banner */}
+            {isAnonymous && (
+                <View style={{ backgroundColor: '#fff3cd', padding: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#ffeeba' }}>
+                    <Text style={{ color: '#856404', fontWeight: 'bold' }}>⚠️ You are reporting anonymously</Text>
+                    <Text style={{ color: '#856404', fontSize: 12 }}>You will not receive updates for this report.</Text>
+                </View>
+            )}
             {/* Flag Notification Toast - Fixed at top */}
             <FlagNotificationToast
                 notification={flagNotification}
@@ -767,7 +775,7 @@ export default function ReportCrime() {
                     {/* Helper Message */}
                     <View style={{ marginTop: 4, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#f5f5f5', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#1D3357' }}>
                         <Text style={{ fontSize: 13, color: '#666', lineHeight: 18 }}>
-                            Not sure which category to choose? If you're confused, please check the definitions above for guidance.
+                            Not sure which category to choose? If you&apos;re confused, please check the definitions above for guidance.
                         </Text>
                     </View>
                 </View>

@@ -321,15 +321,55 @@ class ReportController extends Controller
     {
         try {
             $request->validate([
-                'is_valid' => 'required|in:valid,invalid,checking_for_report_validity'
+                'validity' => 'nullable|in:valid,invalid,checking_for_report_validity',
+                'is_valid' => 'nullable|in:valid,invalid,checking_for_report_validity',
+                'rejection_reason' => 'required_if:validity,invalid|required_if:is_valid,invalid|nullable|string'
             ]);
 
             $report = Report::findOrFail($id);
-            $report->is_valid = $request->is_valid;
-            $report->save();
+            
+            // Handle both 'validity' and 'is_valid' field names
+            $validityValue = $request->validity ?? $request->is_valid;
+            
+            if ($validityValue) {
+                $report->is_valid = $validityValue;
+                
+                // If marking as invalid and rejection reason provided
+                if ($validityValue === 'invalid' && $request->rejection_reason) {
+                    $report->rejection_reason = $request->rejection_reason;
+                    $report->reviewed_at = now();
+                    $report->reviewed_by = auth()->id();
+                    
+                    // Send email notification to user
+                    try {
+                        $user = $report->user;
+                        if ($user && $user->email && !$report->is_anonymous) {
+                            \Mail::send('emails.report_rejected', [
+                                'user' => $user,
+                                'report' => $report,
+                                'rejection_reason' => $request->rejection_reason
+                            ], function ($message) use ($user, $report) {
+                                $message->to($user->email)
+                                        ->subject('Report #' . $report->report_id . ' - Rejected');
+                            });
+                            
+                            \Log::info('Rejection email sent', [
+                                'report_id' => $report->report_id,
+                                'user_email' => $user->email
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to send rejection email: ' . $e->getMessage());
+                        // Don't fail the whole request if email fails
+                    }
+                }
+                
+                $report->save();
+            }
 
             return response()->json(['success' => true, 'message' => 'Report validity status updated successfully']);
         } catch (\Exception $e) {
+            \Log::error('Failed to update validity: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to update validity status: ' . $e->getMessage()], 500);
         }
     }
@@ -891,6 +931,23 @@ class ReportController extends Controller
                 'success' => false,
                 'message' => 'Failed to fetch report counts'
             ], 500);
+        }
+    }
+    /**
+     * Recalculate urgency scores for all reports
+     */
+    public function recalculateUrgencyScores()
+    {
+        if (!auth()->user() || (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('super_admin'))) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        try {
+            \Illuminate\Support\Facades\Artisan::call('reports:recalculate-urgency');
+            return redirect()->back()->with('success', 'Urgency scores has been recalculated successfully for all reports.');
+        } catch (\Exception $e) {
+            \Log::error('Urgency recalculation error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to recalculate urgency scores. Please check logs.');
         }
     }
 }

@@ -177,6 +177,11 @@ const {
 // Files are encrypted at rest and decrypted on-demand for authorized users
 const { decryptFile } = require('./encryptionService');
 const { getVerifiedUserRole } = require('./authMiddleware');
+
+// User routes (push notifications, duty status)
+const userRoutes = require('./routes/user');
+app.use('/api/user', userRoutes);
+
 const fs = require('fs');
 
 // Decrypt and serve evidence files (Admin/Police only)

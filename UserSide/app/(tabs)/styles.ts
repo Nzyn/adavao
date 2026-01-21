@@ -1,14 +1,23 @@
 import { StyleSheet } from "react-native";
+import {
+  spacing,
+  fontSize,
+  containerPadding,
+  cardPadding,
+  buttonHeight,
+  borderRadius,
+  isTablet
+} from "../../utils/responsive";
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingTop: 50,
-    paddingHorizontal: 20,
+    paddingTop: containerPadding.vertical + 30,
+    paddingHorizontal: containerPadding.horizontal,
   },
   textTitle: {
-    fontSize: 36,
+    fontSize: fontSize.title,
     fontWeight: "bold",
     textAlign: 'center',
   },
@@ -21,56 +30,56 @@ const styles = StyleSheet.create({
   },
   davao: {
     color: "black",
-    marginLeft: 5,
-    fontSize: 30,
+    marginLeft: spacing.sm,
+    fontSize: fontSize.xl,
   },
   subheading: {
-    fontSize: 20,
-    marginBottom: 15,
+    fontSize: fontSize.lg,
+    marginBottom: spacing.md,
     fontWeight: "bold",
   },
   welcomeContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 15,
-    gap: 12,
+    marginBottom: spacing.md,
+    gap: spacing.md,
   },
   flagStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     backgroundColor: '#fee2e2',
-    borderRadius: 6,
+    borderRadius: borderRadius.sm,
     borderLeftWidth: 3,
     borderLeftColor: '#dc2626',
   },
   flagStatusText: {
-    fontSize: 13,
+    fontSize: fontSize.sm,
     fontWeight: '600',
     color: '#991b1b',
   },
   notificationIconContainer: {
     position: 'relative',
-    padding: 5,
+    padding: spacing.xs,
   },
   notificationBadge: {
     position: 'absolute',
     top: 0,
     right: 0,
     backgroundColor: '#E63946',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    borderRadius: isTablet ? 12 : 10,
+    width: isTablet ? 24 : 20,
+    height: isTablet ? 24 : 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   notificationBadgeText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: fontSize.xs,
     fontWeight: 'bold',
   },
   notificationContainer: {
@@ -86,17 +95,18 @@ const styles = StyleSheet.create({
   },
   notificationPopup: {
     backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-    width: '80%',
+    borderRadius: borderRadius.md,
+    padding: cardPadding,
+    width: isTablet ? '60%' : '85%',
+    maxWidth: isTablet ? 600 : undefined,
     maxHeight: '70%',
   },
   notificationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
-    paddingBottom: 10,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -316,6 +326,39 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     textAlign: "center",
+  },
+
+  templateButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#1D3557',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+
+  templateButtonText: {
+    color: '#1D3557',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  anonymousButton: {
+    marginTop: 20,
+    borderWidth: 1.5,
+    borderColor: '#1D3557',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    width: '100%',
+  },
+
+  anonymousButtonText: {
+    color: '#1D3557',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 
   cardGrid: {
@@ -761,25 +804,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  termsText: {
-    color: "#1D3557",
-    fontWeight: "bold",
-  },
-
-  loginLinkContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-
-  loginLinkText: {
-    color: '#555',
-  },
-
-  loginLink: {
-    color: '#1D3557',
-    fontWeight: 'bold',
-    textDecorationLine: 'underline',
-  },
+  // Duplicates removed
 
   forgotPasswordText: {
     color: "#1D3557",

@@ -50,6 +50,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAnonymousModal, setShowAnonymousModal] = useState(false);
 
   // Recaptcha State (Removed)
   // const [captchaValid, setCaptchaValid] = useState(false);
@@ -390,9 +391,22 @@ const Login = () => {
       await AsyncStorage.removeItem('rememberedEmail');
     }
 
-    setTimeout(() => {
-      console.log('🚀 Navigating to /(tabs) (home)...');
-      router.replace('/(tabs)');
+    setTimeout(async () => {
+      // Role-based redirect
+      if (user.user_role === 'patrol_officer') {
+        console.log('🚓 Patrol officer detected, redirecting to patrol dashboard');
+        // Initialize push notifications for patrol officers
+        try {
+          const { initializePushNotifications } = await import('../../services/pushNotificationService');
+          await initializePushNotifications(user.id);
+        } catch (error) {
+          console.error('Failed to initialize push notifications:', error);
+        }
+        router.replace('/(patrol)/dashboard');
+      } else {
+        console.log('🚀 Navigating to /(tabs) (home)...');
+        router.replace('/(tabs)');
+      }
     }, 100);
   };
 
@@ -611,7 +625,7 @@ const Login = () => {
           </Text>
 
           <Text style={localStyles.signUpPrompt}>
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Text onPress={handleSignUp} style={localStyles.signUpLink}>
               Sign Up
             </Text>
@@ -637,6 +651,17 @@ const Login = () => {
               {isLoading ? 'Signing in...' : 'Sign in with Google'}
             </Text>
           </Pressable>
+
+          {/* Report Anonymously Button */}
+          <TouchableOpacity
+            style={localStyles.anonymousButton}
+            onPress={() => setShowAnonymousModal(true)}
+            disabled={isLoading}
+          >
+            <Text style={localStyles.anonymousButtonText}>
+              Report Anonymously
+            </Text>
+          </TouchableOpacity>
 
           {/* Emergency Contact Info */}
           <View style={localStyles.emergencyBox}>
@@ -784,6 +809,68 @@ const Login = () => {
             >
               <Text style={localStyles.modalButtonText}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Anonymous Reporting Guidelines Modal */}
+      <Modal
+        visible={showAnonymousModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAnonymousModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: 'white', borderRadius: 12, padding: 24, maxHeight: '80%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1D3557' }}>Anonymous Reporting</Text>
+              <TouchableOpacity onPress={() => setShowAnonymousModal(false)}>
+                <Ionicons name="close" size={28} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView>
+              <View style={{ backgroundColor: '#fff3cd', padding: 12, borderRadius: 8, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#ffc107' }}>
+                <Text style={{ color: '#856404', fontWeight: 'bold', marginBottom: 8 }}>⚠️ Important Information</Text>
+                <Text style={{ color: '#856404', fontSize: 14, lineHeight: 20 }}>
+                  When you report anonymously, you will NOT receive updates about your report. Police cannot contact you for follow-up questions.
+                </Text>
+              </View>
+
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#1D3557', marginBottom: 8 }}>Guidelines:</Text>
+              <Text style={{ fontSize: 14, color: '#333', lineHeight: 22, marginBottom: 12 }}>
+                • Provide as much detail as possible{'\n'}
+                • Include photo/video evidence if available{'\n'}
+                • Be accurate with location and time{'\n'}
+                • Only report real incidents{'\n'}
+                • You can only submit 1 anonymous report every 10 minutes
+              </Text>
+
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#1D3557', marginBottom: 8 }}>What Happens Next:</Text>
+              <Text style={{ fontSize: 14, color: '#333', lineHeight: 22, marginBottom: 16 }}>
+                1. Your report will be reviewed by police{'\n'}
+                2. If valid, it will be assigned to the appropriate station{'\n'}
+                3. You will NOT receive any updates or notifications{'\n'}
+                4. Police will investigate based on the information you provide
+              </Text>
+
+              <TouchableOpacity
+                style={{ backgroundColor: '#1D3557', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 8 }}
+                onPress={() => {
+                  setShowAnonymousModal(false);
+                  router.push({ pathname: '/report', params: { anonymous: 'true' } });
+                }}
+              >
+                <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>I Understand, Continue</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ padding: 12, alignItems: 'center', marginTop: 8 }}
+                onPress={() => setShowAnonymousModal(false)}
+              >
+                <Text style={{ color: '#666', fontSize: 14 }}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -973,6 +1060,21 @@ const localStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#4285F4',
+  },
+  anonymousButton: {
+    marginTop: 20,
+    borderWidth: 1.5,
+    borderColor: '#1D3557',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    width: '100%',
+  },
+  anonymousButtonText: {
+    color: '#1D3557',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   emergencyBox: {
     flexDirection: 'row',
