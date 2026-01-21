@@ -130,6 +130,7 @@ class AuthController extends Controller
         $verificationUrl = route('email.verify', ['token' => $verificationToken]);
 
         // Send verification email
+        try {
             $userAdmin->notify(new EmailVerification($verificationUrl, $userAdmin->firstname));
             
             $successMessage = 'Registration successful! Please check your email (' . $userAdmin->email . ') for a verification link to activate your account. The link will expire in 24 hours.';
