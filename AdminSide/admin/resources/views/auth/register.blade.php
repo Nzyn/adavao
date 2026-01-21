@@ -453,12 +453,12 @@
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const registerBtn = document.getElementById('registerBtn');
+            const registerForm = document.getElementById('registerForm');
+            const termsCheckbox = document.getElementById('terms');
 
-        const registerBtn = document.getElementById('registerBtn');
-        const registerForm = document.getElementById('registerForm');
-        const termsCheckbox = document.getElementById('terms');
-
-        console.log('🔐 AdminSide Register page loaded');
+            console.log('🔐 AdminSide Register page loaded');
 
         // Sanitization Functions
         function sanitizeText(text) {
