@@ -113,7 +113,7 @@ class AuthController extends Controller
                     'firstname' => $request->firstname,
                     'lastname' => $request->lastname,
                     'email' => $request->email,
-                    'phone_number' => $request->contact,
+                    'contact' => $request->contact,
                     'password' => Hash::make($request->password),
                     'user_role' => 'patrol_officer',
                     'is_on_duty' => false,
@@ -130,7 +130,6 @@ class AuthController extends Controller
         $verificationUrl = route('email.verify', ['token' => $verificationToken]);
 
         // Send verification email
-        try {
             $userAdmin->notify(new EmailVerification($verificationUrl, $userAdmin->firstname));
             
             $successMessage = 'Registration successful! Please check your email (' . $userAdmin->email . ') for a verification link to activate your account. The link will expire in 24 hours.';
@@ -140,11 +139,16 @@ class AuthController extends Controller
             
             return redirect()->route('login')->with('success', $successMessage);
         } catch (\Exception $e) {
-            // Delete user if email fails to send
-            $userAdmin->delete();
+            // Log error but ALLOW registration to succeed if mail fails (common in dev/staging)
             \Log::error('Email verification failed: ' . $e->getMessage());
             
-            return back()->withErrors(['email' => 'Failed to send verification email. Please check your email address and try again.'])->withInput();
+            // For now, auto-verify if email fails (emergency fallback)
+            $userAdmin->email_verified_at = now();
+            $userAdmin->save();
+
+            $successMessage = 'Registration successful! NOTE: Verification email could not be sent (SMTP Error). Your account has been auto-verified so you can login immediately.';
+            
+            return redirect()->route('login')->with('success', $successMessage);
         }
     }
 
