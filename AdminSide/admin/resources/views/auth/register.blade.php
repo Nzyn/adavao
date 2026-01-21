@@ -441,7 +441,7 @@
                     </svg>
                     Sign Up with Google
                 </button>
-                <button type="submit" class="submit-btn" id="registerBtn" disabled>Sign Up</button>
+                <button type="submit" class="submit-btn" id="registerBtn">Sign Up</button>
 
                 <div class="login-link">
                     Already have an account? <a href="{{ route('login') }}">Login</a>
@@ -522,17 +522,19 @@
 
 
 
-        // Update button state based on terms
+        // Update button state based on terms - REMOVED to prevent button lock issues
+        // Validation handles terms check on submit
+        /*
         function updateRegisterButton() {
             const termsChecked = termsCheckbox.checked;
             registerBtn.disabled = !termsChecked;
         }
 
-        // Listen to terms checkbox changes
         termsCheckbox.addEventListener('change', function() {
             console.log('🔘 Terms checkbox changed:', this.checked);
             updateRegisterButton();
         });
+        */
 
 
 
