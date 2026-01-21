@@ -139,16 +139,11 @@ class AuthController extends Controller
             
             return redirect()->route('login')->with('success', $successMessage);
         } catch (\Exception $e) {
-            // Log error but ALLOW registration to succeed if mail fails (common in dev/staging)
+            // Reverted: Delete user if email fails to send (Strict verification requested)
+            $userAdmin->delete();
             \Log::error('Email verification failed: ' . $e->getMessage());
             
-            // For now, auto-verify if email fails (emergency fallback)
-            $userAdmin->email_verified_at = now();
-            $userAdmin->save();
-
-            $successMessage = 'Registration successful! NOTE: Verification email could not be sent (SMTP Error). Your account has been auto-verified so you can login immediately.';
-            
-            return redirect()->route('login')->with('success', $successMessage);
+            return back()->withErrors(['email' => 'Failed to send verification email. Error: ' . $e->getMessage()])->withInput();
         }
     }
 
