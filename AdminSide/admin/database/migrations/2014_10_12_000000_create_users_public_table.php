@@ -12,15 +12,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('users_public', function (Blueprint $table) {
-            $table->id();
-            $table->string('firstname', 50);
-            $table->string('lastname', 50);
-            $table->string('contact', 15);
-            $table->string('email', 100)->unique();
-            $table->string('password', 255);
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('users_public')) {
+            Schema::create('users_public', function (Blueprint $table) {
+                $table->id();
+                $table->string('firstname', 50);
+                $table->string('lastname', 50);
+                $table->string('contact', 15);
+                $table->string('email', 100)->unique();
+                $table->string('password', 255);
+                $table->timestamps();
+            });
+        }
     }
 
     /**
