@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('user_admin', function (Blueprint $table) {
+        if (!Schema::hasTable('user_admin')) {
+            Schema::create('user_admin', function (Blueprint $table) {
             $table->id();
             $table->string('firstname', 50);
             $table->string('lastname', 50);
@@ -29,6 +30,7 @@ return new class extends Migration
             // This migration is for future reference/refresh.
         });
     }
+}
 
     /**
      * Reverse the migrations.
