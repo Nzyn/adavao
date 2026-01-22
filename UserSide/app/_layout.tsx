@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Pressable, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
