@@ -56,6 +56,7 @@ class UserAdmin extends Authenticatable
         'failed_login_attempts',
         'lockout_until',
         'last_failed_login',
+        'user_role',
     ];
 
     /**

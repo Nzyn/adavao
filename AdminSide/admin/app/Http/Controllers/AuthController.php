@@ -719,8 +719,42 @@ class AuthController extends Controller
             'token_expires_at' => null,
         ]);
 
-        return redirect()->route('login')->with('success', 
-            'Email verified successfully! You can now login to your account.');
+        // If patrol officer, NOW create entry in users_public table (after verification)
+        if ($userAdmin->user_role === 'patrol_officer') {
+            try {
+                // Check if already exists
+                $existingUser = \DB::table('users_public')
+                    ->where('email', $userAdmin->email)
+                    ->first();
+
+                if (!$existingUser) {
+                    \DB::table('users_public')->insert([
+                        'firstname' => $userAdmin->firstname,
+                        'lastname' => $userAdmin->lastname,
+                        'email' => $userAdmin->email,
+                        'contact' => $userAdmin->contact,
+                        'password' => $userAdmin->password, // Already hashed
+                        'user_role' => 'patrol_officer',
+                        'is_on_duty' => false,
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now(),
+                    ]);
+                    \Log::info('Patrol officer account created in users_public after email verification', [
+                        'email' => $userAdmin->email
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::error('Failed to create patrol officer in users_public during verification: ' . $e->getMessage());
+                // Non-fatal error for the user's admin account activation
+            }
+        }
+
+        $successMessage = 'Email verified successfully! You can now login to your account.';
+        if ($userAdmin->user_role === 'patrol_officer') {
+            $successMessage .= ' Your patrol officer account is now active and you can login to the mobile app.';
+        }
+
+        return redirect()->route('login')->with('success', $successMessage);
     }
 
     // Resend verification email
