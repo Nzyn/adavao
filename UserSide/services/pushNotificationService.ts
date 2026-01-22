@@ -76,7 +76,7 @@ export async function savePushTokenToBackend(
     try {
         console.log('📤 Saving push token to backend...', { userId, token: token.substring(0, 20) + '...' });
 
-        const response = await fetch(`${API_URL}/api/user/push-token`, {
+        const response = await fetch(`${API_URL}/user/push-token`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
