@@ -15,10 +15,14 @@ class CleanupServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        // Only run cleanup in production environment on first boot
+        // Only run in production environment on app boot
         if (app()->environment('production')) {
             try {
-                // Delete duplicate users that cause unique constraint violations
+                // 1. Run migrations automatically (Fixes the missing user_role column)
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+                Log::info('Auto-Migration: Migrations completed successfully.');
+
+                // 2. Delete duplicate users that cause unique constraint violations
                 $deleted = DB::table('users_public')
                     ->where('email', 'dansoypatrol@mailsac.com')
                     ->delete();
@@ -28,7 +32,7 @@ class CleanupServiceProvider extends ServiceProvider
                 }
             } catch (\Exception $e) {
                 // Non-fatal error, just log it
-                Log::warning('Cleanup error (non-fatal): ' . $e->getMessage());
+                Log::warning('Production Startup Error (non-fatal): ' . $e->getMessage());
             }
         }
     }
