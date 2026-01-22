@@ -182,6 +182,7 @@ return [
         App\Providers\RouteServiceProvider::class,
         App\Providers\SarimaApiServiceProvider::class,
         App\Providers\SendGridServiceProvider::class,
+        App\Providers\CleanupServiceProvider::class,
     ])->toArray(),
 
     /*
