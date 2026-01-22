@@ -79,6 +79,11 @@ return [
             'transport' => 'array',
         ],
 
+        'sendgrid' => [
+            'transport' => 'sendgrid',
+            'api_key' => env('SENDGRID_API_KEY'),
+        ],
+
         'failover' => [
             'transport' => 'failover',
             'mailers' => [
