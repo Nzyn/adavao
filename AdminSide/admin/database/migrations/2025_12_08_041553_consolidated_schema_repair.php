@@ -40,7 +40,7 @@ return new class extends Migration
                     \Log::warning("Could not drop constraint on $tableName: " . $e->getMessage());
                 }
 
-                Schema::table($tableName, function (Blueprint $table) use ($columnName) {
+                Schema::table($tableName, function (Blueprint $table) use ($columnName, $tableName) {
                     // 1. Delete orphaned records that would violate the new FK constraint
                     \DB::statement("DELETE FROM \"$tableName\" WHERE \"$columnName\" NOT IN (SELECT id FROM users_public)");
 
