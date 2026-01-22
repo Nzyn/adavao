@@ -6,7 +6,7 @@ import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Pressable, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -63,11 +63,13 @@ export default function RootLayout() {
   }
 
   return (
-    <LoadingProvider>
-      <UserProvider>
-        <AppContent />
-      </UserProvider>
-    </LoadingProvider>
+    <SafeAreaProvider>
+      <LoadingProvider>
+        <UserProvider>
+          <AppContent />
+        </UserProvider>
+      </LoadingProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -95,41 +97,43 @@ function AppContent() {
       style={{ flex: 1 }}
     >
       <GradientBackground>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack
-            screenOptions={{
-              // Add page transition animations
-              animation: 'simple_push',
-              animationDuration: 300,
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="register"
-              options={{
-                headerShown: false,
-                animation: 'slide_from_right',
+        <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom', 'left', 'right']}>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack
+              screenOptions={{
+                // Add page transition animations
+                animation: 'simple_push',
                 animationDuration: 300,
               }}
-            />
-            <Stack.Screen
-              name="edit-profile"
-              options={{
-                headerShown: false,
-                animation: 'slide_from_right',
-                animationDuration: 300,
-              }}
-            />
-            <Stack.Screen
-              name="+not-found"
-              options={{
-                animation: 'fade_from_bottom',
-                animationDuration: 200,
-              }}
-            />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="register"
+                options={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                  animationDuration: 300,
+                }}
+              />
+              <Stack.Screen
+                name="edit-profile"
+                options={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                  animationDuration: 300,
+                }}
+              />
+              <Stack.Screen
+                name="+not-found"
+                options={{
+                  animation: 'fade_from_bottom',
+                  animationDuration: 200,
+                }}
+              />
+            </Stack>
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </SafeAreaView>
         <LoadingOverlay visible={isLoading} message={loadingMessage} />
       </GradientBackground>
     </View>

@@ -32,10 +32,13 @@ return new class extends Migration
         // Helper closure to fix FKs pointing to users_public
         $fixUserFk = function ($tableName, $columnName = 'user_id') {
             if (Schema::hasTable($tableName)) {
-                Schema::table($tableName, function (Blueprint $table) use ($columnName) {
-                    // Try to drop existing foreign key (heuristic: try column array)
-                    try { $table->dropForeign([$columnName]); } catch (\Exception $e) {}
-                });
+                // Use raw SQL for Postgres IF EXISTS support to avoid "Undefined object" errors
+                try {
+                    $constraintName = $tableName . '_' . $columnName . '_foreign';
+                    \DB::statement("ALTER TABLE \"$tableName\" DROP CONSTRAINT IF EXISTS \"$constraintName\"");
+                } catch (\Exception $e) {
+                    \Log::warning("Could not drop constraint on $tableName: " . $e->getMessage());
+                }
 
                 Schema::table($tableName, function (Blueprint $table) use ($columnName) {
                     // Add correct foreign key
