@@ -95,6 +95,7 @@ class AuthController extends Controller
         }
 
         // Create user_admin with verification token (email not verified yet)
+        // Store user_role temporarily - users_public entry will be created AFTER email verification
         $userAdmin = UserAdmin::create([
             'firstname' => $request->firstname,
             'lastname' => $request->lastname,
@@ -104,27 +105,14 @@ class AuthController extends Controller
             'verification_token' => $verificationToken,
             'token_expires_at' => $tokenExpiresAt,
             'email_verified_at' => null, // Not verified yet
+            'user_role' => $userRole, // Store for later use during verification
         ]);
 
-        // If patrol officer, also create entry in users_public table
-        if ($userRole === 'patrol_officer') {
-            try {
-                \DB::table('users_public')->insert([
-                    'firstname' => $request->firstname,
-                    'lastname' => $request->lastname,
-                    'email' => $request->email,
-                    'contact' => $request->contact,
-                    'password' => Hash::make($request->password),
-                    'user_role' => 'patrol_officer',
-                    'is_on_duty' => false,
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                ]);
-                \Log::info('Patrol officer account created in users_public', ['email' => $request->email]);
-            } catch (\Exception $e) {
-                \Log::error('Failed to create patrol officer in users_public: ' . $e->getMessage());
-            }
-        }
+        // Note: users_public entry will be created AFTER email verification
+        \Log::info('User registered, awaiting email verification', [
+            'email' => $request->email,
+            'user_role' => $userRole
+        ]);
 
         // Generate verification URL
         $verificationUrl = route('email.verify', ['token' => $verificationToken]);
