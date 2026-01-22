@@ -3,8 +3,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vite build",
-        "postdeploy": "bash scripts/post-deploy.sh"
+        "build": "vite build"
     },
     "devDependencies": {
         "axios": "^1.6.4",
