@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Text } fro
 import MapView, { Circle, Marker } from 'react-native-maps';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
+import { BACKEND_URL } from '../config/backend';
 
 interface Barangay {
   name: string;
@@ -38,7 +39,7 @@ const WeatherForecastHotspot: React.FC = () => {
 
   const fetchHotspotData = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/hotspot-data');
+      const response = await fetch(`${BACKEND_URL}/api/hotspot-data`);
       const data = await response.json();
       setHotspots(data.barangays || []);
     } catch (error) {

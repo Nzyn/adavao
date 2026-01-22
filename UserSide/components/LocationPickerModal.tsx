@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import LoadingScreen from './LoadingScreen';
 import SearchLoading from './SearchLoading';
+import { BACKEND_URL } from '../config/backend';
 
 const GEOCODING_API_URL = 'https://nominatim.openstreetmap.org/search';
 const REVERSE_GEOCODING_API_URL = 'https://nominatim.openstreetmap.org/reverse';
@@ -223,7 +224,7 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             console.log('Searching for:', searchQuery);
 
             // Get backend URL from environment or use detected one
-            const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+            const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || BACKEND_URL;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -321,7 +322,7 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             if (showConsole) console.log('Reverse geocoding:', latitude, longitude);
 
             // Get backend URL from environment or use detected one
-            const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+            const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || BACKEND_URL;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
@@ -393,19 +394,19 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     };
 
     const updateMapLocation = (latitude: number, longitude: number, address?: string) => {
-         console.log('Updating map location:', latitude, longitude, address);
-         // Update the marker coordinate state to reflect map position
-         setMarkerCoordinate({ latitude, longitude });
-         if (webViewRef.current && Platform.OS !== 'web') {
-             const escapedAddress = (address || '').replace(/"/g, '\\"');
-             const script = `
+        console.log('Updating map location:', latitude, longitude, address);
+        // Update the marker coordinate state to reflect map position
+        setMarkerCoordinate({ latitude, longitude });
+        if (webViewRef.current && Platform.OS !== 'web') {
+            const escapedAddress = (address || '').replace(/"/g, '\\"');
+            const script = `
          if (window.updateLocation) {
            window.updateLocation(${latitude}, ${longitude}, "${escapedAddress}");
          }
        `;
-             webViewRef.current.injectJavaScript(script);
-         }
-     };
+            webViewRef.current.injectJavaScript(script);
+        }
+    };
 
     const generateMapHTML = () => {
         const lat = mapInitialCoordinates.current.latitude || 7.0731;
@@ -646,7 +647,7 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             lat: markerCoordinate?.latitude,
             lng: markerCoordinate?.longitude
         });
-        
+
         if (selectedAddress && markerCoordinate) {
             console.log('✅ Confirming location:', {
                 address: selectedAddress,

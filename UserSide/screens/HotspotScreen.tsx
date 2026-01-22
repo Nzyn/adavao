@@ -4,6 +4,7 @@ import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import GradientContainer from '@/components/GradientContainer';
+import { BACKEND_URL } from '@/config/backend';
 
 interface Barangay {
   name: string;
@@ -34,7 +35,7 @@ const HotspotScreen: React.FC = () => {
 
   const fetchHotspotData = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/hotspot-data');
+      const response = await fetch(`${BACKEND_URL}/api/hotspot-data`);
       const data = await response.json();
       setHotspots(data.barangays || []);
     } catch (error) {
