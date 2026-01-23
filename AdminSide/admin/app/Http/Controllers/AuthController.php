@@ -119,7 +119,7 @@ class AuthController extends Controller
 
         // Send verification email
         try {
-            $userAdmin->notify(new EmailVerification($verificationUrl, $userAdmin->firstname));
+            \Mail::to($userAdmin->email)->send(new \App\Mail\VerifyEmail($verificationUrl, $userAdmin->firstname));
             
             $successMessage = 'Registration successful! Please check your email (' . $userAdmin->email . ') for a verification link to activate your account. The link will expire in 24 hours.';
             if ($userRole === 'patrol_officer') {
