@@ -28,9 +28,9 @@ return new class extends Migration
             // We should ensure those subsequent migrations (which apply to 'user_admin') exist or are handled.
             // Since we applied the schema split via SQL Clone, the DB has them.
             // This migration is for future reference/refresh.
-        });
+            });
+        }
     }
-}
 
     /**
      * Reverse the migrations.

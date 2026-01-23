@@ -39,7 +39,10 @@ class SendGridTransport extends AbstractTransport
 
         // Set content
         $body = $originalMessage->getBody()->toString();
-        if (str_contains($originalMessage->getHeaders()->get('Content-Type')->getBodyAsString(), 'text/html')) {
+        $contentTypeHeader = $originalMessage->getHeaders()->get('Content-Type');
+        $isHtml = $contentTypeHeader && str_contains($contentTypeHeader->getBodyAsString(), 'text/html');
+        
+        if ($isHtml) {
             $email->addContent("text/html", $body);
         } else {
             $email->addContent("text/plain", $body);
