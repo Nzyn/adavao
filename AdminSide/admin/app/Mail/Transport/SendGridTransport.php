@@ -54,7 +54,18 @@ class SendGridTransport extends AbstractTransport
             $response = $sendgrid->send($email);
             
             if ($response->statusCode() < 200 || $response->statusCode() >= 300) {
-                throw new \Exception('SendGrid API error: ' . $response->statusCode());
+                $errorBody = $response->body();
+                \Log::error('SendGrid API Error Details', [
+                    'status' => $response->statusCode(),
+                    'body' => $errorBody,
+                    'from' => $from->getAddress(),
+                ]);
+                
+                if ($response->statusCode() === 403) {
+                    throw new \Exception('SendGrid 403: Sender email not verified. Please verify ' . $from->getAddress() . ' in SendGrid dashboard.');
+                }
+                
+                throw new \Exception('SendGrid API error: ' . $response->statusCode() . ' - ' . $errorBody);
             }
         } catch (\Exception $e) {
             throw new \Exception('Failed to send email via SendGrid: ' . $e->getMessage());
