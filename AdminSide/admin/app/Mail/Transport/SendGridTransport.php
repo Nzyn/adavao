@@ -48,6 +48,10 @@ class SendGridTransport extends AbstractTransport
             $email->addContent("text/plain", $body);
         }
 
+        // Disable click tracking and open tracking to prevent URL wrapping
+        $email->setClickTracking(false, false);
+        $email->setOpenTracking(false);
+
         // Send via SendGrid
         $sendgrid = new SendGrid($this->apiKey);
         try {
