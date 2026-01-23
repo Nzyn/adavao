@@ -82,6 +82,9 @@ Route::get('/register', [AuthController::class, 'showRegister'])->name('register
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+// Maintenance Routes (for cleanup operations without shell access)
+Route::get('/maintenance/cleanup', [App\Http\Controllers\MaintenanceController::class, 'cleanup']);
+
 // Admin Login OTP verification
 Route::get('/login/verify-otp', [AuthController::class, 'showVerifyOtp'])->name('otp.login.verify');
 Route::post('/login/verify-otp', [AuthController::class, 'verifyOtpLogin'])->name('otp.login.verify.post');
