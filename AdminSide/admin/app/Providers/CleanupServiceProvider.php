@@ -22,13 +22,21 @@ class CleanupServiceProvider extends ServiceProvider
                 \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
                 Log::info('Auto-Migration: Migrations completed successfully.');
 
-                // 2. Delete duplicate users that cause unique constraint violations
-                $deleted = DB::table('users_public')
-                    ->where('email', 'dansoypatrol@mailsac.com')
+                // 2. Delete all test accounts automatically on deployment
+                $deletedAdmin = DB::table('user_admin')
+                    ->where('email', 'LIKE', '%@mailsac.com')
+                    ->orWhere('email', 'LIKE', '%test%')
+                    ->orWhere('email', 'LIKE', 'dansoy%')
                     ->delete();
                 
-                if ($deleted > 0) {
-                    Log::info('Cleanup: Deleted duplicate user dansoypatrol@mailsac.com');
+                $deletedPublic = DB::table('users_public')
+                    ->where('email', 'LIKE', '%@mailsac.com')
+                    ->orWhere('email', 'LIKE', '%test%')
+                    ->orWhere('email', 'LIKE', 'dansoy%')
+                    ->delete();
+                
+                if ($deletedAdmin > 0 || $deletedPublic > 0) {
+                    Log::info("Auto-Cleanup: Deleted {$deletedAdmin} test accounts from user_admin and {$deletedPublic} from users_public");
                 }
             } catch (\Exception $e) {
                 // Non-fatal error, just log it
