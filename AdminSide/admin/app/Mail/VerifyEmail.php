@@ -22,7 +22,6 @@ class VerifyEmail extends Mailable
     public function build()
     {
         return $this->subject('Verify Your Email - AlertDavao')
-                    ->view('emails.verify')
-                    ->text('emails.verify-plain');
+                    ->view('emails.verify');
     }
 }
