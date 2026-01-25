@@ -278,8 +278,28 @@ export default function ReportCrime() {
                         if (data.success && data.location) {
                             setLocation(data.location.display_name || '');
                             setBarangay(data.location.barangay || '');
-                            setStreetAddress(data.location.street_address || '');
-                            console.log(`✅ Auto-location set: ${data.location.barangay}`);
+
+                            // Enhanced street address with multiple fallbacks
+                            let street = data.location.street_address || '';
+
+                            // Fallback 1: Extract from display_name
+                            if (!street && data.location.display_name) {
+                                const parts = data.location.display_name.split(',');
+                                street = parts[0]?.trim() || '';
+                            }
+
+                            // Fallback 2: Use barangay
+                            if (!street && data.location.barangay) {
+                                street = `Near ${data.location.barangay}`;
+                            }
+
+                            // Fallback 3: Generic placeholder
+                            if (!street) {
+                                street = 'Location auto-detected';
+                            }
+
+                            setStreetAddress(street);
+                            console.log(`✅ Auto-location: ${data.location.barangay}, Street: ${street}`);
                         }
                     } catch (error) {
                         console.error('Error reverse geocoding:', error);
