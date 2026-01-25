@@ -631,6 +631,24 @@ const Login = () => {
             </Text>
           </Text>
 
+          {/* Divider for Anonymous */}
+          <View style={localStyles.divider}>
+            <View style={localStyles.dividerLine} />
+            <Text style={localStyles.dividerText}>or</Text>
+            <View style={localStyles.dividerLine} />
+          </View>
+
+          {/* Report Anonymously Button - Moved here */}
+          <TouchableOpacity
+            style={localStyles.anonymousButton}
+            onPress={() => setShowAnonymousModal(true)}
+            disabled={isLoading}
+          >
+            <Text style={localStyles.anonymousButtonText}>
+              Report Anonymously
+            </Text>
+          </TouchableOpacity>
+
           {/* Divider */}
           <View style={localStyles.divider}>
             <View style={localStyles.dividerLine} />
@@ -651,17 +669,6 @@ const Login = () => {
               {isLoading ? 'Signing in...' : 'Sign in with Google'}
             </Text>
           </Pressable>
-
-          {/* Report Anonymously Button */}
-          <TouchableOpacity
-            style={localStyles.anonymousButton}
-            onPress={() => setShowAnonymousModal(true)}
-            disabled={isLoading}
-          >
-            <Text style={localStyles.anonymousButtonText}>
-              Report Anonymously
-            </Text>
-          </TouchableOpacity>
 
           {/* Emergency Contact Info */}
           <View style={localStyles.emergencyBox}>
@@ -830,6 +837,12 @@ const Login = () => {
             </View>
 
             <ScrollView>
+              {/* Scroll indicator at top */}
+              <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                <Ionicons name="chevron-down" size={24} color="#999" />
+                <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>Scroll for more info</Text>
+              </View>
+
               <View style={{ backgroundColor: '#fff3cd', padding: 12, borderRadius: 8, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#ffc107' }}>
                 <Text style={{ color: '#856404', fontWeight: 'bold', marginBottom: 8 }}>⚠️ Important Information</Text>
                 <Text style={{ color: '#856404', fontSize: 14, lineHeight: 20 }}>
