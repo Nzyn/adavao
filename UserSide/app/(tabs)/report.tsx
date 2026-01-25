@@ -813,7 +813,7 @@ export default function ReportCrime() {
                         marginBottom: 12,
                         textAlign: 'center'
                     }}>
-                        No location selected yet
+                        {location || barangay || streetAddress ? `${barangay || 'Location'}, ${streetAddress || 'Davao City'}` : 'Getting your location...'}
                     </Text>
                 )}
 
@@ -863,7 +863,7 @@ export default function ReportCrime() {
                 <TouchableOpacity style={styles.locationButton} onPress={handleUseLocation}>
                     <Ionicons name="location" size={18} color="#fff" style={{ marginRight: 8 }} />
                     <Text style={styles.locationButtonText}>
-                        {location ? 'Change Location' : 'Select Location'}
+                        Change Location
                     </Text>
                 </TouchableOpacity>
 
@@ -1092,19 +1092,30 @@ export default function ReportCrime() {
                     </View>
                 </Modal>
 
-                <CheckRow
-                    label="Report Anonymously"
-                    checked={isAnonymous}
-                    onToggle={() => setIsAnonymous((v) => !v)}
-                />
+                {/* Anonymous mode is set from login screen params */}
 
-                <View style={styles.submitButton}>
-                    <Button
-                        title={isFlagged ? "Account Flagged - Cannot Submit" : (isSubmitting ? "Submitting..." : "Submit Report")}
+                <View style={{ paddingVertical: 20, paddingHorizontal: 16 }}>
+                    <TouchableOpacity
                         onPress={handleSubmit}
-                        color={isFlagged ? "#999" : "#1D3557"}
                         disabled={isSubmitting || isFlagged}
-                    />
+                        style={{
+                            backgroundColor: isFlagged ? "#999" : "#1D3557",
+                            paddingVertical: 18,
+                            paddingHorizontal: 32,
+                            borderRadius: 12,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            elevation: 4,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 3 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 4.65,
+                        }}
+                    >
+                        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', letterSpacing: 0.5 }}>
+                            {isFlagged ? "Account Flagged - Cannot Submit" : (isSubmitting ? "Submitting..." : "Submit Report")}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
 
                 {isFlagged && (
