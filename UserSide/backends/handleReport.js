@@ -282,6 +282,39 @@ async function submitReport(req, res) {
       'Cybercrime'
     ];
 
+    // 8 Focus Crimes as per DCPO standards
+    const FOCUS_CRIMES = [
+      'Murder',
+      'Homicide',
+      'Physical Injury',
+      'Rape',
+      'Robbery',
+      'Theft',
+      'Carnapping',
+      'Motorcycle Theft',
+      'Motornapping'
+    ];
+
+    // Check if report contains any Focus Crime
+    const isFocusCrime = crimeTypesArray.some(crime => {
+      const isFocus = FOCUS_CRIMES.some(fc => crime.toLowerCase().trim().includes(fc.toLowerCase()));
+      if (isFocus) console.log(`🔴 FOCUS CRIME detected: ${crime}`);
+      return isFocus;
+    });
+
+    // Check information sufficiency
+    const hasSufficientInfo = reportDescription &&
+      reportDescription.length >= 20 &&
+      latitude &&
+      longitude;
+
+    console.log(`🚨 Priority Flags:`, {
+      isFocusCrime,
+      hasSufficientInfo,
+      isAnonymous: isAnon
+    });
+
+    // Keep urgency_score for backward compatibility (deprecated)
     let urgencyScore = 30; // Base score for all reports
     let urgencyLevel = 'LOW';
 
@@ -500,9 +533,9 @@ async function submitReport(req, res) {
     // Note: stationId can be NULL if coordinates don't fall within any polygon
     const [reportResult] = await connection.query(
       `INSERT INTO reports
-      (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, urgency_score, created_at, updated_at) 
-       VALUES($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, NOW(), NOW()) RETURNING report_id`,
-      [user_id, locationId, reportTitle, reportType, encryptedDescription, incident_date, isAnon, stationId, urgencyScore]
+      (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, is_focus_crime, has_sufficient_info, created_at, updated_at) 
+       VALUES($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, NOW(), NOW()) RETURNING report_id`,
+      [user_id, locationId, reportTitle, reportType, encryptedDescription, incident_date, isAnon, stationId, isFocusCrime, hasSufficientInfo]
     );
 
     const reportId = reportResult[0].report_id;
