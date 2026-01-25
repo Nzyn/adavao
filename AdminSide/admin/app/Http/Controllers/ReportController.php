@@ -375,6 +375,68 @@ class ReportController extends Controller
     }
 
     /**
+     * Set priority flags based on 8 Focus Crimes and information sufficiency
+     */
+    private function setPriorityFlags(Report $report)
+    {
+        // 8 Focus Crimes as per DCPO standards
+        $focusCrimes = [
+            'Murder',
+            'Homicide',
+            'Physical Injury',
+            'Rape',
+            'Robbery',
+            'Theft',
+            'Carnapping',
+            'Motorcycle Theft',
+            'Motornapping'
+        ];
+
+        // Parse report types
+        $types = [];
+        $rawType = $report->report_type;
+        
+        if (is_array($rawType)) {
+            $types = $rawType;
+        } elseif (is_string($rawType)) {
+            $decoded = json_decode($rawType, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $types = $decoded;
+            } else if (!empty($rawType)) {
+                $types = array_map('trim', explode(',', $rawType));
+            }
+        }
+
+        // Check if any crime type matches Focus Crimes
+        $isFocusCrime = false;
+        foreach ($types as $type) {
+            foreach ($focusCrimes as $focusCrime) {
+                if (stripos($type, $focusCrime) !== false) {
+                    $isFocusCrime = true;
+                    break 2;
+                }
+            }
+        }
+
+        // Check information sufficiency
+        $hasSufficientInfo = !empty($report->description) &&
+                            strlen($report->description) >= 20 &&
+                            !empty($report->location_id);
+
+        // Set flags
+        $report->is_focus_crime = $isFocusCrime;
+        $report->has_sufficient_info = $hasSufficientInfo;
+        $report->save();
+
+        \Log::info('Priority flags set', [
+            'report_id' => $report->report_id,
+            'is_focus_crime' => $isFocusCrime,
+            'has_sufficient_info' => $hasSufficientInfo,
+            'is_anonymous' => $report->is_anonymous
+        ]);
+    }
+
+    /**
      * Store a new report with automatic station assignment
      */
     public function store(Request $request)
@@ -483,6 +545,9 @@ class ReportController extends Controller
                     ]);
                 }
             }
+
+            // Set priority flags (8 Focus Crimes + info sufficiency)
+            $this->setPriorityFlags($report);
 
             // Automatically assign to the correct police station based on location
             $this->assignReportToStation($report);

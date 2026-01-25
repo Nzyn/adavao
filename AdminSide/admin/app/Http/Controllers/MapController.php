@@ -162,9 +162,11 @@ class MapController extends Controller
             'bindings' => $query->getBindings()
         ]);
         
-        // Sort by urgency score (highest first), then by date (newest first)
-        $reports = $query->orderByRaw('COALESCE(urgency_score, 0) DESC')
-                         ->orderBy('created_at', 'DESC')
+        // Sort by priority: Focus Crimes > Registered > Sufficient Info > Oldest First
+        $reports = $query->orderByRaw('is_focus_crime DESC NULLS LAST')
+                         ->orderByRaw('is_anonymous ASC NULLS LAST')
+                         ->orderByRaw('has_sufficient_info DESC NULLS LAST')
+                         ->orderBy('created_at', 'ASC')
                          ->limit(8000)
                          ->get();
         

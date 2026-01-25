@@ -84,7 +84,8 @@ class DashboardController extends Controller
                     try {
                         $q = clone $reportsQuery;
                         $q->where('status', 'pending');
-                        $q->where('urgency_score', '>=', 70); // High or Critical
+                        // Focus Crimes are considered urgent
+                        $q->where('is_focus_crime', true);
                         
                         if (!$isSuperAdmin) {
                             if ($userRole === 'police') {

@@ -22,10 +22,14 @@ class Report extends Model
         'is_valid',
         'is_anonymous',
         'date_reported',
+        'is_focus_crime',
+        'has_sufficient_info',
     ];
 
     protected $casts = [
         'is_anonymous' => 'boolean',
+        'is_focus_crime' => 'boolean',
+        'has_sufficient_info' => 'boolean',
         'date_reported' => 'datetime',
         // encryption reverted to fix 500 error
     ];
