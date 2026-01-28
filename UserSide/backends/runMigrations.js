@@ -139,7 +139,7 @@ async function runMigrations() {
 
     // bcrypt hash of "Patrol123!" - a simple test password
     // Generated via: require('bcryptjs').hashSync('Patrol123!', 10)
-    const testPatrolPasswordHash = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
+    const testPatrolPasswordHash = '$2a$10$/qV9cuM7p1mxAbmbehMmLOU37IzHGrp/PcaVRg8toFKjxRrMlAsqq';
 
     // Define test patrol accounts to create directly in users_public
     const testPatrolAccounts = [
