@@ -200,6 +200,15 @@
         color: #3b82f6;
     }
     
+    .unassign-station-btn {
+        color: #6b7280;
+        margin-left: 4px;
+    }
+    
+    .unassign-station-btn:hover {
+        color: #ef4444;
+    }
+    
     .modal-overlay {
         display: none;
         position: fixed;
@@ -523,6 +532,15 @@
                             <polyline points="9 22 9 12 15 12 15 22"/>
                         </svg>
                     </button>
+                    @if($officer->user && $officer->user->station_id)
+                    <button type="button" class="action-btn unassign-station-btn" data-user-id="{{ $officer->user_id }}" title="Unassign from Station">
+                        <svg class="action-icon" viewBox="0 0 24 24">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                    @endif
                 </td>
             </tr>
             @empty
@@ -729,6 +747,38 @@ async function assignStationToOfficer() {
     });
 }
 
+async function unassignStationFromOfficer(userId) {
+    showLoading('Removing station assignment...');
+    
+    fetch('/users/' + userId + '/unassign-station', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+            'Accept': 'application/json'
+        }
+    })
+    .then(async response => {
+        const data = await response.json();
+        hideLoading();
+        
+        if (data.success) {
+            await alert('Officer has been unassigned from the police station successfully');
+            location.reload();
+        } else {
+            const errorMsg = data.message || 'Unknown error occurred';
+            await alert('Error: ' + errorMsg);
+        }
+    })
+    .catch(error => {
+        console.error('Fetch error:', error);
+        alert('An error occurred while unassigning the officer: ' + error.message);
+    })
+    .finally(() => {
+        hideLoading();
+    });
+}
+
 function filterPersonnel() {
     const input = document.getElementById('searchInput');
     const filter = input.value.toUpperCase();
@@ -851,6 +901,17 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const userId = this.getAttribute('data-user-id');
             openAssignStationModal(userId);
+        });
+    });
+    
+    // Unassign station button click handler
+    document.querySelectorAll('.unassign-station-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const userId = this.getAttribute('data-user-id');
+            if (confirm('Are you sure you want to unassign this officer from their current station?')) {
+                unassignStationFromOfficer(userId);
+            }
         });
     });
     

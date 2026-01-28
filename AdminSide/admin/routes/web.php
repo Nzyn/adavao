@@ -242,6 +242,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/users/{id}/promote', [UserController::class, 'promoteToOfficer'])->name('users.promote');
     Route::post('/users/{id}/change-role', [UserController::class, 'changeRole'])->name('users.changeRole');
     Route::post('/users/{id}/assign-station', [UserController::class, 'assignStation'])->name('users.assignStation');
+    Route::post('/users/{id}/unassign-station', [UserController::class, 'unassignStation'])->name('users.unassignStation');
     Route::get('/api/users/{id}/flags', [UserController::class, 'getFlagHistory'])->name('users.flags');
     Route::get('/api/users/{id}/flag-status', [UserController::class, 'getFlagStatus'])->name('users.flagStatus');
 

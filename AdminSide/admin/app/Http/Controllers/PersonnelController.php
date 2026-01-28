@@ -41,10 +41,8 @@ class PersonnelController extends Controller
             return $officer;
         });
 
-        // 3. Use only UserAdmin personnel
-        $officers = Cache::remember('personnel_list', 300, function() use ($mappedAdmins) {
-            return $mappedAdmins;
-        });
+        // 3. Use only UserAdmin personnel (no caching to ensure real-time updates)
+        $officers = $mappedAdmins;
         
         return view('personnel', compact('officers'));
     }
