@@ -17,6 +17,7 @@ use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\HotspotDataController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\AnnouncementController;
 
 
 // Temporary route to force migration on Render
@@ -183,6 +184,7 @@ Route::post('/api/otp/verify', [OtpController::class, 'verifyOtp'])->name('otp.v
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/api/crime-data', [DashboardController::class, 'getCrimeData'])->name('crime.data');
+    Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
 
     // Profile Routes
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile');
