@@ -699,13 +699,46 @@ class AuthController extends Controller
     }
 
     // Verify email
-    public function verifyEmail($token)
+    public function verifyEmail(Request $request, $token = null)
     {
-        $token = trim((string) $token);
+        $rawToken = $token;
+        if (empty($rawToken)) {
+            $rawToken = $request->query('token');
+        }
 
-        $userAdmin = UserAdmin::where('verification_token', $token)->first();
+        $rawToken = trim((string) $rawToken);
+        $decodedToken = rawurldecode($rawToken);
+        // Some email clients/browsers may convert '+' to space in URLs; undo that.
+        $decodedToken = str_replace(' ', '+', $decodedToken);
+        // Remove any whitespace/newlines that may have been inserted by copying.
+        $normalizedToken = preg_replace('/\s+/', '', $decodedToken);
+        // Tokens we generate are alphanumeric (Str::random). If the token got polluted with punctuation,
+        // strip to alphanumerics as a recovery path.
+        $alnumToken = preg_replace('/[^A-Za-z0-9]/', '', $normalizedToken);
+
+        $tokensToTry = array_values(array_unique(array_filter([$normalizedToken, $alnumToken], function ($t) {
+            return is_string($t) && strlen($t) > 0;
+        })));
+
+        $userAdmin = null;
+        $matchedToken = null;
+        foreach ($tokensToTry as $tryToken) {
+            $candidate = UserAdmin::where('verification_token', $tryToken)->first();
+            if ($candidate) {
+                $userAdmin = $candidate;
+                $matchedToken = $tryToken;
+                break;
+            }
+        }
 
         if (!$userAdmin) {
+            \Log::warning('Email verification token not found', [
+                'raw_len' => strlen($rawToken),
+                'normalized_len' => strlen((string) $normalizedToken),
+                'token_prefix' => substr((string) $normalizedToken, 0, 12),
+                'has_query_token' => !empty($request->query('token')),
+                'path' => $request->path(),
+            ]);
             return redirect()->route('login')->withErrors([
                 'token' => 'This verification link is invalid or has expired.'
             ]);
@@ -726,7 +759,8 @@ class AuthController extends Controller
                 'token_expires_at' => $tokenExpiresAt,
             ]);
 
-            $verificationUrl = route('email.verify', ['token' => $verificationToken]);
+            // Use query-param variant to avoid rare path-wrapping issues in some clients.
+            $verificationUrl = url('/email/verify') . '?token=' . rawurlencode($verificationToken);
 
             try {
                 \Mail::to($userAdmin->email)->send(new \App\Mail\VerifyEmail($verificationUrl, $userAdmin->firstname));
@@ -749,6 +783,14 @@ class AuthController extends Controller
             'verification_token' => null,
             'token_expires_at' => null,
         ]);
+
+        if ($matchedToken !== null && $matchedToken !== $normalizedToken) {
+            \Log::info('Email verification succeeded using normalized token', [
+                'email' => $userAdmin->email,
+                'received_prefix' => substr((string) $normalizedToken, 0, 12),
+                'matched_prefix' => substr((string) $matchedToken, 0, 12),
+            ]);
+        }
 
         // If patrol officer, NOW create entry in users_public table (after verification)
         if ($userAdmin->user_role === 'patrol_officer') {

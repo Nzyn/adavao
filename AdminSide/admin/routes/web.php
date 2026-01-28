@@ -91,6 +91,7 @@ Route::post('/login/verify-otp', [AuthController::class, 'verifyOtpLogin'])->nam
 Route::post('/login/resend-otp', [AuthController::class, 'resendOtp'])->name('otp.login.resend');
 
 // Email Verification Routes
+Route::get('/email/verify', [AuthController::class, 'verifyEmail']);
 Route::get('/email/verify/{token}', [AuthController::class, 'verifyEmail'])->name('email.verify');
 Route::post('/email/resend', [AuthController::class, 'resendVerification'])->name('email.resend');
 
