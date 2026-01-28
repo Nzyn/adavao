@@ -701,15 +701,46 @@ class AuthController extends Controller
     // Verify email
     public function verifyEmail($token)
     {
-        $userAdmin = UserAdmin::where('verification_token', $token)
-            ->where('token_expires_at', '>', Carbon::now())
-            ->whereNull('email_verified_at')
-            ->first();
+        $token = trim((string) $token);
+
+        $userAdmin = UserAdmin::where('verification_token', $token)->first();
 
         if (!$userAdmin) {
             return redirect()->route('login')->withErrors([
                 'token' => 'This verification link is invalid or has expired.'
             ]);
+        }
+
+        // If already verified, treat as success (idempotent)
+        if (!is_null($userAdmin->email_verified_at)) {
+            return redirect()->route('login')->with('success', 'Your email is already verified. You can now login.');
+        }
+
+        // Expired (or missing expiry) -> auto-resend a fresh link
+        if (empty($userAdmin->token_expires_at) || Carbon::parse($userAdmin->token_expires_at)->lessThanOrEqualTo(Carbon::now())) {
+            $verificationToken = Str::random(64);
+            $tokenExpiresAt = Carbon::now()->addHours(24);
+
+            $userAdmin->update([
+                'verification_token' => $verificationToken,
+                'token_expires_at' => $tokenExpiresAt,
+            ]);
+
+            $verificationUrl = route('email.verify', ['token' => $verificationToken]);
+
+            try {
+                \Mail::to($userAdmin->email)->send(new \App\Mail\VerifyEmail($verificationUrl, $userAdmin->firstname));
+            } catch (\Exception $e) {
+                \Log::error('Failed to resend verification email: ' . $e->getMessage(), [
+                    'email' => $userAdmin->email,
+                ]);
+
+                return redirect()->route('login')->withErrors([
+                    'token' => 'This verification link has expired. We could not resend a new link right now. Please use the resend option.'
+                ]);
+            }
+
+            return redirect()->route('login')->with('success', 'Your verification link expired. We sent you a new verification email. Please check your inbox.');
         }
 
         // Mark email as verified
