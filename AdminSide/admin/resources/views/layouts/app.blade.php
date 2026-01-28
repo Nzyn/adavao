@@ -356,7 +356,7 @@
                     </li>
 
                     {{-- Unified Dispatches View for Admin and Enforcer --}}
-                    @if(auth()->check() && (auth()->user()->hasAnyRole(['admin', 'police']) || str_contains(auth()->user()->email, 'alertdavao.ph')))
+                    @if(auth()->check() && (auth()->user()->role === 'admin' || auth()->user()->role === 'police' || str_contains(auth()->user()->email, 'alertdavao.ph')))
                     <li class="nav-item">
                         <a href="{{ route('dispatches') }}" class="nav-link {{ request()->routeIs('dispatches') ? 'active' : '' }}">
                             <svg class="nav-icon" viewBox="0 0 24 24">
