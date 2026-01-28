@@ -20,7 +20,11 @@ const reportLimiter = rateLimit({
   limit: Number(process.env.REPORT_RATE_LIMIT_MAX) || 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip,
+  keyGenerator: (req) => {
+    // express-rate-limit v8 requires ipKeyGenerator to correctly normalize IPv6 addresses
+    if (typeof rateLimit.ipKeyGenerator === 'function') return rateLimit.ipKeyGenerator(req);
+    return req.ip;
+  },
   message: {
     success: false,
     message: 'Too many report submissions. Please wait a few minutes and try again.'

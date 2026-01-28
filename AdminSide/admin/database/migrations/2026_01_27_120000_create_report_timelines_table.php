@@ -22,8 +22,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['report_id', 'created_at']);
+            $table->index(['changed_by', 'created_at']);
             $table->foreign('report_id')->references('report_id')->on('reports')->onDelete('cascade');
-            $table->foreign('changed_by')->references('id')->on('users')->nullOnDelete();
         });
     }
 

@@ -248,22 +248,9 @@ export default function ReportCrime() {
                         longitude
                     });
 
-                    // Auto-reverse geocode to get address
-                    // Use BACKEND_URL directly (it's already configured for live/dev)
-                    const apiUrl = typeof window !== 'undefined'
-                        ? `${window.location.protocol}//${window.location.host}/api/location/reverse`
-                        : `${BACKEND_URL}/api/location/reverse`;
-
-                    fetch(`${apiUrl}?lat=${latitude}&lon=${longitude}`)
-                        .then(res => res.json())
-                        .then(addressData => {
-                            if (addressData.success) {
-                                setStreetAddress(addressData.address || '');
-                                setLocation(addressData.barangay || '');
-                                setBarangayId(addressData.barangay_id || null);
-                            }
-                        })
-                        .catch(err => console.error('Reverse geocode error:', err));
+                    // Resolve address + barangay for the selected coordinates
+                    resolveAndSetLocationFromCoords(latitude, longitude)
+                        .catch(err => console.error('Resolve location error:', err));
                 }
             };
 
@@ -288,44 +275,7 @@ export default function ReportCrime() {
                     const { latitude, longitude } = location.coords;
                     console.log(`📍 Auto-pinned location: ${latitude}, ${longitude}`);
 
-                    setLocationCoordinates({ latitude, longitude });
-
-                    // Auto-reverse geocode to get address
-                    try {
-                        const response = await fetch(
-                            `${BACKEND_URL}/api/location/reverse?latitude=${latitude}&longitude=${longitude}`
-                        );
-                        const data = await response.json();
-
-                        if (data.success && data.location) {
-                            setLocation(data.location.display_name || '');
-                            setBarangay(data.location.barangay || '');
-
-                            // Enhanced street address with multiple fallbacks
-                            let street = data.location.street_address || '';
-
-                            // Fallback 1: Extract from display_name
-                            if (!street && data.location.display_name) {
-                                const parts = data.location.display_name.split(',');
-                                street = parts[0]?.trim() || '';
-                            }
-
-                            // Fallback 2: Use barangay
-                            if (!street && data.location.barangay) {
-                                street = `Near ${data.location.barangay}`;
-                            }
-
-                            // Fallback 3: Generic placeholder
-                            if (!street) {
-                                street = 'Location auto-detected';
-                            }
-
-                            setStreetAddress(street);
-                            console.log(`✅ Auto-location: ${data.location.barangay}, Street: ${street}`);
-                        }
-                    } catch (error) {
-                        console.error('Error reverse geocoding:', error);
-                    }
+                    await resolveAndSetLocationFromCoords(latitude, longitude);
                 } else {
                     console.log('⚠️ Location permission not granted');
                 }
@@ -340,6 +290,68 @@ export default function ReportCrime() {
     useEffect(() => {
         console.log('📍 showLocationPicker changed:', showLocationPicker);
     }, [showLocationPicker]);
+
+    const deriveStreetFromAddress = (address?: string) => {
+        const raw = (address || '').trim();
+        if (!raw) return '';
+        if (raw.toLowerCase().startsWith('location:')) return '';
+        const first = raw.split(',')[0]?.trim() || '';
+        // Avoid returning pure coordinates as street
+        if (/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(first)) return '';
+        return first;
+    };
+
+    const resolveAndSetLocationFromCoords = async (latitude: number, longitude: number) => {
+        setLocationCoordinates({ latitude, longitude });
+
+        // 1) Get barangay by coordinates (authoritative for this app)
+        let barangayName = '';
+        let barangayIdLocal: number | null = null;
+        try {
+            const brgyRes = await fetch(
+                `${BACKEND_URL}/api/barangay/by-coordinates?latitude=${latitude}&longitude=${longitude}`
+            );
+            const brgyData = await brgyRes.json();
+            if (brgyData?.success && brgyData?.barangay) {
+                barangayName = brgyData.barangay.barangay_name || '';
+                barangayIdLocal = brgyData.barangay.barangay_id ?? null;
+                setBarangay(barangayName);
+                setBarangayId(barangayIdLocal);
+            }
+        } catch (e) {
+            console.warn('Barangay lookup failed:', (e as any)?.message || e);
+        }
+
+        // 2) Reverse geocode to get a human-friendly street/address
+        let street = '';
+        let fullAddress = '';
+        try {
+            const apiUrl = (Platform.OS === 'web' && typeof window !== 'undefined')
+                ? `${window.location.protocol}//${window.location.host}/api/location/reverse`
+                : `${BACKEND_URL}/api/location/reverse`;
+
+            const res = await fetch(`${apiUrl}?lat=${latitude}&lon=${longitude}`);
+            const addressData = await res.json();
+            if (addressData?.success) {
+                fullAddress = (addressData.address || addressData.display_name || '').trim();
+                street = deriveStreetFromAddress(fullAddress);
+            }
+        } catch (e) {
+            console.warn('Reverse geocode failed:', (e as any)?.message || e);
+        }
+
+        // 3) Ensure streetAddress is never empty (required for submit)
+        if (!street) {
+            if (barangayName) street = `Near ${barangayName}`;
+            else street = 'Location auto-detected';
+        }
+
+        setStreetAddress(street);
+
+        // Keep a full address string for payload/confirmation, even if UI doesn't preview it
+        const composed = [street, barangayName, 'Davao City'].filter(Boolean).join(', ');
+        setLocation(composed || fullAddress || '');
+    };
 
     // ✅ Toggle function with correct typing
     const toggleCrimeType = (crime: string) => {
@@ -565,7 +577,7 @@ export default function ReportCrime() {
             console.log('❌ Validation failed: No street address');
             Alert.alert(
                 'Missing Information',
-                'Please enter a street address.\n\nClick "Select Location" to add your street name, building, and house number.'
+                'Please enter a street address.\n\nClick "Change Location" to add your street name, building, and house number.'
             );
             return;
         }
@@ -904,83 +916,20 @@ export default function ReportCrime() {
 
                 <Text style={styles.label}>Location *</Text>
 
-                {/* Location Display */}
-                {location && (
-                    <View style={{
-                        backgroundColor: '#f0f7ff',
-                        padding: 12,
-                        borderRadius: 8,
-                        marginBottom: 12,
-                        borderWidth: 1,
-                        borderColor: '#d0e7ff'
-                    }}>
-                        <Text style={{ fontSize: 14, color: '#1D3557', fontWeight: '600', marginBottom: 4 }}>
-                            {location}
-                        </Text>
-                        {streetAddress && (
-                            <Text style={{ fontSize: 13, color: '#666', marginTop: 4 }}>
-                                📍 {streetAddress}
-                            </Text>
-                        )}
-                    </View>
-                )}
-
-                {!location && (
-                    <Text style={{
-                        padding: 12,
-                        backgroundColor: '#f5f5f5',
-                        borderRadius: 8,
-                        color: '#666',
-                        fontSize: 14,
-                        marginBottom: 12,
-                        textAlign: 'center'
-                    }}>
-                        {location || barangay || streetAddress ? `${barangay || 'Location'}, ${streetAddress || 'Davao City'}` : 'Getting your location...'}
+                {/* Minimal Location Info (no map/coordinate preview) */}
+                <View style={{
+                    backgroundColor: '#f5f5f5',
+                    padding: 12,
+                    borderRadius: 8,
+                    marginBottom: 12,
+                }}>
+                    <Text style={{ fontSize: 13, color: '#1D3557', fontWeight: '600' }}>
+                        {barangay ? `Barangay: ${barangay}` : 'Barangay: Detecting...'}
                     </Text>
-                )}
-
-                {locationCoordinates && (
-                    <>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingHorizontal: 4 }}>
-                            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                            <Text style={{ marginLeft: 6, color: '#4CAF50', fontSize: 12, fontWeight: '500' }}>
-                                Coordinates: {locationCoordinates.latitude.toFixed(6)}, {locationCoordinates.longitude.toFixed(6)}
-                            </Text>
-                        </View>
-
-                        {/* Static Preview */}
-                        <View style={{
-                            width: '100%',
-                            height: 150,
-                            borderRadius: 8,
-                            overflow: 'hidden',
-                            marginBottom: 12,
-                            borderWidth: 1,
-                            borderColor: '#d0e7ff',
-                        }}>
-                            <Image
-                                source={{
-                                    uri: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+1D3557(${locationCoordinates.longitude},${locationCoordinates.latitude})/${locationCoordinates.longitude},${locationCoordinates.latitude},14,0/350x150@2x?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw`
-                                }}
-                                style={{ width: '100%', height: '100%' }}
-                                resizeMode="cover"
-                            />
-                            <View style={{
-                                position: 'absolute',
-                                top: 8,
-                                right: 8,
-                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                paddingHorizontal: 8,
-                                paddingVertical: 4,
-                                borderRadius: 4,
-                            }}>
-                                <Text style={{ fontSize: 10, color: '#666', fontWeight: '600' }}>
-                                    📍 Location Preview
-                                </Text>
-                            </View>
-                        </View>
-                    </>
-                )}
+                    <Text style={{ fontSize: 13, color: '#666', marginTop: 4 }}>
+                        {streetAddress ? `Street: ${streetAddress}` : 'Street: Detecting...'}
+                    </Text>
+                </View>
 
                 <TouchableOpacity style={styles.locationButton} onPress={handleUseLocation}>
                     <Ionicons name="location" size={18} color="#fff" style={{ marginRight: 8 }} />
@@ -1503,6 +1452,14 @@ export default function ReportCrime() {
                     visible={showLocationPicker}
                     onClose={handleLocationPickerClose}
                     onLocationSelect={handleLocationSelect}
+                    initialLocation={{
+                        barangay,
+                        barangay_id: typeof barangayId === 'number' ? barangayId : undefined,
+                        street_address: streetAddress,
+                        full_address: location,
+                        latitude: typeof locationCoordinates?.latitude === 'number' ? locationCoordinates.latitude : undefined,
+                        longitude: typeof locationCoordinates?.longitude === 'number' ? locationCoordinates.longitude : undefined,
+                    }}
                 />
             )}
         </View>

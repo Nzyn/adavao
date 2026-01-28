@@ -362,14 +362,45 @@ async function submitReport(req, res) {
     }
 
     // ⚠️ CRITICAL: Date Validation - Prevent Future Dates & Enforce 24-Hour Window
-    // This fixes the critical bug where users could report future incidents
+    // NOTE: Mobile app sends incident_date without timezone (e.g. "YYYY-MM-DD HH:mm:ss")
+    // Render/servers often run in UTC; naive parsing can shift by +8h and falsely mark as "future".
     console.log('🔍 Validating incident date:', incident_date);
 
-    const incidentTime = new Date(incident_date);
+    const DEFAULT_LOCAL_TZ_OFFSET = '+08:00'; // Asia/Manila
+    const FUTURE_SKEW_MINUTES = Number(process.env.INCIDENT_FUTURE_SKEW_MINUTES || 5);
+
+    const parseIncidentDate = (value) => {
+      if (!value) return null;
+      if (value instanceof Date) return value;
+
+      const str = String(value).trim();
+      if (!str) return null;
+
+      // If ISO-like with timezone (Z or +/-hh:mm), trust native parsing
+      const hasExplicitTz = /([zZ]|[+-]\d{2}:?\d{2})$/.test(str);
+      if (hasExplicitTz) {
+        const d = new Date(str);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      // Handle common app format: "YYYY-MM-DD HH:mm:ss" (or without seconds)
+      if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(str)) {
+        const iso = str.replace(' ', 'T');
+        const withSeconds = iso.length === 16 ? `${iso}:00` : iso;
+        const d = new Date(`${withSeconds}${DEFAULT_LOCAL_TZ_OFFSET}`);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      // Fallback
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    const incidentTime = parseIncidentDate(incident_date);
     const now = new Date();
 
     // Check if date is valid
-    if (isNaN(incidentTime.getTime())) {
+    if (!incidentTime || isNaN(incidentTime.getTime())) {
       await connection.rollback();
       return res.status(422).json({
         success: false,
@@ -381,8 +412,11 @@ async function submitReport(req, res) {
     }
 
     // Check if date is in the future
-    if (incidentTime > now) {
-      const futureMinutes = Math.round((incidentTime - now) / 60000);
+    const futureDiffMs = incidentTime.getTime() - now.getTime();
+    const futureThresholdMs = FUTURE_SKEW_MINUTES * 60 * 1000;
+
+    if (futureDiffMs > futureThresholdMs) {
+      const futureMinutes = Math.round(futureDiffMs / 60000);
       console.log(`❌ Future date detected: ${futureMinutes} minutes in the future`);
 
       await connection.rollback();
@@ -399,7 +433,7 @@ async function submitReport(req, res) {
     }
 
     // Check if incident is within 24 hours
-    const hoursDiff = (now - incidentTime) / (1000 * 60 * 60);
+    const hoursDiff = (now.getTime() - incidentTime.getTime()) / (1000 * 60 * 60);
 
     if (hoursDiff > 24) {
       console.log(`❌ Incident too old: ${hoursDiff.toFixed(1)} hours ago`);

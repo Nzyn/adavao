@@ -59,12 +59,14 @@ interface EnhancedLocationPickerProps {
     visible: boolean;
     onClose: () => void;
     onLocationSelect: (data: LocationData) => void;
+    initialLocation?: Partial<LocationData>;
 }
 
 const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
     visible,
     onClose,
     onLocationSelect,
+    initialLocation,
 }) => {
     const [barangays, setBarangays] = useState<Barangay[]>([]);
     const [selectedBarangay, setSelectedBarangay] = useState<Barangay | null>(null);
@@ -94,6 +96,40 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
             fetchBarangays();
         }
     }, [visible]);
+
+    // Prefill from parent-provided location (e.g. auto-detected on report screen)
+    useEffect(() => {
+        if (!visible || !initialLocation) return;
+
+        if (typeof initialLocation.latitude === 'number' && typeof initialLocation.longitude === 'number'
+            && initialLocation.latitude !== 0 && initialLocation.longitude !== 0) {
+            setMapCoordinates({ latitude: initialLocation.latitude, longitude: initialLocation.longitude });
+            setMapLocationSet(true);
+        }
+
+        if (typeof initialLocation.street_address === 'string' && initialLocation.street_address.trim()) {
+            setStreetAddress(initialLocation.street_address);
+        }
+    }, [visible, initialLocation]);
+
+    // Once barangays are loaded, select the initial barangay if provided
+    useEffect(() => {
+        if (!visible || !initialLocation) return;
+        if (!barangays || barangays.length === 0) return;
+
+        const byId = typeof initialLocation.barangay_id === 'number'
+            ? barangays.find((b) => b.barangay_id === initialLocation.barangay_id)
+            : null;
+        const byName = typeof initialLocation.barangay === 'string' && initialLocation.barangay.trim()
+            ? barangays.find((b) => (b.barangay_name || '').toLowerCase() === initialLocation.barangay!.toLowerCase())
+            : null;
+
+        const match = byId || byName;
+        if (match) {
+            setSelectedBarangay(match);
+            setBarangayAutoDetected(true);
+        }
+    }, [visible, initialLocation, barangays]);
 
     const fetchBarangays = async () => {
         try {
@@ -976,22 +1012,6 @@ const EnhancedLocationPicker: React.FC<EnhancedLocationPickerProps> = ({
                             </View>
                         )}
                     </View>
-
-                    {/* Use Current Location Button */}
-                    <TouchableOpacity
-                        style={localStyles.locationButton}
-                        onPress={handleUseCurrentLocation}
-                        disabled={loadingLocation}
-                    >
-                        {loadingLocation ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <>
-                                <Ionicons name="locate" size={20} color="#fff" />
-                                <Text style={localStyles.locationButtonText}>Use My Current Location</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
 
                     {/* Map */}
                     <View style={localStyles.mapContainer}>

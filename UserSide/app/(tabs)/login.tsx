@@ -1075,7 +1075,8 @@ const localStyles = StyleSheet.create({
     color: '#4285F4',
   },
   anonymousButton: {
-    marginTop: 20,
+    marginTop: 10,
+    marginBottom: 16,
     borderWidth: 1.5,
     borderColor: '#1D3557',
     paddingVertical: 12,

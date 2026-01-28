@@ -4,6 +4,9 @@
  * Routes requests through backend to avoid CORS issues on the frontend
  */
 
+// Backend uses node-fetch (v2) as dependency; don't rely on global fetch (not always available on hosts)
+const fetch = require('node-fetch');
+
 /**
  * Search for locations by name
  * GET /api/location/search?q=search+query
@@ -66,6 +69,7 @@ const searchLocation = async (req, res) => {
           signal: controller.signal,
           headers: {
             'User-Agent': 'AlertDavao/2.0 (Crime Reporting App)',
+            'Referer': 'https://alertdavao.app/',
             'Accept': 'application/json'
           }
         });
@@ -197,6 +201,7 @@ const reverseGeocode = async (req, res) => {
             signal: controller.signal,
             headers: {
               'User-Agent': 'AlertDavao/2.0 (Crime Reporting App; contact@alertdavao.ph)',
+              'Referer': 'https://alertdavao.app/',
               'Accept': 'application/json',
             }
           }
