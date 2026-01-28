@@ -673,6 +673,7 @@ class UserController extends Controller
             
             // Invalidate cache
             Cache::forget('users_list');
+            Cache::forget('personnel_list');
 
             return response()->json([
                 'success' => true,
@@ -701,6 +702,62 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred while assigning the user to the station: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Unassign a user from their police station
+     */
+    public function unassignStation(Request $request, string $id): JsonResponse
+    {
+        try {
+            \Log::info('unassignStation called', ['user_id' => $id]);
+            
+            // Personnel page shows UserAdmin users, so check UserAdmin FIRST
+            $user = null;
+            $userType = 'admin';
+            
+            try {
+                $user = \App\Models\UserAdmin::findOrFail($id);
+                $userType = 'admin';
+            } catch (ModelNotFoundException $e) {
+                try {
+                    $user = User::findOrFail($id);
+                    $userType = 'user';
+                } catch (ModelNotFoundException $e2) {
+                    throw $e;
+                }
+            }
+            
+            $previousStation = $user->station_id;
+            $user->station_id = null;
+            $user->save();
+            
+            \Log::info('User unassigned from station', [
+                'user_id' => $user->id,
+                'user_type' => $userType,
+                'previous_station_id' => $previousStation
+            ]);
+            
+            // Invalidate cache
+            Cache::forget('users_list');
+            Cache::forget('personnel_list');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User has been unassigned from their police station'
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Exception in unassignStation', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
             ], 500);
         }
     }
