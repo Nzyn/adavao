@@ -135,7 +135,9 @@ async function runMigrations() {
     // Test patrol accounts helper (for QA/dev)
     // Ensures that test patrol accounts can log into the mobile app.
     console.log('🧪 Ensuring patrol test accounts can log in...');
-    const testPatrolPatternsRaw = process.env.TEST_PATROL_EMAIL_PATTERNS || 'dansoypatrol%@mailsac.com,testpatrol%@%';
+    // Only these email patterns will be treated as patrol accounts for UserSide login.
+    // Keep default narrow; expand via Render env var TEST_PATROL_EMAIL_PATTERNS if needed.
+    const testPatrolPatternsRaw = process.env.TEST_PATROL_EMAIL_PATTERNS || 'dansoypatrol%@mailsac.com';
     const testPatrolPatterns = testPatrolPatternsRaw.split(',').map(s => s.trim()).filter(Boolean);
 
     for (const pattern of testPatrolPatterns) {
@@ -149,44 +151,46 @@ async function runMigrations() {
       );
     }
 
-    // Sync ALL patrol officers from AdminSide (user_admin) into UserSide (users_public)
-    // This is what the mobile app queries during login.
-    await safeQuery(
-      'sync user_admin patrol_officer -> users_public',
-      `INSERT INTO users_public (
-          firstname, lastname, email, contact, password,
-          user_role, is_on_duty,
-          email_verified_at,
-          created_at, updated_at
-        )
-        SELECT
-          ua.firstname,
-          ua.lastname,
-          ua.email,
-          ua.contact,
-          ua.password,
-          'patrol_officer',
-          FALSE,
-          COALESCE(ua.email_verified_at, NOW()),
-          NOW(), NOW()
-        FROM user_admin ua
-        WHERE ua.user_role = 'patrol_officer'
-          AND NOT EXISTS (
-            SELECT 1 FROM users_public up
-            WHERE LOWER(up.email) = LOWER(ua.email)
-          )`
-    );
+    // Sync ONLY configured test patrol officers from AdminSide (user_admin) into UserSide (users_public)
+    // This prevents central admins/police accounts from being able to log into the mobile app.
+    for (const pattern of testPatrolPatterns) {
+      await safeQuery(
+        `sync user_admin patrol_officer -> users_public (${pattern})`,
+        `INSERT INTO users_public (
+            firstname, lastname, email, contact, password,
+            user_role, is_on_duty,
+            email_verified_at,
+            created_at, updated_at
+          )
+          SELECT
+            ua.firstname,
+            ua.lastname,
+            ua.email,
+            ua.contact,
+            ua.password,
+            'patrol_officer',
+            FALSE,
+            COALESCE(ua.email_verified_at, NOW()),
+            NOW(), NOW()
+          FROM user_admin ua
+          WHERE ua.user_role = 'patrol_officer'
+            AND ua.email ILIKE $1
+            AND NOT EXISTS (
+              SELECT 1 FROM users_public up
+              WHERE LOWER(up.email) = LOWER(ua.email)
+            )`,
+        [pattern]
+      );
 
-    // Ensure users_public patrol officers are marked correctly + verified (for testing)
-    await safeQuery(
-      'ensure users_public patrol_officer verified',
-      `UPDATE users_public
-       SET user_role = 'patrol_officer',
-           email_verified_at = COALESCE(email_verified_at, NOW())
-       WHERE LOWER(email) IN (
-         SELECT LOWER(email) FROM user_admin WHERE user_role = 'patrol_officer'
-       )`
-    );
+      await safeQuery(
+        `ensure users_public patrol_officer verified (${pattern})`,
+        `UPDATE users_public
+         SET user_role = 'patrol_officer',
+             email_verified_at = COALESCE(email_verified_at, NOW())
+         WHERE email ILIKE $1`,
+        [pattern]
+      );
+    }
 
     console.log('📝 Ensuring patrol_dispatches table exists...');
     await safeQuery('create patrol_dispatches', `
