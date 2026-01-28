@@ -573,6 +573,80 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
+// Version endpoint (helps confirm which commit is deployed on Render)
+app.get('/api/version', (req, res) => {
+  res.status(200).json({
+    service: 'userside-backend',
+    gitCommit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Debug endpoints (disabled by default). Enable by setting ENABLE_DEBUG_ENDPOINTS=true on Render.
+// Guarded by x-debug-key header matching DEBUG_KEY env var.
+if (String(process.env.ENABLE_DEBUG_ENDPOINTS || '').toLowerCase() === 'true') {
+  const db = require('./db');
+
+  const requireDebugKey = (req, res, next) => {
+    const expected = process.env.DEBUG_KEY;
+    const provided = req.headers['x-debug-key'];
+    if (!expected || !provided || String(provided) !== String(expected)) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    next();
+  };
+
+  const sanitizeEmail = (email) => {
+    if (!email) return '';
+    return email.toString().trim().toLowerCase().replace(/[<>'"]/g, '');
+  };
+
+  const wildcardToRegex = (pattern) => {
+    const escaped = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/%/g, '.*')
+      .replace(/\*/g, '.*');
+    return new RegExp(`^${escaped}$`, 'i');
+  };
+
+  const getPatrolPatterns = () => {
+    const raw = process.env.TEST_PATROL_EMAIL_PATTERNS || 'dansoypatrol%@mailsac.com';
+    return raw.split(',').map(s => s.trim()).filter(Boolean);
+  };
+
+  app.post('/api/debug/patrol-lookup', requireDebugKey, async (req, res) => {
+    try {
+      const email = sanitizeEmail(req.body?.email);
+      if (!email) {
+        return res.status(400).json({ success: false, message: 'email is required' });
+      }
+
+      const patterns = getPatrolPatterns();
+      const matchesPattern = patterns.some(p => wildcardToRegex(p).test(email));
+
+      const [publicRows] = await db.query(
+        'SELECT email, user_role, email_verified_at FROM users_public WHERE email = $1 LIMIT 1',
+        [email]
+      );
+      const [adminRows] = await db.query(
+        'SELECT email, user_role, email_verified_at FROM user_admin WHERE email = $1 LIMIT 1',
+        [email]
+      );
+
+      return res.status(200).json({
+        success: true,
+        email,
+        testPatrolPatterns: patterns,
+        matchesPattern,
+        users_public: publicRows[0] || null,
+        user_admin: adminRows[0] || null,
+      });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message || 'error' });
+    }
+  });
+}
+
 // Catch-all for undefined routes
 app.use('*', (req, res) => {
   console.log(`❌ 404 Hit: ${req.method} ${req.originalUrl}`);
