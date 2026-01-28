@@ -9,137 +9,150 @@ const db = require('./db');
 async function runMigrations() {
   console.log('🔄 Running database migrations...');
 
+  const safeQuery = async (label, sql, params = []) => {
+    try {
+      await db.query(sql, params);
+      return true;
+    } catch (error) {
+      console.warn(`⚠️ Migration step skipped (${label}):`, error.message);
+      return false;
+    }
+  };
+
   try {
     // Add new columns for police operations improvements
     console.log('📝 Adding urgency_score column...');
-    await db.query(`
-      ALTER TABLE reports 
+    await safeQuery('reports.urgency_score', `
+      ALTER TABLE reports
       ADD COLUMN IF NOT EXISTS urgency_score INT DEFAULT 0
     `);
 
     console.log('📝 Adding verification_status column...');
-    await db.query(`
-      ALTER TABLE reports 
+    await safeQuery('reports.verification_status', `
+      ALTER TABLE reports
       ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'pending'
     `);
 
     console.log('📝 Adding rejection_reason column...');
-    await db.query(`
-      ALTER TABLE reports 
+    await safeQuery('reports.rejection_reason', `
+      ALTER TABLE reports
       ADD COLUMN IF NOT EXISTS rejection_reason TEXT
     `);
 
     console.log('📝 Adding reviewed_by column...');
-    await db.query(`
-      ALTER TABLE reports 
+    await safeQuery('reports.reviewed_by', `
+      ALTER TABLE reports
       ADD COLUMN IF NOT EXISTS reviewed_by INT
     `);
 
     console.log('📝 Adding reviewed_at column...');
-    await db.query(`
-      ALTER TABLE reports 
+    await safeQuery('reports.reviewed_at', `
+      ALTER TABLE reports
       ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP
     `);
 
     // Add priority flags columns (new system)
     console.log('📝 Adding is_focus_crime column...');
-    await db.query(`
-      ALTER TABLE reports 
+    await safeQuery('reports.is_focus_crime', `
+      ALTER TABLE reports
       ADD COLUMN IF NOT EXISTS is_focus_crime BOOLEAN DEFAULT FALSE
     `);
 
     console.log('📝 Adding has_sufficient_info column...');
-    await db.query(`
-      ALTER TABLE reports 
+    await safeQuery('reports.has_sufficient_info', `
+      ALTER TABLE reports
       ADD COLUMN IF NOT EXISTS has_sufficient_info BOOLEAN DEFAULT TRUE
     `);
 
     // Create indexes for better performance
     console.log('📊 Creating index for priority sorting...');
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_reports_priority 
+    await safeQuery('idx_reports_priority', `
+      CREATE INDEX IF NOT EXISTS idx_reports_priority
       ON reports(is_focus_crime DESC, is_anonymous ASC, has_sufficient_info DESC, created_at ASC)
     `);
 
     console.log('📊 Creating index for verification status...');
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_reports_verification 
+    await safeQuery('idx_reports_verification', `
+      CREATE INDEX IF NOT EXISTS idx_reports_verification
       ON reports(verification_status)
     `);
 
     // Sensitive media (spoiler filter) support
     console.log('📝 Adding report_media.is_sensitive column...');
-    await db.query(`
+    await safeQuery('report_media.is_sensitive', `
       ALTER TABLE report_media
       ADD COLUMN IF NOT EXISTS is_sensitive BOOLEAN NOT NULL DEFAULT FALSE
     `);
 
     console.log('📝 Adding report_media.moderation_provider column...');
-    await db.query(`
+    await safeQuery('report_media.moderation_provider', `
       ALTER TABLE report_media
       ADD COLUMN IF NOT EXISTS moderation_provider VARCHAR(50)
     `);
 
     console.log('📝 Adding report_media.moderation_status column...');
-    await db.query(`
+    await safeQuery('report_media.moderation_status', `
       ALTER TABLE report_media
       ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(50)
     `);
 
     console.log('📝 Adding report_media.moderation_raw column...');
-    await db.query(`
+    await safeQuery('report_media.moderation_raw', `
       ALTER TABLE report_media
       ADD COLUMN IF NOT EXISTS moderation_raw JSONB
     `);
 
     console.log('📊 Creating index for sensitive media...');
-    await db.query(`
+    await safeQuery('idx_report_media_sensitive', `
       CREATE INDEX IF NOT EXISTS idx_report_media_sensitive
       ON report_media(is_sensitive, report_id)
     `);
 
     // Duplicate report detection support
     console.log('📝 Adding reports.content_hash column...');
-    await db.query(`
+    await safeQuery('reports.content_hash', `
       ALTER TABLE reports
       ADD COLUMN IF NOT EXISTS content_hash TEXT
     `);
 
     console.log('📊 Creating index for reports.content_hash...');
-    await db.query(`
+    await safeQuery('idx_reports_content_hash', `
       CREATE INDEX IF NOT EXISTS idx_reports_content_hash
       ON reports(content_hash, created_at DESC)
     `);
 
     // Patrol dispatch system support (used by UserSide patrol UI)
     console.log('📝 Ensuring users_public patrol columns exist...');
-    await db.query(`ALTER TABLE users_public ADD COLUMN IF NOT EXISTS user_role VARCHAR(50) DEFAULT 'user'`);
-    await db.query(`ALTER TABLE users_public ADD COLUMN IF NOT EXISTS assigned_station_id BIGINT`);
-    await db.query(`ALTER TABLE users_public ADD COLUMN IF NOT EXISTS is_on_duty BOOLEAN DEFAULT FALSE`);
-    await db.query(`ALTER TABLE users_public ADD COLUMN IF NOT EXISTS push_token TEXT`);
+    await safeQuery('users_public.user_role', `ALTER TABLE users_public ADD COLUMN IF NOT EXISTS user_role VARCHAR(50) DEFAULT 'user'`);
+    await safeQuery('users_public.assigned_station_id', `ALTER TABLE users_public ADD COLUMN IF NOT EXISTS assigned_station_id BIGINT`);
+    await safeQuery('users_public.is_on_duty', `ALTER TABLE users_public ADD COLUMN IF NOT EXISTS is_on_duty BOOLEAN DEFAULT FALSE`);
+    await safeQuery('users_public.push_token', `ALTER TABLE users_public ADD COLUMN IF NOT EXISTS push_token TEXT`);
 
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_public_user_role ON users_public(user_role)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_public_assigned_station_id ON users_public(assigned_station_id)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_public_is_on_duty ON users_public(is_on_duty)`);
+    await safeQuery('idx_users_public_user_role', `CREATE INDEX IF NOT EXISTS idx_users_public_user_role ON users_public(user_role)`);
+    await safeQuery('idx_users_public_assigned_station_id', `CREATE INDEX IF NOT EXISTS idx_users_public_assigned_station_id ON users_public(assigned_station_id)`);
+    await safeQuery('idx_users_public_is_on_duty', `CREATE INDEX IF NOT EXISTS idx_users_public_is_on_duty ON users_public(is_on_duty)`);
 
     // Test patrol accounts helper (for QA/dev)
-    // Ensures that known test patrol accounts can log into the mobile app.
-    // Scope is intentionally narrow to avoid impacting real users.
-    console.log('🧪 Ensuring test patrol accounts have patrol role...');
-    const testPatrolEmailPattern = 'dansoypatrol%@mailsac.com';
+    // Ensures that test patrol accounts can log into the mobile app.
+    console.log('🧪 Ensuring patrol test accounts can log in...');
+    const testPatrolPatternsRaw = process.env.TEST_PATROL_EMAIL_PATTERNS || 'dansoypatrol%@mailsac.com,testpatrol%@%';
+    const testPatrolPatterns = testPatrolPatternsRaw.split(',').map(s => s.trim()).filter(Boolean);
 
-    // 1) Ensure user_admin rows (if present) have patrol_officer role + verified (for testing)
-    await db.query(
-      `UPDATE user_admin
-       SET user_role = 'patrol_officer',
-           email_verified_at = COALESCE(email_verified_at, NOW())
-       WHERE email ILIKE $1`,
-      [testPatrolEmailPattern]
-    );
+    for (const pattern of testPatrolPatterns) {
+      await safeQuery(
+        `promote user_admin patrol_officer (${pattern})`,
+        `UPDATE user_admin
+         SET user_role = 'patrol_officer',
+             email_verified_at = COALESCE(email_verified_at, NOW())
+         WHERE email ILIKE $1`,
+        [pattern]
+      );
+    }
 
-    // 2) If test patrol accounts exist only in user_admin, create matching users_public rows
-    // Do NOT rely on UNIQUE(email) existing; use NOT EXISTS instead.
-    await db.query(
+    // Sync ALL patrol officers from AdminSide (user_admin) into UserSide (users_public)
+    // This is what the mobile app queries during login.
+    await safeQuery(
+      'sync user_admin patrol_officer -> users_public',
       `INSERT INTO users_public (
           firstname, lastname, email, contact, password,
           user_role, is_on_duty,
@@ -157,25 +170,26 @@ async function runMigrations() {
           COALESCE(ua.email_verified_at, NOW()),
           NOW(), NOW()
         FROM user_admin ua
-        WHERE ua.email ILIKE $1
+        WHERE ua.user_role = 'patrol_officer'
           AND NOT EXISTS (
             SELECT 1 FROM users_public up
             WHERE LOWER(up.email) = LOWER(ua.email)
-          )`,
-      [testPatrolEmailPattern]
+          )`
     );
 
-    // 3) Ensure users_public rows have patrol_officer role + verified (for testing)
-    await db.query(
+    // Ensure users_public patrol officers are marked correctly + verified (for testing)
+    await safeQuery(
+      'ensure users_public patrol_officer verified',
       `UPDATE users_public
        SET user_role = 'patrol_officer',
            email_verified_at = COALESCE(email_verified_at, NOW())
-       WHERE email ILIKE $1`,
-      [testPatrolEmailPattern]
+       WHERE LOWER(email) IN (
+         SELECT LOWER(email) FROM user_admin WHERE user_role = 'patrol_officer'
+       )`
     );
 
     console.log('📝 Ensuring patrol_dispatches table exists...');
-    await db.query(`
+    await safeQuery('create patrol_dispatches', `
       CREATE TABLE IF NOT EXISTS patrol_dispatches (
         dispatch_id BIGSERIAL PRIMARY KEY,
         report_id BIGINT NOT NULL,
@@ -206,15 +220,15 @@ async function runMigrations() {
       )
     `);
 
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_report_id ON patrol_dispatches(report_id)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_officer_id ON patrol_dispatches(patrol_officer_id)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_status ON patrol_dispatches(status)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_station_id ON patrol_dispatches(station_id)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_dispatched_at ON patrol_dispatches(dispatched_at DESC)`);
+    await safeQuery('idx_patrol_dispatches_report_id', `CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_report_id ON patrol_dispatches(report_id)`);
+    await safeQuery('idx_patrol_dispatches_officer_id', `CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_officer_id ON patrol_dispatches(patrol_officer_id)`);
+    await safeQuery('idx_patrol_dispatches_status', `CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_status ON patrol_dispatches(status)`);
+    await safeQuery('idx_patrol_dispatches_station_id', `CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_station_id ON patrol_dispatches(station_id)`);
+    await safeQuery('idx_patrol_dispatches_dispatched_at', `CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_dispatched_at ON patrol_dispatches(dispatched_at DESC)`);
 
     // Update existing reports to set priority flags
     console.log('🔄 Updating existing reports with priority flags...');
-    await db.query(`
+    await safeQuery('backfill reports.is_focus_crime', `
       UPDATE reports 
       SET is_focus_crime = CASE 
         WHEN report_type::text ILIKE '%Murder%' THEN true
@@ -231,7 +245,7 @@ async function runMigrations() {
       WHERE is_focus_crime IS NULL OR is_focus_crime = FALSE
     `);
 
-    await db.query(`
+    await safeQuery('backfill reports.has_sufficient_info', `
       UPDATE reports 
       SET has_sufficient_info = CASE 
         WHEN description IS NOT NULL 
