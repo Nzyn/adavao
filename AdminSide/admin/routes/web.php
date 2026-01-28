@@ -115,6 +115,60 @@ Route::get('/api/version', function () {
     ]);
 });
 
+// Debug endpoint (disabled by default). Enable by setting ENABLE_DEBUG_ENDPOINTS=true.
+// Guarded by x-debug-key header matching DEBUG_KEY env var.
+Route::match(['GET', 'POST'], '/api/debug/user-state', function (\Illuminate\Http\Request $request) {
+    if (strtolower((string) env('ENABLE_DEBUG_ENDPOINTS', 'false')) !== 'true') {
+        return response()->json(['success' => false, 'message' => 'Not found'], 404);
+    }
+
+    $expected = env('DEBUG_KEY');
+    $provided = $request->header('x-debug-key');
+    if (!$expected || !$provided || (string) $provided !== (string) $expected) {
+        return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+    }
+
+    $email = $request->input('email', $request->query('email'));
+    $email = strtolower(trim((string) $email));
+
+    if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return response()->json(['success' => false, 'message' => 'Invalid email'], 400);
+    }
+
+    try {
+        $userAdmin = \DB::table('user_admin')
+            ->select('id', 'email', 'user_role', 'email_verified_at')
+            ->whereRaw('LOWER(TRIM(email)) = LOWER(TRIM(?))', [$email])
+            ->first();
+
+        $pending = null;
+        if (\DB::selectOne("SELECT to_regclass('public.pending_user_admin_registrations') AS reg")?->reg) {
+            $pending = \DB::table('pending_user_admin_registrations')
+                ->select('id', 'email', 'user_role', 'token_expires_at', 'created_at')
+                ->whereRaw('LOWER(TRIM(email)) = LOWER(TRIM(?))', [$email])
+                ->first();
+        }
+
+        $publicUser = null;
+        if (\DB::selectOne("SELECT to_regclass('public.users_public') AS reg")?->reg) {
+            $publicUser = \DB::table('users_public')
+                ->select('id', 'email', 'user_role', 'email_verified_at')
+                ->whereRaw('LOWER(TRIM(email)) = LOWER(TRIM(?))', [$email])
+                ->first();
+        }
+
+        return response()->json([
+            'success' => true,
+            'email' => $email,
+            'user_admin' => $userAdmin ? (array) $userAdmin : null,
+            'pending_user_admin_registrations' => $pending ? (array) $pending : null,
+            'users_public' => $publicUser ? (array) $publicUser : null,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+});
+
 // Password Reset Routes
 Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
 Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
