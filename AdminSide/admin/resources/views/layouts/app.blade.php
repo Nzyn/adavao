@@ -357,7 +357,10 @@
 
                     {{-- Unified Dispatches View for Admin and Enforcer --}}
                     @php
-                        $userRole = strtolower(auth()->user()->role ?? auth()->user()->user_role ?? '');
+                        $userRole = '';
+                        if(auth()->check()) {
+                            $userRole = strtolower(auth()->user()->role ?? auth()->user()->user_role ?? '');
+                        }
                     @endphp
                     @if(auth()->check() && (in_array($userRole, ['admin', 'police', 'enforcer']) || str_contains(auth()->user()->email, 'alertdavao.ph')))
                     <li class="nav-item">
