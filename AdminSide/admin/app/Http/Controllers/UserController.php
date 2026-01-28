@@ -576,14 +576,20 @@ class UserController extends Controller
                 }
             }
             
-            \Log::info('User found', ['user_id' => $user->id, 'type' => $userType, 'current_role' => $user->role]);
+            \Log::info('User found', ['user_id' => $user->id, 'type' => $userType, 'current_role' => $user->role ?? $user->user_role]);
             
             // Validate that user is police or admin
-            // Note: UserAdmin might not have 'role' column directly if using pure RBAC, need to check accessors
-            // But for now assuming consistency with previous code or RBAC methods
-            $role = $user->role ?? ($userType === 'admin' && $user->hasRole('police') ? 'police' : 'admin');
+            // UserAdmin uses 'user_role' column, User uses 'role' column
+            $role = $user->role ?? $user->user_role ?? null;
             
-            if ($role !== 'admin' && $role !== 'police') {
+            // For admin users, 'admin' role should be allowed to assign stations
+            if ($userType === 'admin' && empty($role)) {
+                $role = 'admin'; // Default to admin for UserAdmin table users
+            }
+            
+            \Log::info('Role check', ['role' => $role, 'userType' => $userType]);
+            
+            if ($role !== 'admin' && $role !== 'police' && $role !== 'patrol_officer') {
                 return response()->json([
                     'success' => false,
                     'message' => 'Only police and admin users can be assigned to police stations'
