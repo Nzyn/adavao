@@ -357,8 +357,32 @@ class AuthController extends Controller
             }
         }
 
-        // Password is correct - INSTEAD of logging in, generate OTP and redirect
-        return $this->initiateOtpLogin($userAdmin, $request);
+        // Password is correct - Log in directly (OTP temporarily disabled)
+        // TODO: Re-enable OTP for production by uncommenting the line below and removing direct login
+        // return $this->initiateOtpLogin($userAdmin, $request);
+        
+        // Direct login without OTP (temporary for development)
+        $userAdmin->failed_login_attempts = 0;
+        $userAdmin->lockout_until = null;
+        $userAdmin->save();
+        
+        // Log successful login attempt
+        try {
+            AdminLoginAttempt::create([
+                'user_admin_id' => $userAdmin->id,
+                'email' => $credentials['email'],
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'status' => 'success'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to log admin login attempt: ' . $e->getMessage());
+        }
+        
+        Auth::login($userAdmin);
+        $request->session()->regenerate();
+        
+        return redirect()->intended('dashboard');
     }
 
     // Helper to initiate OTP flow (used by Login and Google Auth)
