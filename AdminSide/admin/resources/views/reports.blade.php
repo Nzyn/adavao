@@ -230,11 +230,13 @@
             background: white;
             border-radius: 12px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: visible;
         }
 
         .reports-table {
             width: 100%;
+            min-width: 1200px;
             border-collapse: collapse;
         }
 
@@ -244,13 +246,13 @@
         }
 
         .reports-table th {
-            padding: 0.75rem 0.5rem;
+            padding: 0.5rem 0.35rem;
             text-align: left;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 600;
             color: #6b7280;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.03em;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -282,8 +284,8 @@
         }
 
         .reports-table td {
-            padding: 0.75rem 0.5rem;
-            font-size: 0.875rem;
+            padding: 0.5rem 0.35rem;
+            font-size: 0.8rem;
             color: #374151;
             border-bottom: 1px solid #f3f4f6;
             white-space: nowrap;
@@ -303,76 +305,100 @@
             border-bottom: none;
         }
 
-        /* Column widths */
+        /* Column widths - Optimized for 100% zoom */
         .reports-table th:nth-child(1),
         .reports-table td:nth-child(1) {
-            width: 80px;
+            width: 65px;
+            max-width: 65px;
         }
 
         /* Report ID */
 
         .reports-table th:nth-child(2),
         .reports-table td:nth-child(2) {
-            width: 120px;
+            width: 70px;
+            max-width: 70px;
         }
 
         /* User */
 
         .reports-table th:nth-child(3),
         .reports-table td:nth-child(3) {
-            width: 100px;
+            width: 80px;
+            max-width: 80px;
         }
 
         /* Type */
 
         .reports-table th:nth-child(4),
         .reports-table td:nth-child(4) {
-            width: 100px;
+            width: 85px;
+            max-width: 85px;
         }
 
         /* Urgency */
 
         .reports-table th:nth-child(5),
         .reports-table td:nth-child(5) {
-            width: 100px;
+            width: 80px;
+            max-width: 80px;
         }
 
         /* SLA Timer */
 
         .reports-table th:nth-child(6),
         .reports-table td:nth-child(6) {
-            width: 110px;
+            width: 90px;
+            max-width: 90px;
         }
 
         /* Rule Status */
 
         .reports-table th:nth-child(7),
         .reports-table td:nth-child(7) {
-            width: 90px;
+            width: 75px;
+            max-width: 75px;
         }
 
         /* User Status */
 
         .reports-table th:nth-child(8),
         .reports-table td:nth-child(8) {
-            width: 120px;
+            width: 100px;
+            max-width: 100px;
         }
 
         /* Date Reported */
 
         .reports-table th:nth-child(9),
         .reports-table td:nth-child(9) {
-            width: 120px;
+            width: 100px;
+            max-width: 100px;
         }
 
         /* Updated At */
 
         .reports-table th:nth-child(10),
         .reports-table td:nth-child(10) {
-            width: 130px;
+            width: 110px;
+            max-width: 110px;
         }
 
-        /* Status */
+        /* Report Status */
+
+        .reports-table th:nth-child(11),
+        .reports-table td:nth-child(11) {
+            width: 115px;
+            max-width: 115px;
+        }
+
+        /* Validity */
+
+        .reports-table th:nth-child(12),
+        .reports-table td:nth-child(12) {
+            width: 110px;
+            max-width: 110px;
+        }
 
         /* Action */
 
@@ -1445,18 +1471,18 @@
         <table class="reports-table" id="reportsTable">
             <thead>
                 <tr>
-                    <th class="sortable" data-column="0" style="width: 80px;" onclick="sortTable(0)">Report ID</th>
-                    <th class="sortable" data-column="1" style="width: 120px;" onclick="sortTable(1)">User</th>
-                    <th class="sortable" data-column="2" style="width: 100px;" onclick="sortTable(2)">Type</th>
-                    <th class="sortable" data-column="3" style="width: 100px;" onclick="sortTable(3)">Urgency</th>
-                    <th class="sortable" data-column="4" style="width: 100px;" onclick="sortTable(4)">SLA Timer</th>
-                    <th class="sortable" data-column="5" style="width: 110px;" onclick="sortTable(5)">Rule Status</th>
-                    <th class="sortable" data-column="6" style="width: 90px;" onclick="sortTable(6)">User Status</th>
-                     <th class="sortable" data-column="7" style="width: 120px;" onclick="sortTable(7)">Date Reported</th>
-                     <th class="sortable" data-column="8" style="width: 120px;" onclick="sortTable(8)">Updated At</th>
-                     <th class="sortable" data-column="9" style="width: 130px;" onclick="sortTable(9)">Report Status</th>
-                     <th style="width: 140px;">Validity</th>
-                     <th style="width: 120px;">Action</th>
+                    <th class="sortable" data-column="0" style="width: 65px;" onclick="sortTable(0)">ID</th>
+                    <th class="sortable" data-column="1" style="width: 70px;" onclick="sortTable(1)">User</th>
+                    <th class="sortable" data-column="2" style="width: 80px;" onclick="sortTable(2)">Type</th>
+                    <th class="sortable" data-column="3" style="width: 85px;" onclick="sortTable(3)">Urgency</th>
+                    <th class="sortable" data-column="4" style="width: 80px;" onclick="sortTable(4)">SLA</th>
+                    <th class="sortable" data-column="5" style="width: 90px;" onclick="sortTable(5)">Rule Status</th>
+                    <th class="sortable" data-column="6" style="width: 75px;" onclick="sortTable(6)">User Status</th>
+                     <th class="sortable" data-column="7" style="width: 100px;" onclick="sortTable(7)">Date</th>
+                     <th class="sortable" data-column="8" style="width: 100px;" onclick="sortTable(8)">Updated</th>
+                     <th class="sortable" data-column="9" style="width: 110px;" onclick="sortTable(9)">Status</th>
+                     <th style="width: 115px;">Validity</th>
+                     <th style="width: 110px;">Action</th>
                 </tr>
             </thead>
             <tbody>
