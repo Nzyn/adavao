@@ -575,11 +575,34 @@ app.get("/api/health", (req, res) => {
 
 // Version endpoint (helps confirm which commit is deployed on Render)
 app.get('/api/version', (req, res) => {
-  res.status(200).json({
-    service: 'userside-backend',
-    gitCommit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || null,
-    timestamp: new Date().toISOString(),
-  });
+  (async () => {
+    let dbInfo = null;
+    try {
+      const db = require('./db');
+      const [rows] = await db.query(
+        `SELECT
+           current_database() AS database,
+           current_schema() AS schema,
+           inet_server_addr()::text AS server_addr,
+           inet_server_port() AS server_port,
+           to_regclass('public.users_public') IS NOT NULL AS has_users_public,
+           to_regclass('public.user_admin') IS NOT NULL AS has_user_admin,
+           to_regclass('public.pending_user_admin_registrations') IS NOT NULL AS has_pending_admin
+         `,
+        []
+      );
+      dbInfo = rows?.[0] || null;
+    } catch (err) {
+      dbInfo = { error: err?.message || String(err) };
+    }
+
+    res.status(200).json({
+      service: 'userside-backend',
+      gitCommit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || null,
+      timestamp: new Date().toISOString(),
+      dbInfo,
+    });
+  })();
 });
 
 // Debug endpoints (disabled by default). Enable by setting ENABLE_DEBUG_ENDPOINTS=true on Render.

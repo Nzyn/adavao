@@ -842,6 +842,24 @@ class AuthController extends Controller
                 }
             }
 
+            try {
+                $row = \DB::selectOne(
+                    "SELECT current_database() AS database, inet_server_addr()::text AS server_addr, inet_server_port() AS server_port"
+                );
+                \Log::info('Email verification completed (pending flow)', [
+                    'email' => $userAdmin->email,
+                    'user_admin_id' => $userAdmin->id,
+                    'user_role' => $userAdmin->user_role,
+                    'db' => $row ? (array) $row : null,
+                ]);
+            } catch (\Throwable $e) {
+                \Log::warning('Email verification completed (pending flow) but DB identity query failed', [
+                    'email' => $userAdmin->email,
+                    'user_admin_id' => $userAdmin->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             $successMessage = 'Email verified successfully! You can now login to your account.';
             if ($userAdmin->user_role === 'patrol_officer') {
                 $successMessage .= ' Your patrol officer account is now active and you can login to the mobile app.';

@@ -95,6 +95,26 @@ Route::get('/email/verify', [AuthController::class, 'verifyEmail']);
 Route::get('/email/verify/{token}', [AuthController::class, 'verifyEmail'])->name('email.verify');
 Route::post('/email/resend', [AuthController::class, 'resendVerification'])->name('email.resend');
 
+// Version/DB info endpoint (helps confirm which DB AdminSide is connected to)
+Route::get('/api/version', function () {
+    $dbInfo = null;
+    try {
+        $row = \DB::selectOne(
+            "SELECT current_database() AS database, current_schema() AS schema, inet_server_addr()::text AS server_addr, inet_server_port() AS server_port"
+        );
+        $dbInfo = $row ? (array) $row : null;
+    } catch (\Throwable $e) {
+        $dbInfo = ['error' => $e->getMessage()];
+    }
+
+    return response()->json([
+        'service' => 'adminside',
+        'gitCommit' => env('RENDER_GIT_COMMIT') ?: env('GIT_COMMIT'),
+        'timestamp' => now()->toISOString(),
+        'dbInfo' => $dbInfo,
+    ]);
+});
+
 // Password Reset Routes
 Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
 Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
