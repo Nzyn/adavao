@@ -9,6 +9,22 @@ const sanitizeEmail = (email) => {
   return email.toString().trim().toLowerCase().replace(/[<>'"]/g, '');
 };
 
+const wildcardToRegex = (pattern) => {
+  // Support SQL-style % and glob-style * wildcards
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/%/g, '.*')
+    .replace(/\*/g, '.*');
+  return new RegExp(`^${escaped}$`, 'i');
+};
+
+const isAllowedTestPatrolEmail = (email) => {
+  const patternsRaw = process.env.TEST_PATROL_EMAIL_PATTERNS || 'dansoypatrol%@mailsac.com';
+  const patterns = patternsRaw.split(',').map(s => s.trim()).filter(Boolean);
+  if (patterns.length === 0) return false;
+  return patterns.some(p => wildcardToRegex(p).test(email));
+};
+
 const handleLogin = async (req, res) => {
   const { email, password } = req.body;
 
@@ -34,12 +50,63 @@ const handleLogin = async (req, res) => {
     console.log("📊 Query result:", rows.length > 0 ? "User found" : "User not found");
 
     if (rows.length === 0) {
-      // User not found in users_public - could be an admin/police user trying to login to app
+      // User not found in users_public.
+      // For patrol testing only: allow pulling a patrol_officer account from AdminSide (user_admin)
+      // and syncing it into users_public (mobile app source of truth).
       console.log("⚠️ User not found in users_public table for:", sanitizedEmail);
-      return res.status(401).json({
-        message: "The provided credentials do not match our records. This account may be restricted to the AdminSide application.",
-        userNotFound: true
-      });
+
+      if (isAllowedTestPatrolEmail(sanitizedEmail)) {
+        try {
+          const [adminRows] = await db.query(
+            'SELECT id, firstname, lastname, email, contact, password, email_verified_at, user_role FROM user_admin WHERE email = $1 LIMIT 1',
+            [sanitizedEmail]
+          );
+
+          if (adminRows.length > 0 && String(adminRows[0].user_role || '').toLowerCase() === 'patrol_officer') {
+            const adminUser = adminRows[0];
+
+            // Ensure the patrol user exists in users_public for UserSide login
+            await db.query(
+              `INSERT INTO users_public (
+                  firstname, lastname, email, contact, password,
+                  user_role, is_on_duty,
+                  email_verified_at,
+                  created_at, updated_at
+                )
+                SELECT $1, $2, $3, $4, $5, 'patrol_officer', FALSE, COALESCE($6, NOW()), NOW(), NOW()
+                WHERE NOT EXISTS (
+                  SELECT 1 FROM users_public WHERE LOWER(email) = LOWER($3)
+                )`,
+              [adminUser.firstname, adminUser.lastname, adminUser.email, adminUser.contact, adminUser.password, adminUser.email_verified_at]
+            );
+
+            // Ensure role + verified timestamp are set (testing convenience)
+            await db.query(
+              `UPDATE users_public
+               SET user_role = 'patrol_officer',
+                   email_verified_at = COALESCE(email_verified_at, COALESCE($2, NOW())),
+                   updated_at = NOW()
+               WHERE LOWER(email) = LOWER($1)`,
+              [adminUser.email, adminUser.email_verified_at]
+            );
+
+            const [syncedRows] = await db.query('SELECT * FROM users_public WHERE email = $1', [sanitizedEmail]);
+            if (syncedRows.length > 0) {
+              console.log('✅ Synced patrol user from user_admin into users_public:', sanitizedEmail);
+              rows.push(syncedRows[0]);
+            }
+          }
+        } catch (syncError) {
+          console.warn('⚠️ Patrol sync attempt failed:', syncError.message);
+        }
+      }
+
+      if (rows.length === 0) {
+        return res.status(401).json({
+          message: "The provided credentials do not match our records. This account may be restricted to the AdminSide application.",
+          userNotFound: true
+        });
+      }
     }
 
     const user = rows[0];
