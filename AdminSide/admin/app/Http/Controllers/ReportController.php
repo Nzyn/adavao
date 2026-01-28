@@ -382,6 +382,12 @@ class ReportController extends Controller
             if ($validityValue) {
                 $report->is_valid = $validityValue;
                 
+                // Set validated_at timestamp when changing from checking to valid/invalid
+                if ($oldValidity === 'checking_for_report_validity' && 
+                    ($validityValue === 'valid' || $validityValue === 'invalid')) {
+                    $report->validated_at = now();
+                }
+                
                 // If marking as invalid and rejection reason provided
                 if ($validityValue === 'invalid' && $request->rejection_reason) {
                     $report->rejection_reason = $request->rejection_reason;

@@ -21,6 +21,7 @@ class Report extends Model
         'assigned_station_id',
         'status',
         'is_valid',
+        'validated_at',
         'is_anonymous',
         'date_reported',
         'is_focus_crime',
@@ -32,6 +33,7 @@ class Report extends Model
         'is_focus_crime' => 'boolean',
         'has_sufficient_info' => 'boolean',
         'date_reported' => 'datetime',
+        'validated_at' => 'datetime',
         // encryption reverted to fix 500 error
     ];
 

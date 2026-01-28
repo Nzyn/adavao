@@ -327,43 +327,52 @@
 
         .reports-table th:nth-child(4),
         .reports-table td:nth-child(4) {
-            width: 150px;
+            width: 100px;
         }
 
-        /* Title */
+        /* Urgency */
 
         .reports-table th:nth-child(5),
         .reports-table td:nth-child(5) {
-            width: 90px;
+            width: 100px;
         }
 
-        /* Verified */
+        /* SLA Timer */
 
         .reports-table th:nth-child(6),
         .reports-table td:nth-child(6) {
+            width: 110px;
+        }
+
+        /* Rule Status */
+
+        .reports-table th:nth-child(7),
+        .reports-table td:nth-child(7) {
+            width: 90px;
+        }
+
+        /* User Status */
+
+        .reports-table th:nth-child(8),
+        .reports-table td:nth-child(8) {
             width: 120px;
         }
 
         /* Date Reported */
 
-        .reports-table th:nth-child(7),
-        .reports-table td:nth-child(7) {
+        .reports-table th:nth-child(9),
+        .reports-table td:nth-child(9) {
             width: 120px;
         }
 
         /* Updated At */
 
-        .reports-table th:nth-child(8),
-        .reports-table td:nth-child(8) {
+        .reports-table th:nth-child(10),
+        .reports-table td:nth-child(10) {
             width: 130px;
         }
 
         /* Status */
-
-        .reports-table th:nth-child(9),
-        .reports-table td:nth-child(9) {
-            width: 120px;
-        }
 
         /* Action */
 
@@ -520,6 +529,58 @@
             background: #fee2e2;
             border: 1px solid #fca5a5;
             white-space: nowrap;
+        }
+
+        /* SLA Timer Badge Styles */
+        .sla-timer {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+        }
+
+        .sla-timer.countdown {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .sla-timer.exceeded {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        /* Rule Status Badge Styles */
+        .rule-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .rule-status.within-sla {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .rule-status.exceeded {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .rule-status.pending {
+            background-color: #f3f4f6;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
         }
 
         .timeline-section {
@@ -1388,11 +1449,12 @@
                     <th class="sortable" data-column="1" style="width: 120px;" onclick="sortTable(1)">User</th>
                     <th class="sortable" data-column="2" style="width: 100px;" onclick="sortTable(2)">Type</th>
                     <th class="sortable" data-column="3" style="width: 100px;" onclick="sortTable(3)">Urgency</th>
-                    <th class="sortable" data-column="4" style="width: 150px;" onclick="sortTable(4)">Title</th>
-                    <th class="sortable" data-column="5" style="width: 90px;" onclick="sortTable(5)">User Status</th>
-                     <th class="sortable" data-column="6" style="width: 120px;" onclick="sortTable(6)">Date Reported</th>
-                     <th class="sortable" data-column="7" style="width: 120px;" onclick="sortTable(7)">Updated At</th>
-                     <th class="sortable" data-column="8" style="width: 130px;" onclick="sortTable(8)">Report Status</th>
+                    <th class="sortable" data-column="4" style="width: 100px;" onclick="sortTable(4)">SLA Timer</th>
+                    <th class="sortable" data-column="5" style="width: 110px;" onclick="sortTable(5)">Rule Status</th>
+                    <th class="sortable" data-column="6" style="width: 90px;" onclick="sortTable(6)">User Status</th>
+                     <th class="sortable" data-column="7" style="width: 120px;" onclick="sortTable(7)">Date Reported</th>
+                     <th class="sortable" data-column="8" style="width: 120px;" onclick="sortTable(8)">Updated At</th>
+                     <th class="sortable" data-column="9" style="width: 130px;" onclick="sortTable(9)">Report Status</th>
                      <th style="width: 140px;">Validity</th>
                      <th style="width: 120px;">Action</th>
                 </tr>
@@ -1458,7 +1520,60 @@
                                         <span class="overdue-badge" title="Unaddressed for 24+ hours">⏰ 24H+</span>
                                     @endif
                                 </td>
-                                <td>{{ \Illuminate\Support\Str::limit($report->title, 30) }}</td>
+                                <td>
+                                    @php
+                                        $createdAt = $report->created_at;
+                                        $now = \Carbon\Carbon::now();
+                                        $elapsedSeconds = $createdAt->diffInSeconds($now);
+                                        $threeMinutes = 180; // 3 minutes in seconds
+                                        
+                                        if ($elapsedSeconds < $threeMinutes) {
+                                            // Countdown mode
+                                            $remainingSeconds = $threeMinutes - $elapsedSeconds;
+                                            $minutes = floor($remainingSeconds / 60);
+                                            $seconds = $remainingSeconds % 60;
+                                            $timerClass = 'countdown';
+                                            $timerDisplay = sprintf('%02d:%02d', $minutes, $seconds);
+                                        } else {
+                                            // Count-up mode (exceeded)
+                                            $exceededSeconds = $elapsedSeconds - $threeMinutes;
+                                            $minutes = floor($exceededSeconds / 60);
+                                            $seconds = $exceededSeconds % 60;
+                                            $timerClass = 'exceeded';
+                                            $timerDisplay = '+' . sprintf('%02d:%02d', $minutes, $seconds);
+                                        }
+                                    @endphp
+                                    <span class="sla-timer {{ $timerClass }}" 
+                                          data-created-at="{{ $createdAt->timestamp }}"
+                                          data-report-id="{{ $report->report_id }}">
+                                        {{ $timerDisplay }}
+                                    </span>
+                                </td>
+                                <td>
+                                    @php
+                                        $validatedAt = $report->validated_at;
+                                        $isValid = $report->is_valid;
+                                        
+                                        if ($isValid === 'checking_for_report_validity' || !$validatedAt) {
+                                            // Still pending validation
+                                            $ruleStatus = 'Pending';
+                                            $ruleClass = 'pending';
+                                        } else {
+                                            // Validated - check if within 3 minutes
+                                            $validationTime = $createdAt->diffInSeconds($validatedAt);
+                                            if ($validationTime <= 180) {
+                                                $ruleStatus = 'Within SLA';
+                                                $ruleClass = 'within-sla';
+                                            } else {
+                                                $ruleStatus = 'Exceeded';
+                                                $ruleClass = 'exceeded';
+                                            }
+                                        }
+                                    @endphp
+                                    <span class="rule-status {{ $ruleClass }}">
+                                        {{ $ruleStatus }}
+                                    </span>
+                                </td>
                                 <td>
                                     <?php 
                                         $user = $report->user;
@@ -1518,11 +1633,11 @@
                                     @if(($report->status === 'pending' || $report->status === 'investigating') && !$report->is_anonymous)
                                     <button 
                                         class="action-btn" 
-                                        title="Dispatch Patrol"
+                                        title="Transfer Patrol"
                                         onclick="openDispatchModal({{ $report->report_id }})"
                                         style="background: #3b82f6; color: white; margin-left: 4px;"
                                     >
-                                        🚓
+                                        🔁
                                     </button>
                                     @endif
                                 </td>
@@ -1530,7 +1645,7 @@
                 @empty
                     @if(empty($csvReports))
                     <tr>
-                        <td colspan="9" class="no-results">
+                        <td colspan="12" class="no-results">
                             <svg style="width: 48px; height: 48px; margin: 0 auto 1rem; opacity: 0.3;" viewBox="0 0 24 24"
                                 fill="currentColor">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
@@ -1790,6 +1905,41 @@ window.updateStatus = function(reportId, status) {};
 window.updateValidity = function(reportId, isValid) {};
 window.closeModal = function() {};
 window.downloadModalAsPDF = function() {};
+
+// Update SLA timers in real-time
+function updateSLATimers() {
+    const timers = document.querySelectorAll('.sla-timer');
+    const now = Math.floor(Date.now() / 1000); // Current time in seconds
+    
+    timers.forEach(timer => {
+        const createdAt = parseInt(timer.getAttribute('data-created-at'));
+        if (!createdAt) return;
+        
+        const elapsedSeconds = now - createdAt;
+        const threeMinutes = 180; // 3 minutes in seconds
+        
+        if (elapsedSeconds < threeMinutes) {
+            // Countdown mode
+            const remainingSeconds = threeMinutes - elapsedSeconds;
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            timer.textContent = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            timer.className = 'sla-timer countdown';
+        } else {
+            // Count-up mode (exceeded)
+            const exceededSeconds = elapsedSeconds - threeMinutes;
+            const minutes = Math.floor(exceededSeconds / 60);
+            const seconds = exceededSeconds % 60;
+            timer.textContent = '+' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            timer.className = 'sla-timer exceeded';
+        }
+    });
+}
+
+// Update timers immediately and then every second
+updateSLATimers();
+setInterval(updateSLATimers, 1000);
+
 </script>
 
 @endsection
@@ -2034,8 +2184,8 @@ window.downloadModalAsPDF = function() {};
                     aValue = parseInt(aValue) || 0;
                     bValue = parseInt(bValue) || 0;
                 }
-                // Handle dates (columns 4 and 5)
-                else if (columnIndex === 4 || columnIndex === 5) {
+                // Handle dates (columns 7 and 8 - Date Reported and Updated At)
+                else if (columnIndex === 7 || columnIndex === 8) {
                     aValue = new Date(aValue).getTime() || 0;
                     bValue = new Date(bValue).getTime() || 0;
                 }
