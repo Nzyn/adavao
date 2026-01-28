@@ -137,9 +137,9 @@ async function runMigrations() {
     // No AdminSide registration/verification needed - these are purely for mobile app testing.
     console.log('🧪 Creating/ensuring test patrol accounts in users_public...');
 
-    // bcrypt hash of "Patrol123!" - a simple test password
-    // Generated via: require('bcryptjs').hashSync('Patrol123!', 10)
-    const testPatrolPasswordHash = '$2a$10$/qV9cuM7p1mxAbmbehMmLOU37IzHGrp/PcaVRg8toFKjxRrMlAsqq';
+    // bcrypt hash of "@patrol1234" - a simple test password
+    // Generated via: require('bcryptjs').hashSync('@patrol1234', 10)
+    const testPatrolPasswordHash = '$2a$10$y157yTfhhR9nl8DBxYAcV.aqB9TlmheN0fG/yqwZzxOE.qQOyZBku';
 
     // Define test patrol accounts to create directly in users_public
     const testPatrolAccounts = [
@@ -161,10 +161,10 @@ async function runMigrations() {
 
         if (existingRows.length > 0) {
           console.log(`   ✅ Test patrol ${acct.email} already exists (id=${existingRows[0].id}, role=${existingRows[0].user_role})`);
-          // Ensure it has patrol_officer role
+          // Ensure it has patrol_officer role AND reset password to known value
           await db.query(
-            `UPDATE users_public SET user_role = 'patrol_officer', email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $1`,
-            [existingRows[0].id]
+            `UPDATE users_public SET user_role = 'patrol_officer', password = $2, email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $1`,
+            [existingRows[0].id, testPatrolPasswordHash]
           );
         } else {
           // Insert new account
