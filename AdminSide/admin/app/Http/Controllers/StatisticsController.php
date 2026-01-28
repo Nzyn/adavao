@@ -6,12 +6,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 use App\Models\CrimeForecast;
 use App\Models\CrimeAnalytics;
 
 class StatisticsController extends Controller
 {
     private $sarimaApiUrl;
+
+    private const REPORT_VALID = 'valid';
+    private const REPORT_INVALID = 'invalid';
+    private const REPORT_CHECKING = 'checking_for_report_validity';
 
     public function __construct() {
         $this->sarimaApiUrl = env('SARIMA_API_URL', 'http://sarima-api:8080');
@@ -199,6 +204,569 @@ class StatisticsController extends Controller
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * DB-backed report summary for analytics cards (role-aware)
+     * Supports optional filtering by year and/or month.
+     */
+    public function getReportSummary(Request $request)
+    {
+        $month = $request->input('month'); // '01'..'12'
+        $year = $request->input('year');   // '2025'..
+
+        // Determine role similarly to DashboardController
+        $user = auth()->user();
+        $email = $user->email ?? '';
+        $role = $user->role ?? null;
+        $isSuperAdmin = $user && ($email === 'alertdavao.ph@gmail.com' || str_contains($email, 'alertdavao.ph'));
+
+        $reportsQuery = DB::table('reports');
+
+        // Optional date filters
+        if ($year) {
+            $reportsQuery->whereYear('created_at', $year);
+        }
+        if ($month) {
+            // Accept either '01'..'12' or 'YYYY-MM'
+            if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                $reportsQuery->whereRaw("to_char(created_at, 'YYYY-MM') = ?", [$month]);
+            } else {
+                $reportsQuery->whereMonth('created_at', intval($month));
+            }
+        }
+
+        // Role-aware scoping
+        if (!$isSuperAdmin) {
+            if ($role === 'police') {
+                $stationId = $user->station_id ?? null;
+                if ($stationId) {
+                    $reportsQuery->where('assigned_station_id', $stationId);
+                } else {
+                    // Police without station: return zeros
+                    return response()->json([
+                        'status' => 'success',
+                        'filter' => ['month' => $month, 'year' => $year],
+                        'data' => [
+                            'total' => 0,
+                            'resolved' => 0,
+                            'pending' => 0,
+                            'investigating' => 0,
+                            'valid' => 0,
+                            'invalid' => 0,
+                            'checking' => 0,
+
+                            // Aliases / extra cards
+                            'complaints' => 0,
+                            'hoaxes' => 0,
+                            'total_complaints' => 0,
+                            'resolved_cases' => 0,
+                            'fake_reports' => 0,
+                            'patrol_total' => 0,
+                            'patrol_on_duty' => 0,
+                            'active_dispatches' => 0,
+                        ]
+                    ]);
+                }
+            } else {
+                // Admin: only assigned reports
+                $reportsQuery->whereNotNull('assigned_station_id');
+            }
+        }
+
+        $base = clone $reportsQuery;
+
+        $total = (clone $base)->count();
+        $resolved = (clone $base)->where('status', 'resolved')->count();
+        $pending = (clone $base)->where('status', 'pending')->count();
+        $investigating = (clone $base)->where('status', 'investigating')->count();
+
+        $valid = (clone $base)->where('is_valid', self::REPORT_VALID)->count();
+        $invalid = (clone $base)->where('is_valid', self::REPORT_INVALID)->count();
+        $checking = (clone $base)->where('is_valid', self::REPORT_CHECKING)->count();
+
+        // Patrol dispatch validity (used as a proxy for "fake reports" after on-ground validation)
+        $dispatchQuery = DB::table('patrol_dispatches');
+        if ($year) {
+            $dispatchQuery->whereYear('dispatched_at', $year);
+        }
+        if ($month) {
+            if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                // Try to keep it cross-db: use year+month split
+                [$y, $m] = explode('-', $month);
+                $dispatchQuery->whereYear('dispatched_at', $y)->whereMonth('dispatched_at', intval($m));
+            } else {
+                $dispatchQuery->whereMonth('dispatched_at', intval($month));
+            }
+        }
+
+        if (!$isSuperAdmin) {
+            if ($role === 'police') {
+                $stationId = $user->station_id ?? null;
+                if ($stationId) {
+                    $dispatchQuery->where('station_id', $stationId);
+                }
+            }
+        }
+
+        $fakeReports = (clone $dispatchQuery)
+            ->whereNotNull('validated_at')
+            ->where('is_valid', false)
+            ->count();
+
+        $activeDispatches = (clone $dispatchQuery)
+            ->whereIn('status', ['pending', 'accepted', 'en_route', 'arrived'])
+            ->count();
+
+        // Police deployment numbers (patrol officers)
+        $officersQuery = DB::table('users_public')->where('user_role', 'patrol_officer');
+        if (!$isSuperAdmin && $role === 'police') {
+            $stationId = $user->station_id ?? null;
+            if ($stationId) {
+                $officersQuery->where('assigned_station_id', $stationId);
+            }
+        }
+        $patrolTotal = (clone $officersQuery)->count();
+        $patrolOnDuty = (clone $officersQuery)->where('is_on_duty', true)->count();
+
+        return response()->json([
+            'status' => 'success',
+            'filter' => ['month' => $month, 'year' => $year],
+            'data' => [
+                'total' => $total,
+                'resolved' => $resolved,
+                'pending' => $pending,
+                'investigating' => $investigating,
+                'valid' => $valid,
+                'invalid' => $invalid,
+                'checking' => $checking,
+
+                // Backlog naming / extra cards
+                'complaints' => $valid,
+                'hoaxes' => $invalid,
+                'total_complaints' => $total,
+                'resolved_cases' => $resolved,
+                'fake_reports' => $fakeReports,
+                'patrol_total' => $patrolTotal,
+                'patrol_on_duty' => $patrolOnDuty,
+                'active_dispatches' => $activeDispatches,
+            ]
+        ]);
+    }
+
+    /**
+     * Insights endpoint: deployment suggestions, seasonality and barangay correlation.
+     * Role-aware and supports optional month/year filtering (same semantics as report-summary).
+     */
+    public function getInsights(Request $request)
+    {
+        $month = $request->input('month'); // 'YYYY-MM' or '01'..'12'
+        $year = $request->input('year');
+
+        $user = auth()->user();
+        $email = $user->email ?? '';
+        $role = $user->role ?? null;
+        $isSuperAdmin = $user && ($email === 'alertdavao.ph@gmail.com' || str_contains($email, 'alertdavao.ph'));
+
+        $stationScopeId = null;
+        if (!$isSuperAdmin && $role === 'police') {
+            $stationScopeId = $user->station_id ?? null;
+            if (!$stationScopeId) {
+                return response()->json([
+                    'status' => 'success',
+                    'filter' => ['month' => $month, 'year' => $year],
+                    'data' => [
+                        'deployment' => [
+                            'patrol_total' => 0,
+                            'patrol_on_duty' => 0,
+                            'active_dispatches' => 0,
+                            'overdue_dispatches' => 0,
+                            'fake_reports' => 0,
+                        ],
+                        'recommendations' => ['No station assigned to this police account; deployment insights are unavailable.'],
+                        'seasonality' => [
+                            'topMonths' => [],
+                        ],
+                        'correlation' => [
+                            'topPairs' => [],
+                            'topByBarangay' => [],
+                        ],
+                    ]
+                ]);
+            }
+        }
+
+        $cacheKey = 'statistics_insights_v1'
+            . ($month ? "_m{$month}" : '')
+            . ($year ? "_y{$year}" : '')
+            . ($stationScopeId ? "_s{$stationScopeId}" : ($isSuperAdmin ? '_super' : '_admin'));
+
+        $payload = Cache::remember($cacheKey, 600, function () use ($month, $year, $isSuperAdmin, $role, $stationScopeId) {
+            // Deployment stats
+            $officersQuery = DB::table('users_public')->where('user_role', 'patrol_officer');
+            if ($stationScopeId) {
+                $officersQuery->where('assigned_station_id', $stationScopeId);
+            }
+            $patrolTotal = (clone $officersQuery)->count();
+            $patrolOnDuty = (clone $officersQuery)->where('is_on_duty', true)->count();
+
+            $dispatchQuery = DB::table('patrol_dispatches');
+            if ($stationScopeId) {
+                $dispatchQuery->where('station_id', $stationScopeId);
+            }
+            if ($year) {
+                $dispatchQuery->whereYear('dispatched_at', $year);
+            }
+            if ($month) {
+                if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                    [$y, $m] = explode('-', $month);
+                    $dispatchQuery->whereYear('dispatched_at', $y)->whereMonth('dispatched_at', intval($m));
+                } else {
+                    $dispatchQuery->whereMonth('dispatched_at', intval($month));
+                }
+            }
+
+            $activeDispatches = (clone $dispatchQuery)
+                ->whereIn('status', ['pending', 'accepted', 'en_route', 'arrived'])
+                ->count();
+
+            $overdueDispatches = (clone $dispatchQuery)
+                ->whereIn('status', ['pending', 'accepted', 'en_route'])
+                ->where('dispatched_at', '<=', Carbon::now()->subSeconds(180))
+                ->count();
+
+            $fakeReports = (clone $dispatchQuery)
+                ->whereNotNull('validated_at')
+                ->where('is_valid', false)
+                ->count();
+
+            // Invalid vs valid reports (for recommendation context)
+            $reportsQuery = DB::table('reports');
+            if ($year) {
+                $reportsQuery->whereYear('created_at', $year);
+            }
+            if ($month) {
+                if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                    [$y, $m] = explode('-', $month);
+                    $reportsQuery->whereYear('created_at', $y)->whereMonth('created_at', intval($m));
+                } else {
+                    $reportsQuery->whereMonth('created_at', intval($month));
+                }
+            }
+            if ($stationScopeId) {
+                $reportsQuery->where('assigned_station_id', $stationScopeId);
+            } elseif (!$isSuperAdmin && $role !== 'police') {
+                // Admin scope: assigned only
+                $reportsQuery->whereNotNull('assigned_station_id');
+            }
+
+            $validReports = (clone $reportsQuery)->where('is_valid', self::REPORT_VALID)->count();
+            $invalidReports = (clone $reportsQuery)->where('is_valid', self::REPORT_INVALID)->count();
+            $checkingReports = (clone $reportsQuery)->where('is_valid', self::REPORT_CHECKING)->count();
+
+            // Recommendations
+            $recommendations = [];
+            if ($patrolOnDuty <= 0 && $activeDispatches > 0) {
+                $recommendations[] = 'No patrol officers are ON DUTY while there are active dispatches. Consider activating at least 1–2 officers immediately.';
+            }
+            if ($overdueDispatches > 0) {
+                $recommendations[] = "{$overdueDispatches} dispatch(es) are over the 3-minute response threshold. Review officer assignment and station routing.";
+            }
+            $loadRatio = $patrolOnDuty > 0 ? ($activeDispatches / $patrolOnDuty) : null;
+            if ($loadRatio !== null && $loadRatio > 2.0) {
+                $recommendations[] = sprintf('High dispatch load: %.2f active dispatches per on-duty officer. Consider adding more officers on-duty or rebalancing stations.', $loadRatio);
+            }
+            if (($invalidReports + $fakeReports) > 0 && ($validReports + $invalidReports + $checkingReports) > 0) {
+                $totalProcessed = ($validReports + $invalidReports + $checkingReports);
+                $invalidRate = round((($invalidReports) / max(1, $totalProcessed)) * 100, 1);
+                if ($invalidRate >= 20) {
+                    $recommendations[] = "High invalid-report rate ({$invalidRate}%). Consider tightening reporting guidance and prioritizing verification.";
+                }
+            }
+            if (empty($recommendations)) {
+                $recommendations[] = 'No critical issues detected for the selected filter. Continue monitoring dispatch response times and report validity.';
+            }
+
+            // Per-station deployment suggestions (admin/super-admin), or station-only for police
+            $stations = [];
+            if ($stationScopeId) {
+                $stationRows = DB::table('police_stations')
+                    ->select('station_id', 'station_name')
+                    ->where('station_id', $stationScopeId)
+                    ->get();
+            } else {
+                $stationRows = DB::table('police_stations')
+                    ->select('station_id', 'station_name')
+                    ->orderBy('station_name', 'asc')
+                    ->get();
+            }
+
+            $officerAgg = DB::table('users_public')
+                ->select(
+                    'assigned_station_id',
+                    DB::raw('COUNT(*) as patrol_total'),
+                    DB::raw('SUM(CASE WHEN is_on_duty = true THEN 1 ELSE 0 END) as patrol_on_duty')
+                )
+                ->where('user_role', 'patrol_officer')
+                ->whereNotNull('assigned_station_id')
+                ->groupBy('assigned_station_id')
+                ->get()
+                ->keyBy('assigned_station_id');
+
+            $dispatchAggQuery = DB::table('patrol_dispatches')
+                ->select('station_id', DB::raw('COUNT(*) as active_dispatches'))
+                ->whereIn('status', ['pending', 'accepted', 'en_route', 'arrived'])
+                ->groupBy('station_id');
+            if ($year) {
+                $dispatchAggQuery->whereYear('dispatched_at', $year);
+            }
+            if ($month) {
+                if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                    [$y, $m] = explode('-', $month);
+                    $dispatchAggQuery->whereYear('dispatched_at', $y)->whereMonth('dispatched_at', intval($m));
+                } else {
+                    $dispatchAggQuery->whereMonth('dispatched_at', intval($month));
+                }
+            }
+            $dispatchAgg = $dispatchAggQuery->get()->keyBy('station_id');
+
+            $overdueAggQuery = DB::table('patrol_dispatches')
+                ->select('station_id', DB::raw('COUNT(*) as overdue_dispatches'))
+                ->whereIn('status', ['pending', 'accepted', 'en_route'])
+                ->where('dispatched_at', '<=', Carbon::now()->subSeconds(180))
+                ->groupBy('station_id');
+            if ($year) {
+                $overdueAggQuery->whereYear('dispatched_at', $year);
+            }
+            if ($month) {
+                if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                    [$y, $m] = explode('-', $month);
+                    $overdueAggQuery->whereYear('dispatched_at', $y)->whereMonth('dispatched_at', intval($m));
+                } else {
+                    $overdueAggQuery->whereMonth('dispatched_at', intval($month));
+                }
+            }
+            $overdueAgg = $overdueAggQuery->get()->keyBy('station_id');
+
+            foreach ($stationRows as $s) {
+                $sid = $s->station_id;
+                $o = $officerAgg->get($sid);
+                $d = $dispatchAgg->get($sid);
+                $od = $overdueAgg->get($sid);
+
+                $sPatrolTotal = intval($o->patrol_total ?? 0);
+                $sPatrolOnDuty = intval($o->patrol_on_duty ?? 0);
+                $sActive = intval($d->active_dispatches ?? 0);
+                $sOverdue = intval($od->overdue_dispatches ?? 0);
+                $ratio = $sPatrolOnDuty > 0 ? ($sActive / $sPatrolOnDuty) : null;
+
+                $suggestion = 'OK';
+                if ($sPatrolOnDuty <= 0 && $sActive > 0) {
+                    $suggestion = 'Activate at least 1–2 patrol officers (active dispatches exist).';
+                } elseif ($sOverdue > 0) {
+                    $suggestion = 'Dispatches overdue (3-min). Reassign or add on-duty officers.';
+                } elseif ($ratio !== null && $ratio > 2.0) {
+                    $suggestion = sprintf('High load (%.2f active per on-duty). Add officers or rebalance.', $ratio);
+                }
+
+                $stations[] = [
+                    'station_id' => $sid,
+                    'station_name' => $s->station_name,
+                    'patrol_total' => $sPatrolTotal,
+                    'patrol_on_duty' => $sPatrolOnDuty,
+                    'active_dispatches' => $sActive,
+                    'overdue_dispatches' => $sOverdue,
+                    'suggestion' => $suggestion,
+                ];
+            }
+
+            // Seasonality from CSV (month-of-year aggregation)
+            $seasonality = $this->computeSeasonalityFromCsv($year);
+
+            // Crime type vs barangay correlation (DB)
+            $correlation = $this->computeCrimeTypeBarangayCorrelation($month, $year, $stationScopeId, $isSuperAdmin, $role);
+
+            return [
+                'deployment' => [
+                    'patrol_total' => $patrolTotal,
+                    'patrol_on_duty' => $patrolOnDuty,
+                    'active_dispatches' => $activeDispatches,
+                    'overdue_dispatches' => $overdueDispatches,
+                    'fake_reports' => $fakeReports,
+                ],
+                'stations' => $stations,
+                'recommendations' => $recommendations,
+                'seasonality' => $seasonality,
+                'correlation' => $correlation,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'filter' => ['month' => $month, 'year' => $year],
+            'data' => $payload,
+        ]);
+    }
+
+    private function computeSeasonalityFromCsv($year = null): array
+    {
+        $csvPath = storage_path('app/davao_crime_5years.csv');
+        if (!file_exists($csvPath)) {
+            return ['topMonths' => []];
+        }
+
+        $monthTotals = array_fill(1, 12, 0.0);
+        $monthCounts = array_fill(1, 12, 0);
+
+        $file = fopen($csvPath, 'r');
+        $header = fgetcsv($file);
+        $headerMap = array_flip($header ?: []);
+        $idxDate = $headerMap['date'] ?? 1;
+        $idxCount = $headerMap['crime_count'] ?? 4;
+
+        while (($row = fgetcsv($file)) !== false) {
+            if (count($row) < 5) continue;
+            $date = $row[$idxDate] ?? null;
+            if (!$date || strlen($date) < 7) continue;
+
+            $rowYear = substr($date, 0, 4);
+            $rowMonth = intval(substr($date, 5, 2));
+            if ($rowMonth < 1 || $rowMonth > 12) continue;
+            if ($year && $rowYear !== (string)$year) continue;
+
+            $count = floatval($row[$idxCount] ?? 0);
+            $monthTotals[$rowMonth] += $count;
+            $monthCounts[$rowMonth] += 1;
+        }
+        fclose($file);
+
+        $monthNames = [
+            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June',
+            7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+        ];
+
+        $averages = [];
+        foreach ($monthTotals as $m => $total) {
+            $avg = $monthCounts[$m] > 0 ? ($total / $monthCounts[$m]) : 0;
+            $averages[] = [
+                'month' => $m,
+                'monthName' => $monthNames[$m],
+                'averageCount' => round($avg, 2),
+                'totalCount' => round($total, 2),
+            ];
+        }
+
+        usort($averages, function ($a, $b) {
+            return $b['averageCount'] <=> $a['averageCount'];
+        });
+
+        return [
+            'topMonths' => array_slice($averages, 0, 3),
+            'monthAverages' => $averages,
+        ];
+    }
+
+    private function normalizeReportTypes($reportTypeRaw): array
+    {
+        if ($reportTypeRaw === null) return [];
+
+        if (is_string($reportTypeRaw)) {
+            $decoded = json_decode($reportTypeRaw, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $reportTypeRaw = $decoded;
+            }
+        }
+
+        $types = [];
+        if (is_array($reportTypeRaw)) {
+            foreach ($reportTypeRaw as $t) {
+                if (!is_string($t)) continue;
+                $clean = trim($t);
+                if ($clean !== '') $types[] = $clean;
+            }
+        } elseif (is_string($reportTypeRaw)) {
+            $clean = trim($reportTypeRaw);
+            if ($clean !== '') $types[] = $clean;
+        }
+
+        return array_values(array_unique($types));
+    }
+
+    private function computeCrimeTypeBarangayCorrelation($month, $year, $stationScopeId, $isSuperAdmin, $role): array
+    {
+        $query = DB::table('reports')
+            ->join('locations', 'reports.location_id', '=', 'locations.location_id')
+            ->select('reports.report_type', 'locations.barangay', 'reports.created_at', 'reports.assigned_station_id')
+            ->where('reports.is_valid', self::REPORT_VALID);
+
+        if ($year) {
+            $query->whereYear('reports.created_at', $year);
+        }
+        if ($month) {
+            if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                [$y, $m] = explode('-', $month);
+                $query->whereYear('reports.created_at', $y)->whereMonth('reports.created_at', intval($m));
+            } else {
+                $query->whereMonth('reports.created_at', intval($month));
+            }
+        }
+
+        if ($stationScopeId) {
+            $query->where('reports.assigned_station_id', $stationScopeId);
+        } elseif (!$isSuperAdmin && $role !== 'police') {
+            $query->whereNotNull('reports.assigned_station_id');
+        }
+
+        // Keep it bounded to avoid heavy loads on large datasets
+        $rows = $query->orderBy('reports.created_at', 'desc')->limit(5000)->get();
+
+        $pairCounts = [];
+        $byBarangay = [];
+
+        foreach ($rows as $row) {
+            $barangay = trim((string)($row->barangay ?? ''));
+            if ($barangay === '') continue;
+
+            $types = $this->normalizeReportTypes($row->report_type);
+            foreach ($types as $t) {
+                $type = trim($t);
+                if ($type === '') continue;
+
+                $pairKey = $barangay . '||' . $type;
+                $pairCounts[$pairKey] = ($pairCounts[$pairKey] ?? 0) + 1;
+
+                if (!isset($byBarangay[$barangay])) {
+                    $byBarangay[$barangay] = [];
+                }
+                $byBarangay[$barangay][$type] = ($byBarangay[$barangay][$type] ?? 0) + 1;
+            }
+        }
+
+        arsort($pairCounts);
+        $topPairs = [];
+        foreach (array_slice($pairCounts, 0, 12, true) as $key => $count) {
+            [$barangay, $type] = explode('||', $key, 2);
+            $topPairs[] = ['barangay' => $barangay, 'crimeType' => $type, 'count' => $count];
+        }
+
+        // For each barangay, keep top 3 types
+        $topByBarangay = [];
+        foreach ($byBarangay as $barangay => $counts) {
+            arsort($counts);
+            $topTypes = [];
+            foreach (array_slice($counts, 0, 3, true) as $type => $count) {
+                $topTypes[] = ['crimeType' => $type, 'count' => $count];
+            }
+            $topByBarangay[] = ['barangay' => $barangay, 'topTypes' => $topTypes];
+        }
+        usort($topByBarangay, function ($a, $b) {
+            return strcmp($a['barangay'], $b['barangay']);
+        });
+
+        return [
+            'topPairs' => $topPairs,
+            'topByBarangay' => array_slice($topByBarangay, 0, 15),
+        ];
     }
 
     private function _getCrimeStats($month, $year)

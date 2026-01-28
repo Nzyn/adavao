@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Modal, ScrollView, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Modal, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from 'expo-router';
 import { useUser } from '../../contexts/UserContext';
@@ -30,14 +30,46 @@ interface Report {
   }>;
 }
 
-const formatDateTime = (dateString: string) => {
+const formatDateTimeManila = (dateString?: string) => {
+  if (!dateString) return 'N/A';
+
   const date = new Date(dateString);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${month}/${day}/${year} ${hours}:${minutes}`;
+  if (Number.isNaN(date.getTime())) return 'N/A';
+
+  // Prefer proper timezone formatting when available
+  try {
+    return date.toLocaleString('en-US', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    // Fallback: convert to UTC+8 (Asia/Manila)
+    const utcMs = date.getTime() + date.getTimezoneOffset() * 60000;
+    const manila = new Date(utcMs + 8 * 3600000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const month = pad(manila.getMonth() + 1);
+    const day = pad(manila.getDate());
+    const year = manila.getFullYear();
+    const hours = pad(manila.getHours());
+    const minutes = pad(manila.getMinutes());
+    return `${month}/${day}/${year} ${hours}:${minutes}`;
+  }
+};
+
+const getIncidentDateString = (report: Report) => {
+  // The backend uses date_reported in many places as the incident time.
+  // Fall back to created_at to avoid blank/invalid values.
+  return report.date_reported || report.created_at;
+};
+
+const getSubmittedDateString = (report: Report) => {
+  // created_at is the most reliable for the actual submission time.
+  return report.created_at || report.date_reported;
 };
 
 const getStatusColor = (status: string) => {
@@ -93,7 +125,7 @@ const HistoryItem = React.memo(({ item, onPress }: {
       {/* Right Section - Date and Status */}
       <View style={{ alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <Text style={[styles.dateHistory, { fontSize: 13, color: '#999', marginBottom: 8 }]}>
-          {formatDateTime(item.date_reported)}
+          {formatDateTimeManila(getSubmittedDateString(item))}
         </Text>
         <View style={[
           styles.statusBadgeHistory,
@@ -190,14 +222,14 @@ const history = () => {
         .then(response => response.json())
         .then(data => {
           console.log('🗺️ Reverse geocoded address:', data);
-          setDecodedAddress(data.display_name || `${report.location.latitude.toFixed(6)}, ${report.location.longitude.toFixed(6)}`);
+          setDecodedAddress(data.display_name || 'Address unavailable');
         })
         .catch(error => {
           console.error('❌ Reverse geocoding failed:', error);
-          setDecodedAddress(`${report.location.latitude.toFixed(6)}, ${report.location.longitude.toFixed(6)}`);
+          setDecodedAddress('Address unavailable');
         });
     } else {
-      setDecodedAddress('No coordinates available');
+      setDecodedAddress('No location coordinates available');
     }
   }, []);
 
@@ -383,79 +415,22 @@ const history = () => {
                   {/* Date of Incident */}
                   <View style={{ marginBottom: 16 }}>
                     <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 4 }}>Date of Incident</Text>
-                    <Text style={{ fontSize: 15, color: '#333' }}>{formatDateTime(selectedReport.date_reported)}</Text>
+                    <Text style={{ fontSize: 15, color: '#333' }}>{formatDateTimeManila(getIncidentDateString(selectedReport))}</Text>
                   </View>
 
                   {/* Submitted Date */}
                   <View style={{ marginBottom: 16 }}>
                     <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 4 }}>Submitted On</Text>
-                    <Text style={{ fontSize: 15, color: '#333' }}>{formatDateTime(selectedReport.created_at)}</Text>
+                    <Text style={{ fontSize: 15, color: '#333' }}>{formatDateTimeManila(getSubmittedDateString(selectedReport))}</Text>
                   </View>
 
-                  {/* Media Attachments */}
-                  {selectedReport.media && selectedReport.media.length > 0 && (
-                    <View style={{ marginBottom: 16 }}>
-                      <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 8 }}>Evidence Attachments</Text>
-                      {selectedReport.media.map((media) => (
-                        <View key={media.media_id} style={{
-                          marginBottom: 12,
-                          padding: 12,
-                          backgroundColor: '#f8f9fa',
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor: '#e9ecef'
-                        }}>
-                          {/* Display image if it's an image type */}
-                          {(media.media_type.toLowerCase().startsWith('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'].includes(media.media_type.toLowerCase())) && (
-                            <Image
-                              source={{ uri: `${BACKEND_URL}${media.media_url}` }}
-                              style={{ width: '100%', height: 200, borderRadius: 8, marginBottom: 8, backgroundColor: '#e9ecef' }}
-                              resizeMode="cover"
-                              onError={(error) => {
-                                console.error('❌ Image failed to load:', `${BACKEND_URL}${media.media_url}`, error.nativeEvent);
-                              }}
-                              onLoad={() => {
-                                console.log('✅ Image loaded successfully:', `${BACKEND_URL}${media.media_url}`);
-                              }}
-                            />
-                          )}
-
-                          {/* Media Info */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                              <Ionicons
-                                name={(media.media_type.toLowerCase().startsWith('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'].includes(media.media_type.toLowerCase())) ? 'image' :
-                                  (media.media_type.toLowerCase().startsWith('video') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(media.media_type.toLowerCase())) ? 'videocam' : 'document'}
-                                size={20}
-                                color="#1D3557"
-                              />
-                              <View style={{ marginLeft: 8, flex: 1 }}>
-                                <Text style={{ fontSize: 13, color: '#333', fontWeight: '600' }}>Evidence File</Text>
-                                <Text style={{ fontSize: 12, color: '#666' }}>Type: {media.media_type.toUpperCase()}</Text>
-                              </View>
-                            </View>
-                            <TouchableOpacity
-                              style={{ padding: 8, backgroundColor: '#1D3557', borderRadius: 6 }}
-                              onPress={() => {
-                                // Open media in new window/tab
-                                if (typeof window !== 'undefined') {
-                                  window.open(`${BACKEND_URL}${media.media_url}`, '_blank');
-                                }
-                              }}
-                            >
-                              <Ionicons name="open-outline" size={16} color="#fff" />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  {selectedReport.media && selectedReport.media.length === 0 && (
-                    <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8 }}>
-                      <Text style={{ fontSize: 13, color: '#666', textAlign: 'center' }}>No evidence files attached</Text>
-                    </View>
-                  )}
+                  {/* Evidence Attachments (police/admin-only by policy) */}
+                  <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e9ecef' }}>
+                    <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 6 }}>Evidence Attachments</Text>
+                    <Text style={{ fontSize: 13, color: '#666' }}>
+                      Attachments are only visible to police/admin for privacy and safety.
+                    </Text>
+                  </View>
                 </View>
               )}
             </ScrollView>

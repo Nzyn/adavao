@@ -2,16 +2,34 @@ const express = require("express");
 const cors = require("cors");
 const path = require('path');
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
 require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 8081;
 
+// Needed for correct req.ip behind proxies (e.g., Render)
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json());
 
+// Global rate limit for report submissions (extra safety; DB checks apply inside handler too)
+const reportLimiter = rateLimit({
+  windowMs: Number(process.env.REPORT_RATE_LIMIT_WINDOW_MS) || 5 * 60 * 1000, // 5 minutes
+  limit: Number(process.env.REPORT_RATE_LIMIT_MAX) || 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+  message: {
+    success: false,
+    message: 'Too many report submissions. Please wait a few minutes and try again.'
+  }
+});
+
 // Serve static files from 'evidence' directory
-app.use('/evidence', express.static(path.join(__dirname, '../evidence')));
+// DO NOT serve evidence as public static files.
+// Evidence is encrypted at rest and must be decrypted only for authorized roles.
 app.use('/verifications', express.static(path.join(__dirname, '../verifications')));
 
 const requestLogger = (req, res, next) => {
@@ -177,10 +195,25 @@ const {
 // Files are encrypted at rest and decrypted on-demand for authorized users
 const { decryptFile } = require('./encryptionService');
 const { getVerifiedUserRole } = require('./authMiddleware');
+const { verifyUserRole, requireAuthorizedRole } = require('./authMiddleware');
+
+// Patrol dispatch handlers
+const {
+  getMyDispatches,
+  getDispatchDetails,
+  acceptDispatch,
+  declineDispatch,
+} = require('./handlePatrolDispatches');
 
 // User routes (push notifications, duty status)
 const userRoutes = require('./routes/user');
 app.use('/api/user', userRoutes);
+
+// Patrol dispatch API (mobile patrol UI)
+app.get('/api/patrol/dispatches', verifyUserRole, requireAuthorizedRole, getMyDispatches);
+app.get('/api/patrol/dispatches/:dispatchId', verifyUserRole, requireAuthorizedRole, getDispatchDetails);
+app.post('/api/patrol/dispatches/:dispatchId/accept', verifyUserRole, requireAuthorizedRole, acceptDispatch);
+app.post('/api/patrol/dispatches/:dispatchId/decline', verifyUserRole, requireAuthorizedRole, declineDispatch);
 
 const fs = require('fs');
 
@@ -195,11 +228,11 @@ app.get('/evidence/:filename', async (req, res) => {
   const requestingUserId = req.query.userId || req.headers['x-user-id'];
   const userRole = await getVerifiedUserRole(requestingUserId);
 
-  if (userRole !== 'admin' && userRole !== 'police' && userRole !== 'user') {
+  if (!requestingUserId || (userRole !== 'admin' && userRole !== 'police')) {
     console.log(`🚫 Unauthorized access attempt to evidence by user ${requestingUserId} with role: ${userRole}`);
     return res.status(403).json({
       success: false,
-      message: 'Unauthorized: Access denied'
+      message: 'Unauthorized: Only admin and police can access report attachments'
     });
   }
 
@@ -283,8 +316,8 @@ app.get('/verifications/:filename', async (req, res) => {
   }
 });
 
-// Backward compatibility: serve old uploads from uploads/evidence folder (legacy - unencrypted)
-app.use('/uploads/evidence', express.static(path.join(__dirname, '../uploads/evidence')));
+// Do not expose legacy evidence uploads publicly.
+// If you still have legacy paths referenced, migrate them to `/evidence/:filename`.
 
 // Debug logger - BEFORE multer processes the request
 app.use((req, res, next) => {
@@ -345,10 +378,11 @@ app.post("/api/reports", (req, res, next) => {
   console.log("   Content-Type:", req.headers['content-type']);
   console.log("   Is multipart?", req.headers['content-type']?.includes('multipart'));
   next();
-}, reportUpload.single('media'), (req, res, next) => {
+}, reportLimiter, reportUpload.array('media', 6), (req, res, next) => {
   console.log("\n📦 AFTER MULTER:");
-  console.log("   req.file exists?", !!req.file);
-  console.log("   req.file:", req.file);
+  console.log("   req.files exists?", Array.isArray(req.files) && req.files.length > 0);
+  console.log("   req.files count:", Array.isArray(req.files) ? req.files.length : 0);
+  console.log("   req.files:", req.files);
   console.log("   req.body:", req.body);
   next();
 }, submitReport);
@@ -360,9 +394,9 @@ app.post("/api/reports/auto-assign", autoAssignReports);
 
 // Police Reports Routes (Station-specific)
 // IMPORTANT: More specific routes must come BEFORE less specific routes
-app.get("/api/police/station/:stationId/dashboard", getStationDashboardStats);
-app.get("/api/police/station/:stationId/reports/:status", getReportsByStationAndStatus);
-app.get("/api/police/station/:stationId/reports", getReportsByStation);
+app.get("/api/police/station/:stationId/dashboard", verifyUserRole, requireAuthorizedRole, getStationDashboardStats);
+app.get("/api/police/station/:stationId/reports/:status", verifyUserRole, requireAuthorizedRole, getReportsByStationAndStatus);
+app.get("/api/police/station/:stationId/reports", verifyUserRole, requireAuthorizedRole, getReportsByStation);
 
 // Police Stations API Routes
 // IMPORTANT: More specific routes must come BEFORE less specific routes
@@ -417,6 +451,29 @@ app.get("/api/barangay/by-coordinates", getBarangayByCoordinates);
 // Diagnostics Routes (for debugging)
 app.get("/api/diagnostics/user/:userId", checkPoliceOfficerSetup);
 app.get("/api/diagnostics/user/:userId/station", debugUserStation);
+
+// Central error handler (multer + rate-limit + generic)
+app.use((err, req, res, next) => {
+  if (!err) return next();
+
+  if (err instanceof multer.MulterError) {
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(status).json({
+      success: false,
+      message: err.code === 'LIMIT_FILE_SIZE'
+        ? 'Uploaded file is too large.'
+        : 'File upload failed.',
+      error: err.code
+    });
+  }
+
+  // express-rate-limit sets statusCode on the error in some cases
+  const statusCode = typeof err.statusCode === 'number' ? err.statusCode : 500;
+  return res.status(statusCode).json({
+    success: false,
+    message: err.message || 'Server error'
+  });
+});
 app.get("/api/diagnostics/reports-all", listAllReportsWithStations);
 app.get("/api/diagnostics/report-assignment", checkReportAssignment);
 app.post("/api/fix/assign-stations-to-reports", autoAssignStationToReports);
@@ -522,15 +579,23 @@ app.use('*', (req, res) => {
 const { encryptAllSensitiveData } = require('./encrypt_all_sensitive_data');
 const { runMigrations } = require('./runMigrations');
 
-console.log("🔒 Initializing encryption verification on startup...");
-encryptAllSensitiveData().then(() => {
-  const server = app.listen(PORT, "0.0.0.0", () => {
+(async () => {
+  console.log("🔄 Initializing DB migrations on startup...");
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.warn("⚠️ Migrations failed, but starting server anyway:", err?.message || err);
+  }
+
+  console.log("🔒 Initializing encryption verification on startup...");
+  try {
+    await encryptAllSensitiveData();
+  } catch (err) {
+    console.error("⚠️ Encryption migration failed, but starting server anyway:", err);
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
     // console.log(`   Local Network: http://${require('ip').address()}:${PORT}`);
   });
-}).catch(err => {
-  console.error("⚠️ Encryption migration failed, but starting server anyway:", err);
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
-  });
-});
+})();

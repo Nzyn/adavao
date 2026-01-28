@@ -18,12 +18,12 @@ export interface ReportSubmissionData {
   reporters_address?: string;  // Street address
   barangay?: string;  // Barangay name
   barangay_id?: number;  // Barangay ID for database linking
-  media?: {
+  mediaFiles?: Array<{
     uri: string;
     fileName?: string;
     fileSize?: number;
     type?: string;
-  } | null;
+  }> | null;
   userId: string;
 }
 
@@ -76,13 +76,10 @@ export const reportService = {
         });
       }
 
-      // Add media file if available
-      if (reportData.media && reportData.media.uri) {
-        console.log('📎 Preparing media file for upload...');
-        console.log('   URI:', reportData.media.uri);
-        console.log('   File name:', reportData.media.fileName);
-        console.log('   File type:', reportData.media.type);
-        console.log('   File size:', reportData.media.fileSize);
+      // Add media files if available (supports multiple uploads)
+      const mediaFiles = Array.isArray(reportData.mediaFiles) ? reportData.mediaFiles.filter(m => !!m?.uri) : [];
+      if (mediaFiles.length > 0) {
+        console.log(`📎 Preparing ${mediaFiles.length} media file(s) for upload...`);
 
         // Extract file extension from URI or filename
         const getFileExtension = (uri: string, fileName?: string): string => {
@@ -95,79 +92,70 @@ export const reportService = {
           return 'jpg'; // default
         };
 
-        const fileExtension = getFileExtension(reportData.media.uri, reportData.media.fileName);
-        const fileName = reportData.media.fileName || `evidence_${Date.now()}.${fileExtension}`;
-
-        // Determine MIME type based on file extension
-        // Don't trust reportData.media.type as it might be just 'image' or 'video'
-        const ext = fileExtension.toLowerCase();
-        let mimeType = 'image/jpeg'; // default
-
-        // Map file extension to proper MIME type
-        if (ext === 'png') mimeType = 'image/png';
-        else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
-        else if (ext === 'gif') mimeType = 'image/gif';
-        else if (ext === 'webp') mimeType = 'image/webp';
-        else if (ext === 'mp4') mimeType = 'video/mp4';
-        else if (ext === 'mov') mimeType = 'video/quicktime';
-        else if (ext === 'avi') mimeType = 'video/x-msvideo';
-        else if (ext === 'webm') mimeType = 'video/webm';
-
-        console.log('🔍 File extension:', ext);
-        console.log('📋 Determined MIME type:', mimeType);
-
         // Detect Platform
         // @ts-ignore
         const isWeb = typeof Platform !== 'undefined' ? Platform.OS === 'web' : typeof document !== 'undefined';
 
-        if (isWeb) {
-          // CRITICAL FIX FOR REACT NATIVE WEB:
-          // For web platform, we need to convert the file URI to a Blob/File
-          console.log('🌐 Platform: Web - Converting URI to Blob...');
+        for (const media of mediaFiles) {
+          console.log('   URI:', media.uri);
+          console.log('   File name:', media.fileName);
+          console.log('   File type:', media.type);
+          console.log('   File size:', media.fileSize);
 
-          try {
-            // Fetch the file from the URI and convert to Blob
-            const fileResponse = await fetch(reportData.media.uri);
-            const fileBlob = await fileResponse.blob();
+          const fileExtension = getFileExtension(media.uri, media.fileName);
+          const fileName = media.fileName || `evidence_${Date.now()}.${fileExtension}`;
 
-            // Create a proper File object from the Blob
-            const file = new File([fileBlob], fileName, { type: mimeType });
+          // Determine MIME type based on file extension
+          // Don't trust media.type as it might be just 'image' or 'video'
+          const ext = fileExtension.toLowerCase();
+          let mimeType = 'image/jpeg'; // default
 
-            // Append the actual File object to FormData
-            formData.append('media', file, fileName);
+          if (ext === 'png') mimeType = 'image/png';
+          else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+          else if (ext === 'gif') mimeType = 'image/gif';
+          else if (ext === 'webp') mimeType = 'image/webp';
+          else if (ext === 'mp4') mimeType = 'video/mp4';
+          else if (ext === 'mov') mimeType = 'video/quicktime';
+          else if (ext === 'avi') mimeType = 'video/x-msvideo';
+          else if (ext === 'webm') mimeType = 'video/webm';
 
-            console.log('✅ Media file added to FormData (Web)');
-          } catch (fileError) {
-            console.error('❌ Error converting file:', fileError);
-            throw new Error('Failed to process media file. Please try again.');
+          console.log('🔍 File extension:', ext);
+          console.log('📋 Determined MIME type:', mimeType);
+
+          if (isWeb) {
+            console.log('🌐 Platform: Web - Converting URI to Blob...');
+            try {
+              const fileResponse = await fetch(media.uri);
+              const fileBlob = await fileResponse.blob();
+              const file = new File([fileBlob], fileName, { type: mimeType });
+              formData.append('media', file, fileName);
+              console.log('✅ Media file added to FormData (Web)');
+            } catch (fileError) {
+              console.error('❌ Error converting file:', fileError);
+              throw new Error('Failed to process media file. Please try again.');
+            }
+          } else {
+            console.log('📱 Platform: Native - Appending file object...');
+            formData.append('media', {
+              uri: media.uri,
+              name: fileName,
+              type: mimeType,
+            } as any);
+            console.log('✅ Media file added to FormData (Native)');
           }
-        } else {
-          // NATIVE PLATFORM (Android/iOS)
-          console.log('📱 Platform: Native - Appending file object...');
-          formData.append('media', {
-            uri: reportData.media.uri,
-            name: fileName,
-            type: mimeType,
-          } as any);
-          console.log('✅ Media file added to FormData (Native)');
         }
       } else {
-        console.log('⚠️  No media file to upload');
+        console.log('⚠️  No media files to upload');
       }
 
       console.log('\n' + '='.repeat(50));
       console.log('🚀 Sending report to backend...');
       console.log('API URL:', `${BACKEND_URL}/api/reports`);
-      console.log('Has media:', reportData.media ? 'YES' : 'NO');
+      console.log('Has media:', mediaFiles.length > 0 ? 'YES' : 'NO');
 
       // CRITICAL DEBUG: Log FormData info
       console.log('\n📦 FormData Info:');
-      console.log('   Media file included:', reportData.media ? 'YES' : 'NO');
-      if (reportData.media) {
-        console.log('   File URI:', reportData.media.uri);
-        console.log('   File name:', reportData.media.fileName);
-        console.log('   File type:', reportData.media.type);
-      }
+      console.log('   Media files included:', mediaFiles.length);
       console.log('='.repeat(50) + '\n');
 
       // Get user token for authentication

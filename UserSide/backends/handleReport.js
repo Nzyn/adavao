@@ -3,8 +3,168 @@ const db = require("./db");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const crypto = require('crypto');
 const { encrypt, decrypt, canDecrypt, encryptFields, decryptFields } = require("./encryptionService");
 const { getClientIp, normalizeIp, getUserAgent } = require("./ipUtils");
+
+function sha256Hex(text) {
+  return crypto.createHash('sha256').update(String(text || ''), 'utf8').digest('hex');
+}
+
+function normalizeDuplicateText(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim();
+}
+
+function containsInappropriateLanguage(text) {
+  const sensitiveWords = [
+    'fuck', 'shit', 'bitch', 'asshole',
+    'gago', 'putangina', 'leche', 'bobo', 'tanga', 'piste', 'yawa', 'inutil'
+  ];
+  const lowered = (text || '').toLowerCase();
+  const found = sensitiveWords.find((w) => lowered.includes(w));
+  return found ? { found: true, word: found } : { found: false };
+}
+
+function getIntEnv(key, fallback) {
+  const raw = process.env[key];
+  const parsed = Number.parseInt(String(raw ?? ''), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+async function enforceReportAbusePrevention(connection, { clientIp, effectiveUserId, needsGuestUser }) {
+  const windowMinutes = getIntEnv('REPORT_ABUSE_WINDOW_MINUTES', 10);
+  const ipLimit = getIntEnv('REPORT_ABUSE_IP_LIMIT', needsGuestUser ? 3 : 10);
+  const userLimit = getIntEnv('REPORT_ABUSE_USER_LIMIT', 5);
+  const cooldownSeconds = getIntEnv('REPORT_ABUSE_COOLDOWN_SECONDS', 20);
+
+  try {
+    const [recentIpCountRows] = await connection.query(
+      `SELECT COUNT(*)::int AS count
+       FROM report_ip_tracking
+       WHERE ip_address = $1
+         AND submitted_at > NOW() - ($2::text || ' minutes')::interval`,
+      [clientIp, String(windowMinutes)]
+    );
+
+    const recentIpCount = recentIpCountRows?.[0]?.count ?? 0;
+    if (recentIpCount >= ipLimit) {
+      const error = new Error('Too many reports from this network. Please wait and try again.');
+      error.statusCode = 429;
+      throw error;
+    }
+
+    const [lastSubmissionRows] = await connection.query(
+      `SELECT submitted_at
+       FROM report_ip_tracking
+       WHERE ip_address = $1
+       ORDER BY submitted_at DESC
+       LIMIT 1`,
+      [clientIp]
+    );
+
+    const lastSubmittedAt = lastSubmissionRows?.[0]?.submitted_at ? new Date(lastSubmissionRows[0].submitted_at) : null;
+    if (lastSubmittedAt) {
+      const secondsSinceLast = (Date.now() - lastSubmittedAt.getTime()) / 1000;
+      if (secondsSinceLast < cooldownSeconds) {
+        const error = new Error('You are submitting reports too quickly. Please wait a moment and try again.');
+        error.statusCode = 429;
+        throw error;
+      }
+    }
+
+    if (!needsGuestUser && effectiveUserId) {
+      const [recentUserCountRows] = await connection.query(
+        `SELECT COUNT(*)::int AS count
+         FROM reports
+         WHERE user_id = $1
+           AND created_at > NOW() - ($2::text || ' minutes')::interval`,
+        [effectiveUserId, String(windowMinutes)]
+      );
+
+      const recentUserCount = recentUserCountRows?.[0]?.count ?? 0;
+      if (recentUserCount >= userLimit) {
+        const error = new Error('Too many reports from this account in a short time. Please wait and try again.');
+        error.statusCode = 429;
+        throw error;
+      }
+    }
+  } catch (e) {
+    // If tracking tables don't exist yet or query fails, do not block submissions here.
+    // express-rate-limit in server.js still provides baseline protection.
+    if (e && (e.statusCode === 429)) throw e;
+    console.warn('⚠️ Abuse-prevention DB checks skipped due to error:', e?.message || e);
+  }
+}
+
+function evaluateCloudinaryModerationDecision(uploadResult) {
+  const moderationEnabled = String(process.env.MEDIA_MODERATION_ENABLED || '').trim() === '1';
+  const requireModeration = String(process.env.MEDIA_MODERATION_REQUIRE || '').trim() === '1';
+  // New default for production: accept report, but hide flagged evidence behind a reveal/spoiler UI.
+  // Set MEDIA_MODERATION_PENDING_ACTION=reject if you want strict blocking.
+  const pendingAction = (process.env.MEDIA_MODERATION_PENDING_ACTION || 'flag').toLowerCase();
+
+  if (!moderationEnabled) return { decision: 'allow' };
+  if (!uploadResult || !uploadResult.success) {
+    return requireModeration
+      ? { decision: 'reject', reason: 'Upload failed' }
+      : { decision: 'allow' };
+  }
+
+  const moderation = uploadResult.moderation;
+  if (!moderation || !Array.isArray(moderation) || moderation.length === 0) {
+    return requireModeration
+      ? { decision: 'reject', reason: 'Moderation not available (provider not configured)' }
+      : { decision: 'allow' };
+  }
+
+  for (const item of moderation) {
+    const status = String(item?.status || '').toLowerCase();
+    const provider = String(item?.kind || item?.type || item?.provider || '').trim() || null;
+    if (status === 'rejected') {
+      return { decision: 'flag', reason: 'Media flagged by moderation provider', moderation_status: status, moderation_provider: provider };
+    }
+    if (status === 'pending') {
+      if (pendingAction === 'reject') {
+        return { decision: 'reject', reason: 'Media moderation is pending review', moderation_status: status, moderation_provider: provider };
+      }
+      return { decision: 'flag', reason: 'Media moderation is pending review', moderation_status: status, moderation_provider: provider };
+    }
+
+    let response = item?.response;
+    if (typeof response === 'string') {
+      try { response = JSON.parse(response); } catch { /* ignore */ }
+    }
+
+    const labels = response?.ModerationLabels || response?.moderation_labels || response?.labels;
+    if (Array.isArray(labels)) {
+      const blockedPatterns = (process.env.MEDIA_MODERATION_BLOCK_PATTERNS || 'explicit nudity,nudity,sexual activity,pornography').split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+
+      for (const label of labels) {
+        const name = String(label?.Name || label?.name || label?.label || '').toLowerCase();
+        const confidence = Number(label?.Confidence || label?.confidence || label?.score || 0);
+        if (!name) continue;
+        const matches = blockedPatterns.some((p) => name.includes(p));
+        const threshold = Number(process.env.MEDIA_MODERATION_BLOCK_THRESHOLD || 75);
+        if (matches && confidence >= threshold) {
+          return {
+            decision: 'flag',
+            reason: `Sensitive content detected: ${label?.Name} (${confidence.toFixed(1)}%)`,
+            moderation_status: String(item?.status || '').toLowerCase() || null,
+            moderation_provider: provider,
+          };
+        }
+      }
+    }
+  }
+
+  return { decision: 'allow' };
+}
 
 /**
  * Point-in-polygon algorithm (Ray Casting)
@@ -88,6 +248,22 @@ async function submitReport(req, res) {
       barangay_id,
     } = req.body;
 
+    const isAnon = is_anonymous === "1" || is_anonymous === true || is_anonymous === "true";
+    const incomingUserId = typeof user_id === 'string' ? user_id.trim() : user_id;
+    const files = Array.isArray(req.files) ? req.files : [];
+    const hasFiles = files.length > 0;
+
+    // Server-side text moderation (client-side checks can be bypassed)
+    const descriptionCheck = containsInappropriateLanguage(description);
+    if (descriptionCheck.found) {
+      await connection.rollback();
+      return res.status(422).json({
+        success: false,
+        message: 'Sensitive content detected in description',
+        errors: { description: [`Please remove inappropriate language ("${descriptionCheck.word}") and try again.`] }
+      });
+    }
+
     console.log("📝 Submitting report:", {
       title,
       crime_types,
@@ -100,22 +276,23 @@ async function submitReport(req, res) {
       reporters_address,
       barangay,
       barangay_id,
-      hasFile: !!req.file,
-      fileDetails: req.file ? {
-        fieldname: req.file.fieldname,
-        originalname: req.file.originalname,
-        encoding: req.file.encoding,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        destination: req.file.destination,
-        filename: req.file.filename,
-        path: req.file.path
-      } : null
+      hasFiles,
+      filesCount: files.length,
+      fileDetails: files.slice(0, 6).map(f => ({
+        fieldname: f.fieldname,
+        originalname: f.originalname,
+        encoding: f.encoding,
+        mimetype: f.mimetype,
+        size: f.size,
+        destination: f.destination,
+        filename: f.filename,
+        path: f.path
+      }))
     });
 
     // Validation
     // Title is now optional - will be auto-generated if not provided
-    if (!crime_types || !description || !incident_date || !user_id) {
+    if (!crime_types || !description || !incident_date || (!incomingUserId && !isAnon)) {
       await connection.rollback();
       return res.status(422).json({
         success: false,
@@ -124,29 +301,63 @@ async function submitReport(req, res) {
           crime_types: !crime_types ? ["Crime type is required"] : [],
           description: !description ? ["Description is required"] : [],
           incident_date: !incident_date ? ["Incident date is required"] : [],
-          user_id: !user_id ? ["User ID is required"] : [],
+          user_id: (!incomingUserId && !isAnon) ? ["User ID is required"] : [],
         },
       });
     }
 
-    // Check if user is restricted
-    const [userCheck] = await connection.query(
-      'SELECT restriction_level, total_flags FROM users_public WHERE id = $1',
-      [user_id]
-    );
+    // If anonymous and no real user_id provided, use a dedicated guest user record.
+    // This enables true unregistered complaints while keeping DB foreign keys intact.
+    let effectiveUserId = incomingUserId;
+    const needsGuestUser = isAnon && (!effectiveUserId || effectiveUserId === '0' || effectiveUserId === 0);
 
-    if (userCheck.length > 0) {
-      const { restriction_level, total_flags } = userCheck[0];
-      if (restriction_level && restriction_level !== 'none') {
-        await connection.rollback();
-        return res.status(403).json({
-          success: false,
-          message: `Your account is ${restriction_level}. You cannot submit reports until the restriction is lifted by an administrator.`,
-          restriction: {
-            level: restriction_level,
-            flags: total_flags
-          }
-        });
+    if (needsGuestUser) {
+      const guestEmail = (process.env.GUEST_REPORTER_EMAIL || 'guest@alertdavao.local').toLowerCase();
+
+      const [existingGuest] = await connection.query(
+        'SELECT id FROM users_public WHERE LOWER(email) = $1 LIMIT 1',
+        [guestEmail]
+      );
+
+      if (existingGuest.length > 0) {
+        effectiveUserId = existingGuest[0].id;
+      } else {
+        const [guestInsert] = await connection.query(
+          `INSERT INTO users_public (email, firstname, lastname, is_verified, email_verified, created_at)
+           VALUES ($1, 'Guest', 'Reporter', false, false, NOW())
+           RETURNING id`,
+          [guestEmail]
+        );
+        effectiveUserId = guestInsert[0].id;
+      }
+
+      console.log('👤 Using guest reporter user_id:', effectiveUserId);
+    }
+
+    // Abuse prevention: DB-backed throttles (in addition to express-rate-limit)
+    const clientIp = normalizeIp(getClientIp(req));
+    await enforceReportAbusePrevention(connection, { clientIp, effectiveUserId, needsGuestUser });
+
+    // Check if user is restricted (skip guest submissions)
+    if (!needsGuestUser && effectiveUserId) {
+      const [userCheck] = await connection.query(
+        'SELECT restriction_level, total_flags FROM users_public WHERE id = $1',
+        [effectiveUserId]
+      );
+
+      if (userCheck.length > 0) {
+        const { restriction_level, total_flags } = userCheck[0];
+        if (restriction_level && restriction_level !== 'none') {
+          await connection.rollback();
+          return res.status(403).json({
+            success: false,
+            message: `Your account is ${restriction_level}. You cannot submit reports until the restriction is lifted by an administrator.`,
+            restriction: {
+              level: restriction_level,
+              flags: total_flags
+            }
+          });
+        }
       }
     }
 
@@ -219,37 +430,89 @@ async function submitReport(req, res) {
     } catch (e) {
       crimeTypesArray = [crime_types];
     }
-    const reportType = JSON.stringify(crimeTypesArray);
+    const crimeTypesNormalized = (Array.isArray(crimeTypesArray) ? crimeTypesArray : [crimeTypesArray])
+      .map((c) => (typeof c === 'string' ? c.trim() : String(c ?? '').trim()))
+      .filter(Boolean);
+
+    const crimeTypesLower = crimeTypesNormalized.map((c) => c.toLowerCase());
+    const reportType = JSON.stringify(crimeTypesNormalized);
 
     // ⚠️ EVIDENCE REQUIREMENT: Make evidence mandatory (with exceptions)
     // This reduces fake reports and improves validation quality
     const EVIDENCE_OPTIONAL_CRIMES = [
-      'Threats', 'Harassment', 'Missing Person', 'Suspicious Activity', 'Noise Complaint'
+      'threats', 'harassment', 'missing person', 'suspicious activity', 'noise complaint'
     ];
 
-    const requiresEvidence = !crimeTypesArray.some(crime =>
+    const requiresEvidence = !crimeTypesLower.some(crime =>
       EVIDENCE_OPTIONAL_CRIMES.includes(crime)
     );
 
-    if (requiresEvidence && !req.file) {
-      console.log('❌ Evidence required but not provided for:', crimeTypesArray);
-      await connection.rollback();
-      return res.status(422).json({
-        success: false,
-        message: "Evidence is required for this type of report",
-        errors: {
-          media: [
-            "Please upload photo or video evidence of this incident. " +
-            "This helps police verify and respond faster to your report."
-          ]
-        }
-      });
+    if (requiresEvidence) {
+      if (!hasFiles) {
+        console.log('❌ Evidence required but not provided for:', crimeTypesNormalized);
+        await connection.rollback();
+        return res.status(422).json({
+          success: false,
+          message: "Evidence is required for this type of report",
+          errors: {
+            media: [
+              "Please upload BOTH a photo AND a video of this incident. " +
+              "This helps police verify and respond faster to your report."
+            ]
+          }
+        });
+      }
+
+      const hasImage = files.some((f) => (f.mimetype || '').startsWith('image/'));
+      const hasVideo = files.some((f) => (f.mimetype || '').startsWith('video/'));
+
+      if (!hasImage || !hasVideo) {
+        console.log('❌ Evidence incomplete (need photo + video). Provided:', files.map(f => f.mimetype));
+        await connection.rollback();
+        return res.status(422).json({
+          success: false,
+          message: "Incomplete evidence",
+          errors: {
+            media: ["Please upload BOTH a photo AND a video. One of the two is missing."]
+          }
+        });
+      }
     }
 
-    if (req.file) {
-      console.log('✅ Evidence provided:', req.file.filename);
+    if (hasFiles) {
+      console.log('✅ Evidence files provided:', files.length);
     } else if (!requiresEvidence) {
       console.log('ℹ️ Evidence optional for this crime type');
+    }
+
+    // Duplicate report prevention (anti-spam)
+    // Keep it strict and simple: within a time window, block multiple submissions by the same account.
+    try {
+      const windowMinutes = getIntEnv('DUPLICATE_REPORT_WINDOW_MINUTES', 10);
+      const contentHash = sha256Hex(`${reportType}|${normalizeDuplicateText(description)}`);
+
+      if (effectiveUserId) {
+        const [recent] = await connection.query(
+          `SELECT report_id
+           FROM reports
+           WHERE user_id = $1
+             AND created_at > NOW() - ($2::text || ' minutes')::interval
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [effectiveUserId, String(windowMinutes)]
+        );
+
+        if (recent && recent.length > 0) {
+          const err = new Error('You recently submitted a report. Please wait a few minutes before submitting another one.');
+          err.statusCode = 409;
+          throw err;
+        }
+      }
+
+      req.__contentHash = contentHash;
+    } catch (dupErr) {
+      if (dupErr && dupErr.statusCode === 409) throw dupErr;
+      console.warn('⚠️ Duplicate detection skipped due to error:', dupErr?.message || dupErr);
     }
 
     // 🚨 URGENCY SCORING: Calculate priority for police operations (Item #11, #13)
@@ -355,7 +618,7 @@ async function submitReport(req, res) {
     }
 
     // Bonus points for having evidence (+10)
-    if (req.file) {
+    if (hasFiles) {
       urgencyScore = Math.min(100, urgencyScore + 10);
       console.log(`📸 Evidence bonus: +10 points`);
     }
@@ -499,7 +762,6 @@ async function submitReport(req, res) {
     }
 
     // Create report record
-    const isAnon = is_anonymous === "1" || is_anonymous === true || is_anonymous === "true";
 
     // 📝 AUTO-GENERATE TITLE if not provided
     // Format: "[Crime Type] - [Barangay] - [Date]"
@@ -507,7 +769,7 @@ async function submitReport(req, res) {
     let reportTitle = title;
 
     if (!reportTitle || reportTitle.trim() === '') {
-      const primaryCrimeType = crimeTypesArray[0]; // Use first crime type
+      const primaryCrimeType = crimeTypesNormalized[0] || crimeTypesArray[0] || 'Incident'; // Use first crime type
       const dateObj = new Date(incident_date);
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const formattedDate = `${monthNames[dateObj.getMonth()]} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
@@ -531,81 +793,173 @@ async function submitReport(req, res) {
     console.log("✅ Encryption complete - data secured with AES-256-CBC");
 
     // Note: stationId can be NULL if coordinates don't fall within any polygon
-    const [reportResult] = await connection.query(
-      `INSERT INTO reports
-      (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, is_focus_crime, has_sufficient_info, created_at, updated_at) 
-       VALUES($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, NOW(), NOW()) RETURNING report_id`,
-      [user_id, locationId, reportTitle, reportType, encryptedDescription, incident_date, isAnon, stationId, isFocusCrime, hasSufficientInfo]
-    );
+    let reportResult;
+    try {
+      [reportResult] = await connection.query(
+        `INSERT INTO reports
+        (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, is_focus_crime, has_sufficient_info, content_hash, created_at, updated_at) 
+         VALUES($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, NOW(), NOW()) RETURNING report_id`,
+        [effectiveUserId, locationId, reportTitle, reportType, encryptedDescription, incident_date, isAnon, stationId, isFocusCrime, hasSufficientInfo, req.__contentHash || null]
+      );
+    } catch (e) {
+      const message = String(e?.message || '');
+      if (message.includes('column "content_hash"')) {
+        [reportResult] = await connection.query(
+          `INSERT INTO reports
+          (user_id, location_id, title, report_type, description, date_reported, status, is_anonymous, assigned_station_id, is_focus_crime, has_sufficient_info, created_at, updated_at) 
+           VALUES($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, NOW(), NOW()) RETURNING report_id`,
+          [effectiveUserId, locationId, reportTitle, reportType, encryptedDescription, incident_date, isAnon, stationId, isFocusCrime, hasSufficientInfo]
+        );
+      } else {
+        throw e;
+      }
+    }
 
     const reportId = reportResult[0].report_id;
     console.log("✅ Report created with ID:", reportId);
 
-    // Handle media upload if file exists
-    let mediaData = null;
-    if (req.file) {
-      console.log("📸 Processing file upload...");
-      console.log("   Original name:", req.file.originalname);
-      console.log("   Saved as:", req.file.filename);
-      console.log("   Size:", req.file.size, "bytes");
-      console.log("   MIME type:", req.file.mimetype);
-      console.log("   Saved to:", req.file.path);
+    // Handle media uploads if files exist
+    let mediaData = [];
+    if (hasFiles) {
+      console.log(`📸 Processing ${files.length} file upload(s)...`);
 
-      // ☁️ Upload to Cloudinary for persistent storage
+      // ☁️ Upload to Cloudinary for persistent storage (and optional moderation)
       const { uploadFile, isConfigured } = require('./cloudinaryService');
-      const fs = require('fs');
 
-      let mediaUrl;
-      const mediaType = path.extname(req.file.originalname).substring(1).toLowerCase();
+      const moderationEnabled = String(process.env.MEDIA_MODERATION_ENABLED || '').trim() === '1';
+      const cloudinaryModerationImageRaw = (process.env.CLOUDINARY_MODERATION_IMAGE || process.env.CLOUDINARY_MODERATION || '').trim();
+      const cloudinaryModerationVideoRaw = (process.env.CLOUDINARY_MODERATION_VIDEO || '').trim();
 
-      if (isConfigured()) {
-        console.log("☁️ Uploading evidence to Cloudinary...");
+      const normalizeModerationValue = (raw) => {
+        const list = raw
+          ? raw.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+        return list.length === 1 ? list[0] : (list.length > 1 ? list : '');
+      };
 
-        const uploadResult = await uploadFile(req.file.path, 'evidence', {
-          public_id: `evidence_${reportId}_${Date.now()}`
-        });
+      const cloudinaryModerationImage = normalizeModerationValue(cloudinaryModerationImageRaw);
+      const cloudinaryModerationVideo = normalizeModerationValue(cloudinaryModerationVideoRaw);
+      const requireModeration = String(process.env.MEDIA_MODERATION_REQUIRE || '').trim() === '1';
 
-        if (uploadResult.success) {
-          mediaUrl = uploadResult.url;
-          console.log("✅ Evidence uploaded to Cloudinary:", mediaUrl);
+      for (const file of files) {
+        console.log("   Original name:", file.originalname);
+        console.log("   Saved as:", file.filename);
+        console.log("   Size:", file.size, "bytes");
+        console.log("   MIME type:", file.mimetype);
+        console.log("   Saved to:", file.path);
+
+        let mediaUrl;
+        const mediaType = path.extname(file.originalname).substring(1).toLowerCase();
+
+        if (isConfigured()) {
+          console.log("☁️ Uploading evidence to Cloudinary...");
+
+          const isImage = (file.mimetype || '').startsWith('image/');
+          const isVideo = (file.mimetype || '').startsWith('video/');
+          const moderationForThisFile = isImage ? cloudinaryModerationImage : (isVideo ? cloudinaryModerationVideo : '');
+
+          const uploadResult = await uploadFile(file.path, 'evidence', {
+            public_id: `evidence_${reportId}_${Date.now()}_${Math.round(Math.random() * 1e9)}`
+            ,
+            ...(moderationEnabled && moderationForThisFile ? { moderation: moderationForThisFile } : {})
+          });
+
+          if (uploadResult.success) {
+            // Media moderation decision (only when enabled)
+            const decision = evaluateCloudinaryModerationDecision(uploadResult);
+            if (decision.decision === 'reject') {
+              console.error('🚫 Evidence blocked by moderation:', decision.reason);
+              try {
+                if (uploadResult.public_id) {
+                  const { deleteFile } = require('./cloudinaryService');
+                  await deleteFile(uploadResult.public_id);
+                }
+              } catch (cleanupError) {
+                console.warn('⚠️ Failed to cleanup moderated Cloudinary asset:', cleanupError?.message || cleanupError);
+              }
+              const err = new Error(`Evidence rejected: ${decision.reason}`);
+              err.statusCode = 422;
+              throw err;
+            }
+
+            mediaUrl = uploadResult.url;
+            console.log("✅ Evidence uploaded to Cloudinary:", mediaUrl);
+
+            // Persist spoiler/sensitive flags per media item
+            file.__moderation = {
+              decision: decision?.decision || 'allow',
+              is_sensitive: decision?.decision === 'flag',
+              moderation_provider: decision?.moderation_provider || null,
+              moderation_status: decision?.moderation_status || null,
+              moderation_raw: uploadResult.moderation || null,
+            };
+          } else {
+            console.error("❌ Cloudinary upload failed:", uploadResult.error);
+            // Fallback to local path (will be lost on redeploy)
+            if (moderationEnabled && requireModeration) {
+              const err = new Error('Evidence moderation is required but Cloudinary upload failed.');
+              err.statusCode = 503;
+              throw err;
+            }
+            mediaUrl = `/evidence/${file.filename}`;
+            console.log("⚠️ Using local fallback path:", mediaUrl);
+          }
         } else {
-          console.error("❌ Cloudinary upload failed:", uploadResult.error);
-          // Fallback to local path (will be lost on redeploy)
-          mediaUrl = `/ evidence / ${req.file.filename}`;
-          console.log("⚠️ Using local fallback path:", mediaUrl);
+          console.log("⚠️ Cloudinary not configured, using local storage (will be lost on redeploy!)");
+          if (moderationEnabled && requireModeration) {
+            const err = new Error('Evidence moderation is required but Cloudinary is not configured.');
+            err.statusCode = 503;
+            throw err;
+          }
+          mediaUrl = `/evidence/${file.filename}`;
         }
-      } else {
-        console.log("⚠️ Cloudinary not configured, using local storage (will be lost on redeploy!)");
-        mediaUrl = `/ evidence / ${req.file.filename}`;
-      }
 
-      console.log("   Media URL:", mediaUrl);
-      console.log("   Media Type:", mediaType);
+        console.log("   Media URL:", mediaUrl);
+        console.log("   Media Type:", mediaType);
 
-      try {
-        const [mediaResult] = await connection.query(
-          "INSERT INTO report_media (report_id, media_url, media_type, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING media_id",
-          [reportId, mediaUrl, mediaType]
-        );
+        const moderationMeta = file.__moderation || null;
+        const isSensitive = Boolean(moderationMeta?.is_sensitive);
+        const moderationProvider = moderationMeta?.moderation_provider || null;
+        const moderationStatus = moderationMeta?.moderation_status || null;
+        const moderationRaw = moderationMeta?.moderation_raw || null;
 
-        mediaData = {
-          media_id: mediaResult[0].media_id,
-          media_url: mediaUrl,
-          media_type: mediaType,
-          file_size: req.file.size,
-          original_name: req.file.originalname,
-        };
+        try {
+          let mediaResult;
+          try {
+            [mediaResult] = await connection.query(
+              "INSERT INTO report_media (report_id, media_url, media_type, is_sensitive, moderation_provider, moderation_status, moderation_raw, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING media_id",
+              [reportId, mediaUrl, mediaType, isSensitive, moderationProvider, moderationStatus, moderationRaw]
+            );
+          } catch (e) {
+            // Backward-compatible fallback if DB hasn't been migrated yet.
+            const message = String(e?.message || '');
+            const missingColumn = message.includes('column "is_sensitive"') || message.includes('column "moderation_provider"') || message.includes('column "moderation_status"') || message.includes('column "moderation_raw"');
+            if (!missingColumn) throw e;
 
-        console.log("✅ Media uploaded successfully!");
-        console.log("   Media ID:", mediaResult[0].media_id);
-        console.log("   Stored in database: report_media table");
-        console.log("   URL:", mediaUrl);
-      } catch (dbError) {
-        console.error("❌ Database insertion failed:", dbError);
-        throw new Error("Failed to save media to database: " + dbError.message);
+            [mediaResult] = await connection.query(
+              "INSERT INTO report_media (report_id, media_url, media_type, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING media_id",
+              [reportId, mediaUrl, mediaType]
+            );
+          }
+
+          mediaData.push({
+            media_id: mediaResult[0].media_id,
+            media_url: mediaUrl,
+            media_type: mediaType,
+            is_sensitive: isSensitive,
+            file_size: file.size,
+            original_name: file.originalname,
+          });
+
+          console.log("✅ Media uploaded successfully!");
+          console.log("   Media ID:", mediaResult[0].media_id);
+        } catch (dbError) {
+          console.error("❌ Database insertion failed:", dbError);
+          throw new Error("Failed to save media to database: " + dbError.message);
+        }
       }
     } else {
-      console.log("⚠️  No file uploaded with this report");
+      console.log("⚠️  No files uploaded with this report");
     }
 
     // Track IP address for security and audit purposes
@@ -633,6 +987,29 @@ async function submitReport(req, res) {
     // Commit transaction
     await connection.commit();
 
+    // Determine submitter role for attachment visibility in response
+    let submitterRole = 'user';
+    try {
+      if (effectiveUserId) {
+        const [rows] = await connection.query(
+          'SELECT role FROM users_public WHERE id = $1',
+          [effectiveUserId]
+        );
+        if (rows?.[0]?.role) submitterRole = rows[0].role;
+      }
+    } catch {
+      // ignore role lookup failures
+    }
+
+    const canViewAttachments = submitterRole === 'admin' || submitterRole === 'police';
+    const responseMedia = canViewAttachments
+      ? mediaData
+      : mediaData.map((m) => ({
+        media_id: m.media_id,
+        media_type: m.media_type,
+        is_sensitive: Boolean(m.is_sensitive),
+      }));
+
     // Return success response
     res.status(201).json({
       success: true,
@@ -652,7 +1029,7 @@ async function submitReport(req, res) {
           barangay: barangay,
           reporters_address: address,
         },
-        media: mediaData,
+        media: responseMedia,
       },
     });
 
@@ -660,9 +1037,12 @@ async function submitReport(req, res) {
   } catch (error) {
     await connection.rollback();
     console.error("❌ Error submitting report:", error);
-    res.status(500).json({
+    const statusCode = typeof error?.statusCode === 'number' ? error.statusCode : 500;
+    res.status(statusCode).json({
       success: false,
-      message: "Failed to submit report: " + error.message,
+      message: statusCode >= 500
+        ? 'Failed to submit report'
+        : (error?.message || 'Request rejected'),
     });
   } finally {
     connection.release();
@@ -704,7 +1084,13 @@ async function getUserReports(req, res) {
       ps.station_name,
       ps.address as station_address,
       ps.contact_number,
-      STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
+      COALESCE(
+        json_agg(
+          json_build_object('media_id', rm.media_id, 'media_url', rm.media_url, 'media_type', rm.media_type, 'is_sensitive', COALESCE(rm.is_sensitive, false))
+          ORDER BY rm.media_id
+        ) FILTER (WHERE rm.media_id IS NOT NULL),
+        '[]'::json
+      ) as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN police_stations ps ON r.assigned_station_id = ps.station_id
@@ -721,14 +1107,19 @@ async function getUserReports(req, res) {
       [userId]
     );
 
+    const canViewAttachments = userRole === 'admin' || userRole === 'police';
+
     // Parse media data and decrypt if authorized
     const formattedReports = reports.map((report) => {
       let mediaArray = [];
-      if (report.media) {
-        mediaArray = report.media.split("|").map((m) => {
-          const [media_id, media_url, media_type] = m.split(":");
-          return { media_id: parseInt(media_id), media_url, media_type };
-        });
+      if (Array.isArray(report.media)) {
+        mediaArray = report.media;
+      } else if (typeof report.media === 'string') {
+        try { mediaArray = JSON.parse(report.media); } catch { mediaArray = []; }
+      }
+
+      if (!canViewAttachments) {
+        mediaArray = [];
       }
 
       // 🔓 DECRYPT sensitive data for authorized roles (police/admin)
@@ -828,7 +1219,13 @@ async function getAllReports(req, res) {
       ps.station_name,
       ps.address as station_address,
       ps.contact_number,
-      STRING_AGG(rm.media_id || ':' || rm.media_url || ':' || rm.media_type, '|') as media
+      COALESCE(
+        json_agg(
+          json_build_object('media_id', rm.media_id, 'media_url', rm.media_url, 'media_type', rm.media_type, 'is_sensitive', COALESCE(rm.is_sensitive, false))
+          ORDER BY rm.media_id
+        ) FILTER (WHERE rm.media_id IS NOT NULL),
+        '[]'::json
+      ) as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN users_public u ON r.user_id = u.id
@@ -862,14 +1259,19 @@ async function getAllReports(req, res) {
 
     const [reports] = await db.query(query, queryParams);
 
+    const canViewAttachments = userRole === 'admin' || userRole === 'police';
+
     // Parse media data and decrypt for authorized roles
     const formattedReports = reports.map((report) => {
       let mediaArray = [];
-      if (report.media) {
-        mediaArray = report.media.split("|").map((m) => {
-          const [media_id, media_url, media_type] = m.split(":");
-          return { media_id: parseInt(media_id), media_url, media_type };
-        });
+      if (Array.isArray(report.media)) {
+        mediaArray = report.media;
+      } else if (typeof report.media === 'string') {
+        try { mediaArray = JSON.parse(report.media); } catch { mediaArray = []; }
+      }
+
+      if (!canViewAttachments) {
+        mediaArray = [];
       }
 
       // 🔓 DECRYPT sensitive data ONLY for police/admin roles

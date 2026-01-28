@@ -5,7 +5,7 @@ services:
     plan: free
     region: singapore
     buildCommand: cd AdminSide/admin && composer install --no-dev --optimize-autoloader
-    startCommand: cd AdminSide/admin && php artisan migrate --force && heroku-php-apache2 public/
+    startCommand: bash scripts/render-migrate.sh && cd AdminSide/admin && heroku-php-apache2 public/
     envVars:
       - key: PHP_VERSION
         value: 8.1

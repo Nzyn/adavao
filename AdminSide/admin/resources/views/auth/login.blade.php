@@ -113,6 +113,10 @@
             position: relative;
         }
 
+        .password-wrapper .form-input {
+            padding-right: 2.75rem;
+        }
+
         .password-toggle {
             position: absolute;
             right: 12px;
@@ -301,14 +305,27 @@
 
                    <div class="form-group password-group">
                        <label for="password" class="form-label">Password <span style="color: red;">*</span></label>
-                       <input 
-                           type="password" 
-                           id="password" 
-                           name="password" 
-                           class="form-input" 
-                           required
-                           placeholder="Enter your password"
-                       >
+                       <div class="password-wrapper">
+                           <input 
+                               type="password" 
+                               id="password" 
+                               name="password" 
+                               class="form-input" 
+                               required
+                               placeholder="Enter your password"
+                           >
+                           <button
+                               type="button"
+                               class="password-toggle"
+                               onclick="togglePassword('password')"
+                               aria-label="Toggle password visibility"
+                           >
+                               <svg id="eye-password" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20">
+                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                               </svg>
+                           </button>
+                       </div>
                        <span class="error-message" id="passwordError" style="display:none;"></span>
                    </div>
 

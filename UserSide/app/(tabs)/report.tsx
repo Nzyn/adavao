@@ -137,11 +137,33 @@ export default function ReportCrime() {
     const [showLocationPicker, setShowLocationPicker] = useState(false);
     const [locationCoordinates, setLocationCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
     const [isAnonymous, setIsAnonymous] = useState(params.anonymous === 'true');
-    const [selectedMedia, setSelectedMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
+    const [selectedPhotoEvidence, setSelectedPhotoEvidence] = useState<ImagePicker.ImagePickerAsset | null>(null);
+    const [selectedVideoEvidence, setSelectedVideoEvidence] = useState<ImagePicker.ImagePickerAsset | null>(null);
     const [showMediaViewer, setShowMediaViewer] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+    type ConfirmSnapshot = {
+        crimeTypes: string[];
+        description: string;
+        incidentDateTime: string;
+        isAnonymous: boolean;
+        locationText: string;
+        streetAddress: string;
+        barangay: string;
+        barangayId: number | null;
+        coordinates: { latitude: number; longitude: number } | null;
+        requiresEvidence: boolean;
+        mediaFiles: Array<{
+            fileName?: string;
+            fileSize?: number;
+            type?: string;
+            uri: string;
+        }>;
+    };
+
+    const [confirmSnapshot, setConfirmSnapshot] = useState<ConfirmSnapshot | null>(null);
     const [flagNotification, setFlagNotification] = useState<Notification | null>(null);
     const [isFlagged, setIsFlagged] = useState(false);
     const [userId, setUserId] = useState<string>('');
@@ -397,39 +419,47 @@ export default function ReportCrime() {
         setShowLocationPicker(false);
     };
 
-    const pickMedia = async () => {
-        // Request permission first
+    const pickEvidence = async (kind: 'photo' | 'video') => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
         if (!permissionResult.granted) {
-            Alert.alert('Permission Required', 'Please grant access to your photo library to upload evidence.');
+            Alert.alert('Permission Required', 'Please grant access to your media library to upload evidence.');
             return;
         }
 
-        // Launch image picker
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images', 'videos'],
-            allowsEditing: true,
+            mediaTypes: kind === 'photo' ? ['images'] : ['videos'],
+            allowsEditing: kind === 'photo',
             quality: 1,
         });
 
         if (!result.canceled && result.assets && result.assets[0]) {
             const asset = result.assets[0];
 
-            // Check file size (25MB = 25 * 1024 * 1024 bytes)
             const maxSizeInBytes = 25 * 1024 * 1024;
-
             if (asset.fileSize && asset.fileSize > maxSizeInBytes) {
                 Alert.alert('File Too Large', 'Your file is too big. Please select a file smaller than 25MB.');
                 return;
             }
 
-            setSelectedMedia(asset);
+            if (kind === 'photo') {
+                setSelectedPhotoEvidence(asset);
+            } else {
+                setSelectedVideoEvidence(asset);
+            }
         }
     };
 
-    const removeMedia = () => {
-        setSelectedMedia(null);
+    const removePhotoEvidence = () => setSelectedPhotoEvidence(null);
+    const removeVideoEvidence = () => setSelectedVideoEvidence(null);
+
+    // Helper function to format file sizes
+    const formatBytes = (bytes?: number) => {
+        if (!bytes || bytes <= 0) return 'Unknown size';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const exp = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const value = bytes / Math.pow(1024, exp);
+        return `${value.toFixed(value >= 10 || exp === 0 ? 0 : 1)} ${units[exp]}`;
     };
 
 
@@ -464,7 +494,7 @@ export default function ReportCrime() {
 
         if (selectedCrimes.length === 0) {
             console.log('❌ Validation failed: No crime types');
-            window.alert('Missing Information: Please select at least one crime type.');
+            Alert.alert('Missing Information', 'Please select at least one crime type.');
             return;
         }
         console.log('✅ Crime types validated');
@@ -477,13 +507,16 @@ export default function ReportCrime() {
 
         if (foundSensitive.length > 0) {
             console.log('❌ Validation failed: Sensitive content detected');
-            window.alert('Sensitive Content Detected\n\nYour report contains inappropriate language ("' + foundSensitive[0] + '").\n\nPlease remove it to maintain community guidelines.');
+            Alert.alert(
+                'Sensitive Content Detected',
+                `Your report contains inappropriate language ("${foundSensitive[0]}").\n\nPlease remove it to maintain community guidelines.`
+            );
             return;
         }
 
         if (!description.trim()) {
             console.log('❌ Validation failed: No description');
-            window.alert('Missing Information: Please describe what happened in detail.');
+            Alert.alert('Missing Information', 'Please describe what happened in detail.');
             return;
         }
         console.log('✅ Description validated');
@@ -493,21 +526,21 @@ export default function ReportCrime() {
             'Threats', 'Harassment', 'Missing Person', 'Suspicious Activity', 'Noise Complaint'
         ];
 
-        const requiresEvidence = !selectedCrimes.some(crime =>
-            EVIDENCE_OPTIONAL_CRIMES.includes(crime)
+        const selectedCrimesLower = selectedCrimes.map(c => (c || '').toLowerCase().trim());
+        const requiresEvidence = !selectedCrimesLower.some(crime =>
+            EVIDENCE_OPTIONAL_CRIMES.map(c => c.toLowerCase()).includes(crime)
         );
 
-        if (requiresEvidence && !selectedMedia) {
+        if (requiresEvidence && (!selectedPhotoEvidence || !selectedVideoEvidence)) {
             console.log('❌ Validation failed: Evidence required but not provided');
-            window.alert(
-                'Evidence Required: Please upload photo or video evidence of this incident.\n\n' +
-                'This helps police verify and respond faster to your report.\n\n' +
-                'Evidence is required for: ' + selectedCrimes.join(', ')
+            Alert.alert(
+                'Evidence Required',
+                `Please upload BOTH a photo AND a video of this incident.\n\nThis helps police verify and respond faster to your report.\n\nEvidence is required for: ${selectedCrimes.join(', ')}`
             );
             return;
         }
 
-        if (selectedMedia) {
+        if (selectedPhotoEvidence || selectedVideoEvidence) {
             console.log('✅ Evidence provided');
         } else {
             console.log('ℹ️ Evidence optional for this crime type');
@@ -521,7 +554,7 @@ export default function ReportCrime() {
 
         if (!isAnonymous && (!user || !user.id)) {
             console.log('❌ Validation failed: User not logged in and not anonymous');
-            window.alert('Authentication Required: You must be logged in to submit a report.');
+            Alert.alert('Authentication Required', 'You must be logged in to submit a report.');
             console.error('User not logged in:', user);
             return;
         }
@@ -530,8 +563,9 @@ export default function ReportCrime() {
         // Street address and coordinates are required, barangay is optional (will be determined server-side)
         if (!streetAddress.trim()) {
             console.log('❌ Validation failed: No street address');
-            window.alert(
-                'Missing Information: Please enter a street address.\n\nClick "Select Location" to add your street name, building, and house number.'
+            Alert.alert(
+                'Missing Information',
+                'Please enter a street address.\n\nClick "Select Location" to add your street name, building, and house number.'
             );
             return;
         }
@@ -545,8 +579,9 @@ export default function ReportCrime() {
 
         if (!locationCoordinates) {
             console.log('❌ Validation failed: No coordinates');
-            window.alert(
-                'Missing Information: Location coordinates are missing. Please use the location picker to set a valid location.'
+            Alert.alert(
+                'Missing Information',
+                'Location coordinates are missing. Please use the location picker to set a valid location.'
             );
             return;
         }
@@ -555,8 +590,9 @@ export default function ReportCrime() {
         // Validate coordinates are not 0,0
         if (locationCoordinates.latitude === 0 && locationCoordinates.longitude === 0) {
             console.log('❌ Validation failed: Invalid coordinates (0,0)');
-            window.alert(
-                'Invalid Location: The location has invalid coordinates. Please select a valid location using the map.'
+            Alert.alert(
+                'Invalid Location',
+                'The location has invalid coordinates. Please select a valid location using the map.'
             );
             return;
         }
@@ -571,11 +607,10 @@ export default function ReportCrime() {
 
         if (!geofenceValidation.isValid) {
             console.log('❌ Final geofence check failed:', geofenceValidation.errorMessage);
-            window.alert(
-                'We Only Accept Reports Within Davao City\n\n' +
-                (geofenceValidation.errorMessage ||
-                    'The selected location is outside Davao City boundaries.\n\n' +
-                    'Please go back and select a location within Davao City to proceed with your report.')
+            Alert.alert(
+                'We Only Accept Reports Within Davao City',
+                geofenceValidation.errorMessage ||
+                'The selected location is outside Davao City boundaries.\n\nPlease go back and select a location within Davao City to proceed with your report.'
             );
             return;
         }
@@ -583,6 +618,61 @@ export default function ReportCrime() {
 
         console.log('✅ All validations passed');
         console.log('📢 About to show confirmation...');
+
+        // Keep incident datetime logic consistent with submit payload (Asia/Manila, UTC+8)
+        const getManilaIncidentDateTime = () => {
+            const now = new Date();
+            const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+            const manilaTime = new Date(utcMs + 8 * 3600000);
+
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const year = manilaTime.getFullYear();
+            const month = pad(manilaTime.getMonth() + 1);
+            const day = pad(manilaTime.getDate());
+            const hour = pad(manilaTime.getHours());
+            const minute = pad(manilaTime.getMinutes());
+            const second = pad(manilaTime.getSeconds());
+
+            return {
+                payload: `${year}-${month}-${day} ${hour}:${minute}:${second}`,
+                display: `${month}/${day}/${year} ${hour}:${minute}:${second} (Asia/Manila)`
+            };
+        };
+
+        const incident = getManilaIncidentDateTime();
+
+        setConfirmSnapshot({
+            crimeTypes: [...selectedCrimes],
+            description: description.trim(),
+            incidentDateTime: incident.display,
+            isAnonymous,
+            locationText: (location || '').trim(),
+            streetAddress: (streetAddress || '').trim(),
+            barangay: (barangay || '').trim(),
+            barangayId,
+            coordinates: locationCoordinates
+                ? { latitude: locationCoordinates.latitude, longitude: locationCoordinates.longitude }
+                : null,
+            requiresEvidence,
+            mediaFiles: [
+                ...(selectedPhotoEvidence
+                    ? [{
+                        uri: selectedPhotoEvidence.uri,
+                        fileName: selectedPhotoEvidence.fileName ?? undefined,
+                        fileSize: selectedPhotoEvidence.fileSize ?? undefined,
+                        type: selectedPhotoEvidence.type ?? undefined,
+                    }]
+                    : []),
+                ...(selectedVideoEvidence
+                    ? [{
+                        uri: selectedVideoEvidence.uri,
+                        fileName: selectedVideoEvidence.fileName ?? undefined,
+                        fileSize: selectedVideoEvidence.fileSize ?? undefined,
+                        type: selectedVideoEvidence.type ?? undefined,
+                    }]
+                    : []),
+            ],
+        });
 
         // Show custom confirmation modal
         setShowConfirmDialog(true);
@@ -622,12 +712,24 @@ export default function ReportCrime() {
                 reporters_address: streetAddress.trim(), // Street address for database
                 barangay: barangay, // Barangay name
                 barangay_id: barangayId, // Barangay ID for linking
-                media: selectedMedia ? {
-                    uri: selectedMedia.uri,
-                    fileName: selectedMedia.fileName ?? undefined,
-                    fileSize: selectedMedia.fileSize ?? undefined,
-                    type: selectedMedia.type ?? undefined
-                } : null,
+                mediaFiles: [
+                    ...(selectedPhotoEvidence
+                        ? [{
+                            uri: selectedPhotoEvidence.uri,
+                            fileName: selectedPhotoEvidence.fileName ?? undefined,
+                            fileSize: selectedPhotoEvidence.fileSize ?? undefined,
+                            type: selectedPhotoEvidence.type ?? undefined,
+                        }]
+                        : []),
+                    ...(selectedVideoEvidence
+                        ? [{
+                            uri: selectedVideoEvidence.uri,
+                            fileName: selectedVideoEvidence.fileName ?? undefined,
+                            fileSize: selectedVideoEvidence.fileSize ?? undefined,
+                            type: selectedVideoEvidence.type ?? undefined,
+                        }]
+                        : []),
+                ],
                 userId: user?.id || '0',
             };
 
@@ -635,7 +737,7 @@ export default function ReportCrime() {
             console.log('   Crime Types:', reportData.crimeTypes);
             console.log('   Location:', reportData.location);
             console.log('   Coordinates:', { lat: reportData.latitude, lng: reportData.longitude });
-            console.log('   Has Media:', !!reportData.media);
+            console.log('   Has Media:', (reportData.mediaFiles?.length || 0) > 0);
             console.log('   Anonymous:', reportData.isAnonymous);
             console.log('   User ID:', reportData.userId);
 
@@ -647,7 +749,7 @@ export default function ReportCrime() {
             console.log('Response:', response);
 
             // Store success data to show in dialog
-            const locationStr = location.trim() || `${locationCoordinates?.latitude?.toFixed(4)}, ${locationCoordinates?.longitude?.toFixed(4)}`;
+            const locationStr = location.trim() || streetAddress.trim() || barangay?.trim() || 'Location recorded';
             const successMessage = `Your report has been submitted successfully.\n\nLocation: ${locationStr}\n\nIP Address and location have been recorded for security and tracking purposes.`;
 
             // Show success dialog with IP/location recording message
@@ -665,7 +767,7 @@ export default function ReportCrime() {
                 ? error.message
                 : 'An unexpected error occurred. Please try again.';
 
-            window.alert('Submission Failed: ' + errorMessage);
+            Alert.alert('Submission Failed', errorMessage);
         } finally {
             setIsSubmitting(false);
         }
@@ -907,69 +1009,93 @@ export default function ReportCrime() {
                     multiline
                 />
 
-                <Text style={styles.label}>Photo/Video Evidence *</Text>
+                <Text style={styles.label}>Evidence (Photo + Video) *</Text>
                 <Text style={{ fontSize: 12, color: '#666', marginBottom: 8, marginTop: -8 }}>
-                    Required for most crime types. Upload a photo or video of the incident, damage, or suspect.
+                    Required for most crime types. If required, upload BOTH a photo AND a video of the incident, damage, or suspect.
                 </Text>
-                <TouchableOpacity style={[styles.mediaButton, isFlagged && { opacity: 0.6 }]} onPress={isFlagged ? undefined : pickMedia}>
-                    <Ionicons name="camera-outline" size={24} color="#1D3557" />
-                    <Text style={styles.mediaButtonText}>Select Photo/Video</Text>
-                </TouchableOpacity>
 
-                {selectedMedia && (
-                    <View style={styles.mediaPreviewContainer}>
-                        <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} onPress={() => setShowMediaViewer(true)}>
-                            {/* Image Thumbnail Preview */}
-                            {(selectedMedia?.mimeType?.startsWith('image') ||
-                                selectedMedia?.type?.startsWith('image') ||
-                                selectedMedia?.uri?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) ? (
-                                <View style={{
-                                    width: 80,
-                                    height: 80,
-                                    borderRadius: 8,
-                                    overflow: 'hidden',
-                                    marginRight: 12,
-                                    backgroundColor: '#f0f0f0',
-                                    borderWidth: 1,
-                                    borderColor: '#ddd'
-                                }}>
-                                    <Image
-                                        source={{ uri: selectedMedia.uri }}
-                                        style={{ width: '100%', height: '100%' }}
-                                        resizeMode="cover"
-                                    />
-                                </View>
-                            ) : (
-                                <View style={{
-                                    width: 80,
-                                    height: 80,
-                                    borderRadius: 8,
-                                    marginRight: 12,
-                                    backgroundColor: '#f0f0f0',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    borderWidth: 1,
-                                    borderColor: '#ddd'
-                                }}>
-                                    <Ionicons name="videocam" size={32} color="#1D3557" />
-                                </View>
-                            )}
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.mediaName}>{selectedMedia.fileName || 'Selected Media'}</Text>
-                                <Text style={styles.mediaSize}>
-                                    {selectedMedia.fileSize ? `${(selectedMedia.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'Unknown size'}
-                                </Text>
-                                <Text style={{ color: '#1D3557', marginTop: 4, fontSize: 12 }}>Tap to view full size</Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity
+                        style={[styles.mediaButton, { flex: 1 }, isFlagged && { opacity: 0.6 }]}
+                        onPress={isFlagged ? undefined : () => pickEvidence('photo')}
+                    >
+                        <Ionicons name="image-outline" size={24} color="#1D3557" />
+                        <Text style={styles.mediaButtonText}>Select Photo</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.mediaButton, { flex: 1 }, isFlagged && { opacity: 0.6 }]}
+                        onPress={isFlagged ? undefined : () => pickEvidence('video')}
+                    >
+                        <Ionicons name="videocam-outline" size={24} color="#1D3557" />
+                        <Text style={styles.mediaButtonText}>Select Video</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {(selectedPhotoEvidence || selectedVideoEvidence) && (
+                    <View style={{ marginTop: 12 }}>
+                        {selectedPhotoEvidence && (
+                            <View style={styles.mediaPreviewContainer}>
+                                <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} onPress={() => setShowMediaViewer(true)}>
+                                    <View style={{
+                                        width: 80,
+                                        height: 80,
+                                        borderRadius: 8,
+                                        overflow: 'hidden',
+                                        marginRight: 12,
+                                        backgroundColor: '#f0f0f0',
+                                        borderWidth: 1,
+                                        borderColor: '#ddd'
+                                    }}>
+                                        <Image
+                                            source={{ uri: selectedPhotoEvidence.uri }}
+                                            style={{ width: '100%', height: '100%' }}
+                                            resizeMode="cover"
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.mediaName}>{selectedPhotoEvidence.fileName || 'Selected Photo'}</Text>
+                                        <Text style={styles.mediaSize}>{formatBytes(selectedPhotoEvidence.fileSize)}</Text>
+                                        <Text style={{ color: '#1D3557', marginTop: 4, fontSize: 12 }}>Tap to view</Text>
+                                    </View>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.removeButton} onPress={removePhotoEvidence}>
+                                    <Ionicons name="close-circle" size={24} color="#dc3545" />
+                                </TouchableOpacity>
                             </View>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.removeButton} onPress={removeMedia}>
-                            <Ionicons name="close-circle" size={24} color="#dc3545" />
-                        </TouchableOpacity>
+                        )}
+
+                        {selectedVideoEvidence && (
+                            <View style={styles.mediaPreviewContainer}>
+                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                    <View style={{
+                                        width: 80,
+                                        height: 80,
+                                        borderRadius: 8,
+                                        marginRight: 12,
+                                        backgroundColor: '#f0f0f0',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        borderWidth: 1,
+                                        borderColor: '#ddd'
+                                    }}>
+                                        <Ionicons name="videocam" size={32} color="#1D3557" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.mediaName}>{selectedVideoEvidence.fileName || 'Selected Video'}</Text>
+                                        <Text style={styles.mediaSize}>{formatBytes(selectedVideoEvidence.fileSize)}</Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity style={styles.removeButton} onPress={removeVideoEvidence}>
+                                    <Ionicons name="close-circle" size={24} color="#dc3545" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 )}
 
-                {/* Full-screen media viewer */}
-                {showMediaViewer && selectedMedia && (
+                {/* Full-screen photo viewer */}
+                {showMediaViewer && selectedPhotoEvidence && (
                     <Modal
                         transparent
                         visible={showMediaViewer}
@@ -977,7 +1103,6 @@ export default function ReportCrime() {
                         onRequestClose={() => setShowMediaViewer(false)}
                     >
                         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
-                            {/* Close button */}
                             <TouchableOpacity
                                 onPress={() => setShowMediaViewer(false)}
                                 style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}
@@ -985,18 +1110,16 @@ export default function ReportCrime() {
                                 <Ionicons name="close-circle" size={36} color="#fff" />
                             </TouchableOpacity>
 
-                            {/* Image preview - full width */}
                             <Image
-                                source={{ uri: selectedMedia.uri }}
+                                source={{ uri: selectedPhotoEvidence.uri }}
                                 style={{ width: '95%', height: '70%' }}
                                 resizeMode="contain"
                                 onError={(e) => console.error('Image load error:', e.nativeEvent.error)}
                                 onLoad={() => console.log('✅ Image loaded successfully')}
                             />
 
-                            {/* File name at bottom */}
                             <Text style={{ color: '#fff', marginTop: 16, fontSize: 14 }}>
-                                {selectedMedia.fileName || 'Selected Image'}
+                                {selectedPhotoEvidence.fileName || 'Selected Photo'}
                             </Text>
                         </View>
                     </Modal>
@@ -1066,7 +1189,10 @@ export default function ReportCrime() {
                     visible={showConfirmDialog}
                     transparent={true}
                     animationType="fade"
-                    onRequestClose={() => setShowConfirmDialog(false)}
+                    onRequestClose={() => {
+                        setShowConfirmDialog(false);
+                        setConfirmSnapshot(null);
+                    }}
                 >
                     <View style={confirmStyles.overlay}>
                         <View style={confirmStyles.dialog}>
@@ -1084,12 +1210,126 @@ export default function ReportCrime() {
                                 This helps ensure accountability and assists law enforcement in responding to reports.
                             </Text>
 
+                            <View style={confirmStyles.detailsContainer}>
+                                <Text style={confirmStyles.detailsTitle}>Review your report details</Text>
+                                <ScrollView style={confirmStyles.detailsScroll} contentContainerStyle={confirmStyles.detailsScrollContent}>
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Crime type(s)</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {(confirmSnapshot?.crimeTypes?.length ? confirmSnapshot.crimeTypes : selectedCrimes).join(', ') || 'N/A'}
+                                        </Text>
+                                    </View>
+
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Description</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {confirmSnapshot?.description ?? description.trim()}
+                                        </Text>
+                                    </View>
+
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Incident time</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {confirmSnapshot?.incidentDateTime || 'Will be recorded at submission time (Asia/Manila)'}
+                                        </Text>
+                                    </View>
+
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Anonymous</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {(confirmSnapshot?.isAnonymous ?? isAnonymous) ? 'Yes' : 'No'}
+                                        </Text>
+                                    </View>
+
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Location</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {(
+                                                confirmSnapshot?.locationText ||
+                                                location.trim() ||
+                                                streetAddress.trim() ||
+                                                barangay?.trim() ||
+                                                'Location recorded'
+                                            )}
+                                        </Text>
+                                    </View>
+
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Street address</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {confirmSnapshot?.streetAddress || streetAddress.trim()}
+                                        </Text>
+                                    </View>
+
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Barangay</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {(confirmSnapshot?.barangay || barangay?.trim())
+                                                ? `${confirmSnapshot?.barangay || barangay?.trim()}${(confirmSnapshot?.barangayId ?? barangayId) ? ` (ID: ${confirmSnapshot?.barangayId ?? barangayId})` : ''}`
+                                                : 'Auto-detected server-side'}
+                                        </Text>
+                                    </View>
+
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Coordinates</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {(() => {
+                                                const coords = confirmSnapshot?.coordinates || locationCoordinates;
+                                                if (!coords) return 'N/A';
+                                                return `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+                                            })()}
+                                        </Text>
+                                    </View>
+
+                                    <View style={confirmStyles.detailRow}>
+                                        <Text style={confirmStyles.detailLabel}>Evidence</Text>
+                                        <Text style={confirmStyles.detailValue}>
+                                            {(() => {
+                                                const mediaFiles = (confirmSnapshot?.mediaFiles && confirmSnapshot.mediaFiles.length > 0)
+                                                    ? confirmSnapshot.mediaFiles
+                                                    : [
+                                                        ...(selectedPhotoEvidence ? [{
+                                                            uri: selectedPhotoEvidence.uri,
+                                                            fileName: selectedPhotoEvidence.fileName ?? undefined,
+                                                            fileSize: selectedPhotoEvidence.fileSize ?? undefined,
+                                                            type: selectedPhotoEvidence.type ?? undefined,
+                                                        }] : []),
+                                                        ...(selectedVideoEvidence ? [{
+                                                            uri: selectedVideoEvidence.uri,
+                                                            fileName: selectedVideoEvidence.fileName ?? undefined,
+                                                            fileSize: selectedVideoEvidence.fileSize ?? undefined,
+                                                            type: selectedVideoEvidence.type ?? undefined,
+                                                        }] : []),
+                                                    ];
+
+                                                if (!mediaFiles || mediaFiles.length === 0) {
+                                                    const required = confirmSnapshot?.requiresEvidence ?? false;
+                                                    return required ? 'Required (missing photo + video)' : 'None (optional for selected crime types)';
+                                                }
+
+                                                return mediaFiles
+                                                    .map((m) => {
+                                                        const name = m.fileName || 'Selected file';
+                                                        const type = m.type ? ` • ${m.type}` : '';
+                                                        const size = m.fileSize ? ` • ${formatBytes(m.fileSize)}` : '';
+                                                        return `${name}${type}${size}`;
+                                                    })
+                                                    .join(' | ');
+                                            })()}
+                                        </Text>
+                                    </View>
+                                </ScrollView>
+                            </View>
+
                             <Text style={confirmStyles.question}>Do you want to proceed?</Text>
 
                             <View style={confirmStyles.buttonContainer}>
                                 <TouchableOpacity
                                     style={[confirmStyles.button, confirmStyles.cancelButton]}
-                                    onPress={() => setShowConfirmDialog(false)}
+                                    onPress={() => {
+                                        setShowConfirmDialog(false);
+                                        setConfirmSnapshot(null);
+                                    }}
                                     disabled={isSubmitting}
                                 >
                                     <Text style={confirmStyles.cancelButtonText}>Cancel</Text>
@@ -1100,6 +1340,7 @@ export default function ReportCrime() {
                                     onPress={() => {
                                         console.log('🚀 User confirmed submission, calling submitReportData...');
                                         setShowConfirmDialog(false);
+                                        setConfirmSnapshot(null);
                                         submitReportData();
                                     }}
                                     disabled={isSubmitting}
@@ -1189,7 +1430,8 @@ export default function ReportCrime() {
 
                             setLocationCoordinates(null);
                             setIsAnonymous(false);
-                            setSelectedMedia(null);
+                            setSelectedPhotoEvidence(null);
+                            setSelectedVideoEvidence(null);
                             // Navigate to history
                             router.push('/history');
                         }}
@@ -1323,6 +1565,42 @@ const confirmStyles = StyleSheet.create({
         color: '#1D3557',
         textAlign: 'center',
         marginBottom: 24,
+    },
+    detailsContainer: {
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 12,
+        backgroundColor: '#f9fafb',
+        padding: 12,
+        marginBottom: 16,
+    },
+    detailsTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: '#111827',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    detailsScroll: {
+        maxHeight: 260,
+    },
+    detailsScrollContent: {
+        paddingBottom: 4,
+    },
+    detailRow: {
+        marginBottom: 10,
+    },
+    detailLabel: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#374151',
+        marginBottom: 2,
+        textTransform: 'uppercase',
+    },
+    detailValue: {
+        fontSize: 14,
+        color: '#111827',
+        lineHeight: 20,
     },
     buttonContainer: {
         flexDirection: 'row',

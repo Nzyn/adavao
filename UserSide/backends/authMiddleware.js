@@ -5,6 +5,14 @@
 
 const db = require("./db");
 
+function normalizeRole(role) {
+  let normalized = String(role || 'user').toLowerCase();
+  if (normalized === 'superadmin' || normalized === 'super_admin') normalized = 'admin';
+  // Patrol officers are operationally police for access control
+  if (normalized === 'patrol_officer') normalized = 'police';
+  return normalized;
+}
+
 /**
  * Middleware to verify user role from database
  * Expects userId to be passed in query, body, or params
@@ -13,7 +21,7 @@ const db = require("./db");
 const verifyUserRole = async (req, res, next) => {
   try {
     // Get userId from various sources
-    const userId = req.params.userId || req.query.userId || req.body.userId;
+    const userId = req.params.userId || req.query.userId || req.body.userId || req.headers['x-user-id'];
 
     if (!userId) {
       return res.status(400).json({
@@ -22,21 +30,9 @@ const verifyUserRole = async (req, res, next) => {
       });
     }
 
-    // Query database to get actual user role
-    const [users] = await db.query(
-      "SELECT role FROM users_public WHERE id = $1",
-      [userId]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found"
-      });
-    }
-
-    // Set verified role from database
-    req.userRole = users[0].role || 'user';
+    // Query database to get actual user role (check BOTH admin/officer and public users)
+    const role = await getVerifiedUserRole(userId);
+    req.userRole = role;
     req.userId = userId;
 
     console.log(`✅ Verified user ${userId} has role: ${req.userRole}`);
@@ -104,23 +100,19 @@ const getVerifiedUserRole = async (userId) => {
     );
 
     if (adminUsers.length > 0) {
-      let role = adminUsers[0].role || 'admin';
-      // Normalize superadmin variants to 'admin' for access control purposes
-      if (role === 'superadmin' || role === 'super_admin') {
-        role = 'admin';
-      }
+      const role = normalizeRole(adminUsers[0].role || 'admin');
       console.log(`✅ Found admin/police user ${userId} with role: ${role}`);
       return role;
     }
 
     // If not in user_admin, check users_public (UserSide app users)
     const [publicUsers] = await db.query(
-      "SELECT role FROM users_public WHERE id = $1",
+      "SELECT COALESCE(user_role, role, 'user') AS role FROM users_public WHERE id = $1",
       [userId]
     );
 
     if (publicUsers.length > 0) {
-      return publicUsers[0].role || 'user';
+      return normalizeRole(publicUsers[0].role || 'user');
     }
 
     console.log(`⚠️ User ${userId} not found in any user table`);

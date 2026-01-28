@@ -57,7 +57,8 @@ const uploadFile = async (filePath, folder = 'alertdavao', options = {}) => {
             public_id: result.public_id,
             format: result.format,
             resource_type: result.resource_type,
-            bytes: result.bytes
+            bytes: result.bytes,
+            moderation: result.moderation
         };
     } catch (error) {
         console.error('❌ Cloudinary upload error:', error);

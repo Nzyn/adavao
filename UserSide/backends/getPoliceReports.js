@@ -45,7 +45,13 @@ async function getReportsByStation(req, res) {
         ps.station_name,
         ps.address as station_address,
         ps.contact_number,
-        STRING_AGG(CONCAT(rm.media_id, ':', rm.media_url, ':', rm.media_type), '|') as media
+        COALESCE(
+          json_agg(
+            json_build_object('media_id', rm.media_id, 'media_url', rm.media_url, 'media_type', rm.media_type, 'is_sensitive', COALESCE(rm.is_sensitive, false))
+            ORDER BY rm.media_id
+          ) FILTER (WHERE rm.media_id IS NOT NULL),
+          '[]'::json
+        ) as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN users_public u ON r.user_id = u.id
@@ -66,11 +72,10 @@ async function getReportsByStation(req, res) {
     // Parse media data and decrypt encrypted fields
     const formattedReports = reports.map((report) => {
       let mediaArray = [];
-      if (report.media) {
-        mediaArray = report.media.split("|").map((m) => {
-          const [media_id, media_url, media_type] = m.split(":");
-          return { media_id: parseInt(media_id), media_url, media_type };
-        });
+      if (Array.isArray(report.media)) {
+        mediaArray = report.media;
+      } else if (typeof report.media === 'string') {
+        try { mediaArray = JSON.parse(report.media); } catch { mediaArray = []; }
       }
 
       // Parse report_type from JSON string to array
@@ -188,7 +193,13 @@ async function getReportsByStationAndStatus(req, res) {
         ps.station_name,
         ps.address as station_address,
         ps.contact_number,
-        STRING_AGG(CONCAT(rm.media_id, ':', rm.media_url, ':', rm.media_type), '|') as media
+        COALESCE(
+          json_agg(
+            json_build_object('media_id', rm.media_id, 'media_url', rm.media_url, 'media_type', rm.media_type, 'is_sensitive', COALESCE(rm.is_sensitive, false))
+            ORDER BY rm.media_id
+          ) FILTER (WHERE rm.media_id IS NOT NULL),
+          '[]'::json
+        ) as media
       FROM reports r
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN users_public u ON r.user_id = u.id
@@ -209,11 +220,10 @@ async function getReportsByStationAndStatus(req, res) {
     // Parse media data and decrypt encrypted fields
     const formattedReports = reports.map((report) => {
       let mediaArray = [];
-      if (report.media) {
-        mediaArray = report.media.split("|").map((m) => {
-          const [media_id, media_url, media_type] = m.split(":");
-          return { media_id: parseInt(media_id), media_url, media_type };
-        });
+      if (Array.isArray(report.media)) {
+        mediaArray = report.media;
+      } else if (typeof report.media === 'string') {
+        try { mediaArray = JSON.parse(report.media); } catch { mediaArray = []; }
       }
 
       // Parse report_type from JSON string to array

@@ -378,6 +378,119 @@
             <div class="stat-value" style="font-size: 1.25rem;" id="forecastStatus">Checking...</div>
             <div class="stat-change">Port 8001</div>
         </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-label">Total Complaints (DB)</span>
+                <div class="stat-icon blue">🗃️</div>
+            </div>
+            <div class="stat-value" id="dbTotalReports">-</div>
+            <div class="stat-change" id="dbScopeText">System reports</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-label">Resolved Cases (DB)</span>
+                <div class="stat-icon green">✅</div>
+            </div>
+            <div class="stat-value" id="dbResolvedReports">-</div>
+            <div class="stat-change">Status: resolved</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-label">Complaints (DB)</span>
+                <div class="stat-icon green">🧾</div>
+            </div>
+            <div class="stat-value" id="dbValidReports">-</div>
+            <div class="stat-change">is_valid: valid</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-label">Hoaxes (DB)</span>
+                <div class="stat-icon orange">🚫</div>
+            </div>
+            <div class="stat-value" id="dbInvalidReports">-</div>
+            <div class="stat-change">is_valid: invalid</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-label">Fake Reports (Validated)</span>
+                <div class="stat-icon orange">🕵️</div>
+            </div>
+            <div class="stat-value" id="dbFakeReports">-</div>
+            <div class="stat-change">patrol_dispatches.is_valid = false</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-label">Checking Validity (DB)</span>
+                <div class="stat-icon purple">🕒</div>
+            </div>
+            <div class="stat-value" id="dbCheckingReports">-</div>
+            <div class="stat-change">is_valid: checking</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-label">Patrol On Duty</span>
+                <div class="stat-icon blue">👮</div>
+            </div>
+            <div class="stat-value" id="patrolOnDuty">-</div>
+            <div class="stat-change" id="patrolDutyHint">users_public.is_on_duty</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-label">Active Dispatches</span>
+                <div class="stat-icon purple">🚓</div>
+            </div>
+            <div class="stat-value" id="activeDispatches">-</div>
+            <div class="stat-change">pending/accepted/en_route/arrived</div>
+        </div>
+    </div>
+
+    <!-- Deployment & AI Insights -->
+    <div class="chart-section">
+        <div class="chart-header">
+            <h2 class="chart-title">👮 Deployment & Recommendations</h2>
+        </div>
+        <div id="deploymentSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+            <div style="padding: 1rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
+                <div style="font-size: 0.875rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">Deployment</div>
+                <div style="font-size: 1.25rem; font-weight: 700; color: #111827; margin-top: 0.25rem;" id="deploymentHeadline">Loading...</div>
+                <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;" id="deploymentDetails"></div>
+            </div>
+        </div>
+        <div style="margin-top: 0.5rem;">
+            <div style="font-weight: 600; margin-bottom: 0.5rem; color: #111827;">Recommendations</div>
+            <ul id="aiRecommendations" style="margin: 0; padding-left: 1.25rem; color: #374151;"></ul>
+        </div>
+
+        <div style="margin-top: 1rem;">
+            <div style="font-weight: 600; margin-bottom: 0.5rem; color: #111827;">Station Deployment Suggestions</div>
+            <div id="stationDeploymentTable" style="overflow-x: auto; color: #374151;">Loading...</div>
+        </div>
+    </div>
+
+    <div class="chart-section">
+        <div class="chart-header">
+            <h2 class="chart-title">🗓️ Seasonal Pattern Analysis</h2>
+        </div>
+        <div id="seasonalitySummary" style="color: #374151;">
+            Loading...
+        </div>
+    </div>
+
+    <div class="chart-section">
+        <div class="chart-header">
+            <h2 class="chart-title">📍 Crime Type vs Barangay Correlation</h2>
+        </div>
+        <div id="correlationSummary" style="overflow-x: auto; color: #374151;">
+            Loading...
+        </div>
     </div>
 
     <!-- Crime Trend Chart -->
@@ -480,6 +593,16 @@ let trendChart, typeChart, locationChart;
 let crimeStats = null;
 let forecastData = null;
 let currentFilter = { month: '', year: '' };
+
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 // Polyfill for requestIdleCallback (for older browsers)
 window.requestIdleCallback = window.requestIdleCallback || function(cb) {
@@ -618,6 +741,8 @@ async function loadCrimeStats() {
         if (data.status === 'success') {
             crimeStats = data.data;
             updateOverviewCards(data.data.overview);
+            loadDbReportSummary();
+            loadInsights();
             renderTypeChart(data.data.byType);
             renderLocationChart(data.data.byLocation);
             console.log('Crime statistics loaded successfully');
@@ -761,6 +886,225 @@ function updateOverviewCards(overview) {
     const arrow = change >= 0 ? '↑' : '↓';
     changeEl.textContent = `${arrow} ${Math.abs(change)}% from last month`;
     changeEl.className = `stat-change ${change >= 0 ? 'positive' : 'negative'}`;
+}
+
+// Load DB-backed report summary for analytics cards
+async function loadDbReportSummary() {
+    try {
+        let url = '/api/statistics/report-summary';
+        const params = new URLSearchParams();
+
+        if (currentFilter.month) {
+            // currentFilter.month is expected to be 'YYYY-MM'
+            params.append('month', currentFilter.month);
+        }
+        if (currentFilter.year && !currentFilter.month) {
+            params.append('year', currentFilter.year);
+        }
+
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.status !== 'success' || !data.data) {
+            throw new Error(data.message || 'Invalid response');
+        }
+
+        document.getElementById('dbTotalReports').textContent = (data.data.total ?? 0).toLocaleString();
+        document.getElementById('dbResolvedReports').textContent = (data.data.resolved ?? 0).toLocaleString();
+        document.getElementById('dbInvalidReports').textContent = (data.data.invalid ?? 0).toLocaleString();
+        document.getElementById('dbCheckingReports').textContent = (data.data.checking ?? 0).toLocaleString();
+
+        const validEl = document.getElementById('dbValidReports');
+        if (validEl) validEl.textContent = (data.data.complaints ?? data.data.valid ?? 0).toLocaleString();
+
+        const fakeEl = document.getElementById('dbFakeReports');
+        if (fakeEl) fakeEl.textContent = (data.data.fake_reports ?? 0).toLocaleString();
+
+        const patrolOnDutyEl = document.getElementById('patrolOnDuty');
+        const patrolTotal = (data.data.patrol_total ?? 0);
+        const patrolOnDuty = (data.data.patrol_on_duty ?? 0);
+        if (patrolOnDutyEl) patrolOnDutyEl.textContent = patrolOnDuty.toLocaleString();
+
+        const patrolHint = document.getElementById('patrolDutyHint');
+        if (patrolHint) patrolHint.textContent = `On duty: ${patrolOnDuty.toLocaleString()} / ${patrolTotal.toLocaleString()} patrol officers`;
+
+        const activeDispatchesEl = document.getElementById('activeDispatches');
+        if (activeDispatchesEl) activeDispatchesEl.textContent = (data.data.active_dispatches ?? 0).toLocaleString();
+
+        const scopeText = document.getElementById('dbScopeText');
+        if (scopeText) {
+            if (currentFilter.month) {
+                scopeText.textContent = `Filtered: ${currentFilter.month}`;
+            } else if (currentFilter.year) {
+                scopeText.textContent = `Filtered: ${currentFilter.year}`;
+            } else {
+                scopeText.textContent = 'All time';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading DB report summary:', error);
+        // Fail soft: keep UI usable
+        const ids = ['dbTotalReports', 'dbResolvedReports', 'dbInvalidReports', 'dbCheckingReports', 'dbValidReports', 'dbFakeReports', 'patrolOnDuty', 'activeDispatches'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '-';
+        });
+    }
+}
+
+// Load recommendations/seasonality/correlation insights
+async function loadInsights() {
+    try {
+        let url = '/api/statistics/insights';
+        const params = new URLSearchParams();
+
+        if (currentFilter.month) {
+            params.append('month', currentFilter.month);
+        }
+        if (currentFilter.year && !currentFilter.month) {
+            params.append('year', currentFilter.year);
+        }
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const payload = await response.json();
+        if (payload.status !== 'success' || !payload.data) {
+            throw new Error(payload.message || 'Invalid response');
+        }
+
+        const d = payload.data;
+
+        // Deployment summary
+        const headlineEl = document.getElementById('deploymentHeadline');
+        const detailsEl = document.getElementById('deploymentDetails');
+        if (headlineEl) {
+            headlineEl.textContent = `${(d.deployment?.patrol_on_duty ?? 0)} on-duty patrol / ${(d.deployment?.active_dispatches ?? 0)} active dispatches`;
+        }
+        if (detailsEl) {
+            const overdue = (d.deployment?.overdue_dispatches ?? 0);
+            const fake = (d.deployment?.fake_reports ?? 0);
+            detailsEl.textContent = `Overdue (3-min): ${overdue} · Fake validated: ${fake}`;
+        }
+
+        // Recommendations
+        const list = document.getElementById('aiRecommendations');
+        if (list) {
+            const recs = Array.isArray(d.recommendations) ? d.recommendations : [];
+            list.innerHTML = recs.length
+                ? recs.map(r => `<li>${escapeHtml(r)}</li>`).join('')
+                : '<li>No recommendations available.</li>';
+        }
+
+        // Station deployment table
+        const stationEl = document.getElementById('stationDeploymentTable');
+        if (stationEl) {
+            const stations = Array.isArray(d.stations) ? d.stations : [];
+            if (!stations.length) {
+                stationEl.textContent = 'No station deployment data available.';
+            } else {
+                stationEl.innerHTML = `
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Station</th>
+                                <th style="text-align: right; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">On Duty</th>
+                                <th style="text-align: right; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Active</th>
+                                <th style="text-align: right; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Overdue</th>
+                                <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Suggestion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stations.map(s => `
+                                <tr>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">${escapeHtml(s.station_name)}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 600;">${escapeHtml(s.patrol_on_duty)}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6; text-align: right;">${escapeHtml(s.active_dispatches)}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6; text-align: right;">${escapeHtml(s.overdue_dispatches)}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">${escapeHtml(s.suggestion)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+
+        // Seasonality
+        const seasonEl = document.getElementById('seasonalitySummary');
+        if (seasonEl) {
+            const top = d.seasonality?.topMonths || [];
+            if (!top.length) {
+                seasonEl.textContent = 'No seasonal data available (CSV missing).';
+            } else {
+                seasonEl.innerHTML = `
+                    <div style="margin-bottom: 0.5rem; color: #6b7280;">Top months by average crime count (from CSV)</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
+                        ${top.map(m => `
+                            <div style="padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 10px; background: #f9fafb;">
+                                <div style="font-weight: 700;">${escapeHtml(m.monthName)}</div>
+                                <div style="color: #6b7280; font-size: 0.875rem;">Avg: ${escapeHtml(m.averageCount)} · Total: ${escapeHtml(m.totalCount)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        // Correlation
+        const corrEl = document.getElementById('correlationSummary');
+        if (corrEl) {
+            const pairs = d.correlation?.topPairs || [];
+            if (!pairs.length) {
+                corrEl.textContent = 'No correlation data available for the selected filter.';
+            } else {
+                corrEl.innerHTML = `
+                    <div style="margin-bottom: 0.5rem; color: #6b7280;">Top barangay × crime type pairs (valid reports)</div>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Barangay</th>
+                                <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Crime Type</th>
+                                <th style="text-align: right; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${pairs.map(p => `
+                                <tr>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">${escapeHtml(p.barangay)}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">${escapeHtml(p.crimeType)}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 600;">${escapeHtml(p.count)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading insights:', error);
+        const ids = ['deploymentHeadline', 'deploymentDetails', 'aiRecommendations', 'stationDeploymentTable', 'seasonalitySummary', 'correlationSummary'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (id === 'aiRecommendations') {
+                el.innerHTML = '<li>Failed to load insights.</li>';
+            } else {
+                el.textContent = 'Failed to load insights.';
+            }
+        });
+    }
 }
 
 // Render trend chart with forecast

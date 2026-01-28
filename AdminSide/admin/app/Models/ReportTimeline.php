@@ -5,25 +5,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ReportMedia extends Model
+class ReportTimeline extends Model
 {
     use HasFactory;
-    
-    protected $table = 'report_media';
-    protected $primaryKey = 'media_id';
-    
+
     protected $fillable = [
         'report_id',
-        'media_url',
-        'media_type',
-        'is_sensitive',
-        'moderation_provider',
-        'moderation_status',
-        'moderation_raw'
+        'event_type',
+        'from_value',
+        'to_value',
+        'notes',
+        'changed_by',
     ];
-    
+
     public function report()
     {
         return $this->belongsTo(Report::class, 'report_id', 'report_id');
+    }
+
+    public function actor()
+    {
+        return $this->belongsTo(User::class, 'changed_by', 'id');
     }
 }

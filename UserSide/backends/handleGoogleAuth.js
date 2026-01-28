@@ -2,7 +2,6 @@ const db = require("./db");
 const { OAuth2Client } = require('google-auth-library');
 
 // Initialize Google OAuth client
-// TODO: Replace with your actual Google Web Client ID
 const CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID; // Support both naming conventions
 const client = new OAuth2Client(CLIENT_ID);
 const { sendOtpInternal, verifyOtpInternal } = require('./handleOtp');
@@ -84,6 +83,10 @@ const handleGoogleLogin = async (req, res) => {
 // Verify Google ID token (optional but recommended for production)
 const verifyGoogleToken = async (idToken) => {
   try {
+    if (!CLIENT_ID) {
+      console.warn('⚠️ GOOGLE_WEB_CLIENT_ID is not configured; cannot verify Google token');
+      return null;
+    }
     const ticket = await client.verifyIdToken({
       idToken: idToken,
       audience: CLIENT_ID,
@@ -238,8 +241,7 @@ const handleGoogleOtpVerify = async (req, res) => {
 
     res.json({
       message: 'Login successful',
-      user: user,
-      token: 'dummy-token-jwt-implementation-todo'
+      user: user
     });
 
   } catch (error) {

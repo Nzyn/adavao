@@ -204,6 +204,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/statistics', [StatisticsController::class, 'index'])->name('statistics');
     Route::get('/api/statistics/forecast', [StatisticsController::class, 'getForecast'])->name('statistics.forecast');
     Route::get('/api/statistics/crime-stats', [StatisticsController::class, 'getCrimeStats'])->name('statistics.crime');
+    Route::get('/api/statistics/report-summary', [StatisticsController::class, 'getReportSummary'])->name('statistics.reportSummary');
+    Route::get('/api/statistics/insights', [StatisticsController::class, 'getInsights'])->name('statistics.insights');
     Route::get('/api/statistics/export', [StatisticsController::class, 'exportCrimeData'])->name('statistics.export');
     Route::get('/api/statistics/barangay-stats', [StatisticsController::class, 'getBarangayCrimeStats'])->name('statistics.barangay');
     Route::post('/api/statistics/clear-cache', [StatisticsController::class, 'clearCache'])->name('statistics.clearCache');

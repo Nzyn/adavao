@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ReportTimeline;
 
 class Report extends Model
 {
@@ -72,6 +73,12 @@ class Report extends Model
     public function media()
     {
         return $this->hasMany(ReportMedia::class, 'report_id', 'report_id');
+    }
+
+    public function timelines()
+    {
+        return $this->hasMany(ReportTimeline::class, 'report_id', 'report_id')
+            ->orderBy('created_at', 'asc');
     }
 
     /**

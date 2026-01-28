@@ -62,7 +62,7 @@ router.post('/duty-status', async (req, res) => {
       SET is_on_duty = $1, 
           updated_at = NOW() 
       WHERE id = $2 AND user_role = 'patrol_officer'
-      RETURNING id, name, is_on_duty
+            RETURNING id, firstname, lastname, is_on_duty
     `;
 
         const result = await db.query(query, [is_on_duty, user_id]);

@@ -174,6 +174,9 @@ const handleLogin = async (req, res) => {
     // 8. Return full user data for login
     console.log("✅ Login successful for:", user.email);
 
+    // Role normalization: DB uses `user_role` but older clients may read `role`.
+    const effectiveRole = user.user_role || user.role || 'user';
+
     // Return complete user data
     res.json({
       success: true,
@@ -188,7 +191,8 @@ const handleLogin = async (req, res) => {
         address: user.address || '',
         is_verified: user.is_verified,
         profile_image: user.profile_image,
-        role: user.role,
+        user_role: effectiveRole,
+        role: effectiveRole,
         createdAt: user.created_at,
         updatedAt: user.updated_at,
         emailVerified: Boolean(user.email_verified_at)

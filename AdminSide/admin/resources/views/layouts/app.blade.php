@@ -354,6 +354,17 @@
                         </ul>
                         @endif
                     </li>
+
+                    @if(auth()->user() && (auth()->user()->role === 'police' || auth()->user()->role === 'admin' || str_contains(auth()->user()->email, 'alertdavao.ph')))
+                    <li class="nav-item">
+                        <a href="{{ route('dispatches') }}" class="nav-link {{ request()->routeIs('dispatches') ? 'active' : '' }}">
+                            <svg class="nav-icon" viewBox="0 0 24 24">
+                                <path d="M3 11h18l-1 8H4l-1-8zm2-3h14l1 3H4l1-3zm3 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
+                            </svg>
+                            Dispatches
+                        </a>
+                    </li>
+                    @endif
                     <li class="nav-item">
                         <a href="{{ route('messages') }}" class="nav-link {{ request()->routeIs('messages') ? 'active' : '' }}">
                             <svg class="nav-icon" viewBox="0 0 24 24">

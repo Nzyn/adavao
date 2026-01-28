@@ -146,7 +146,8 @@ class VerificationController extends Controller
     {
         $request->validate([
             'verificationId' => 'required|exists:verifications,verification_id',
-            'userId' => 'required|exists:users_public,id'
+            'userId' => 'required|exists:users_public,id',
+            'rejection_reason' => 'required|string|max:500'
         ]);
         
         try {
@@ -154,6 +155,7 @@ class VerificationController extends Controller
             $verification = Verification::findOrFail($request->verificationId);
             $verification->status = 'rejected';
             $verification->is_verified = false;
+            $verification->rejection_reason = $request->rejection_reason;
             $verification->save();
             
             // Note: We don't update the user's is_verified status here because they should be able to resubmit

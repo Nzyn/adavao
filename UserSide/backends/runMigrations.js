@@ -67,6 +67,99 @@ async function runMigrations() {
       ON reports(verification_status)
     `);
 
+    // Sensitive media (spoiler filter) support
+    console.log('📝 Adding report_media.is_sensitive column...');
+    await db.query(`
+      ALTER TABLE report_media
+      ADD COLUMN IF NOT EXISTS is_sensitive BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
+    console.log('📝 Adding report_media.moderation_provider column...');
+    await db.query(`
+      ALTER TABLE report_media
+      ADD COLUMN IF NOT EXISTS moderation_provider VARCHAR(50)
+    `);
+
+    console.log('📝 Adding report_media.moderation_status column...');
+    await db.query(`
+      ALTER TABLE report_media
+      ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(50)
+    `);
+
+    console.log('📝 Adding report_media.moderation_raw column...');
+    await db.query(`
+      ALTER TABLE report_media
+      ADD COLUMN IF NOT EXISTS moderation_raw JSONB
+    `);
+
+    console.log('📊 Creating index for sensitive media...');
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_report_media_sensitive
+      ON report_media(is_sensitive, report_id)
+    `);
+
+    // Duplicate report detection support
+    console.log('📝 Adding reports.content_hash column...');
+    await db.query(`
+      ALTER TABLE reports
+      ADD COLUMN IF NOT EXISTS content_hash TEXT
+    `);
+
+    console.log('📊 Creating index for reports.content_hash...');
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_reports_content_hash
+      ON reports(content_hash, created_at DESC)
+    `);
+
+    // Patrol dispatch system support (used by UserSide patrol UI)
+    console.log('📝 Ensuring users_public patrol columns exist...');
+    await db.query(`ALTER TABLE users_public ADD COLUMN IF NOT EXISTS user_role VARCHAR(50) DEFAULT 'user'`);
+    await db.query(`ALTER TABLE users_public ADD COLUMN IF NOT EXISTS assigned_station_id BIGINT`);
+    await db.query(`ALTER TABLE users_public ADD COLUMN IF NOT EXISTS is_on_duty BOOLEAN DEFAULT FALSE`);
+    await db.query(`ALTER TABLE users_public ADD COLUMN IF NOT EXISTS push_token TEXT`);
+
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_public_user_role ON users_public(user_role)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_public_assigned_station_id ON users_public(assigned_station_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_public_is_on_duty ON users_public(is_on_duty)`);
+
+    console.log('📝 Ensuring patrol_dispatches table exists...');
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patrol_dispatches (
+        dispatch_id BIGSERIAL PRIMARY KEY,
+        report_id BIGINT NOT NULL,
+        station_id BIGINT NOT NULL,
+        patrol_officer_id BIGINT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        dispatched_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        accepted_at TIMESTAMP NULL,
+        declined_at TIMESTAMP NULL,
+        en_route_at TIMESTAMP NULL,
+        arrived_at TIMESTAMP NULL,
+        completed_at TIMESTAMP NULL,
+        cancelled_at TIMESTAMP NULL,
+        acceptance_time INT NULL,
+        response_time INT NULL,
+        completion_time INT NULL,
+        three_minute_rule_met BOOLEAN NULL,
+        three_minute_rule_time INT NULL,
+        is_valid BOOLEAN NULL,
+        validation_notes TEXT NULL,
+        validated_at TIMESTAMP NULL,
+        dispatched_by BIGINT NULL,
+        decline_reason TEXT NULL,
+        cancellation_reason TEXT NULL,
+        notes TEXT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_report_id ON patrol_dispatches(report_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_officer_id ON patrol_dispatches(patrol_officer_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_status ON patrol_dispatches(status)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_station_id ON patrol_dispatches(station_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_dispatched_at ON patrol_dispatches(dispatched_at DESC)`);
+
     // Update existing reports to set priority flags
     console.log('🔄 Updating existing reports with priority flags...');
     await db.query(`

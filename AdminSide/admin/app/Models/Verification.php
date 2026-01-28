@@ -16,6 +16,7 @@ class Verification extends Model
         'otp_code',
         'expiration',
         'status',
+        'rejection_reason',
         'id_picture',
         'id_selfie',
         'billing_document',

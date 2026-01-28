@@ -11,7 +11,7 @@ const Terms = () => {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: '#fff' }}
-      contentContainerStyle={{ paddingBottom: 50 }}
+      contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={true}
       scrollEnabled={true}
@@ -30,18 +30,18 @@ const Terms = () => {
         <Text style={styles.normalTxtJustify}>Welcome to AlertDavao. By using our platform, you agree to the following Terms and Conditions.
           Please read them carefully before submitting any report or using our services.</Text>
 
-        <Text>1. Purpose of the Platform</Text>
+        <Text style={styles.sectionHeading}>1. Purpose of the Platform</Text>
         <Text style={styles.normalTxtJustify}>AlertDavao is a community safety platform designed to allow users to report crimes, emergencies, and safety-related incidents to DCPO.
           The system facilitates communication between the public and local law enforcement for faster and more efficient response.</Text>
 
-        <Text>2. User Responsibilities</Text>
+        <Text style={styles.sectionHeading}>2. User Responsibilities</Text>
         <Text style={styles.normalTxt}>By using AlertDavao, you agree to: {'\n'}
           • Submit only truthful, accurate, and relevant information.{'\n'}
           • Avoid submitting false, misleading, or malicious reports.{'\n'}
           • Use the platform only for legitimate safety and security concerns.{'\n'}
           • Respect applicable laws and regulations in the Philippines.</Text>
 
-        <Text>3. Data Collection and Privacy</Text>
+        <Text style={styles.sectionHeading}>3. Data Collection and Privacy</Text>
         <Text style={styles.normalTxtJustify}>In compliance with the Data Privacy Act of 2012 (Republic Act No. 10173),
           AlertDavao collects and processes personal data for security and operational purposes, which may include:</Text>
         <Text style={styles.normalTxt}>
@@ -59,29 +59,29 @@ const Terms = () => {
           which helps identify and forecast seasonal crime patterns (e.g., monthly or weekly trends) to assist authorities in resource allocation and proactive crime prevention
         </Text>
 
-        <Text>4. Accountability & Transparency</Text>
+        <Text style={styles.sectionHeading}>4. Accountability & Transparency</Text>
         <Text style={styles.normalTxtJustify}>For every submitted report: {'\n'}
           • Your IP address and GPS location will be recorded.
           • You will receive an automatic confirmation that this data has been logged.
           • This ensures traceability and prevents abuse of the reporting system.
         </Text>
 
-        <Text>5. Limitations of Service</Text>
+        <Text style={styles.sectionHeading}>5. Limitations of Service</Text>
         <Text style={styles.normalTxtJustify}>AlertDavao is a reporting and coordination platform and does not directly dispatch emergency response teams.
           While we aim for fast processing, response time depends on the relevant authorities and not solely on the platform.</Text>
 
-        <Text>6. Misuse and Penalties</Text>
+        <Text style={styles.sectionHeading}>6. Misuse and Penalties</Text>
         <Text style={styles.normalTxtJustify}>Users who submit false or prank reports may face legal action under: {'\n'}
           • Revised Penal Code (False Information / Perjury) {'\n'}
           • Cybercrime Prevention Act of 2012 (RA 10175){'\n'}
           • Other applicable laws upon investigation</Text>
 
-        <Text>7. Modifications to Terms</Text>
+        <Text style={styles.sectionHeading}>7. Modifications to Terms</Text>
         <Text style={styles.normalTxtJustify}>We may update these Terms and Conditions from time to time.
           Continued use of AlertDavao after updates means you accept the revised terms.
         </Text>
 
-        <Text>8. Contact Information</Text>
+        <Text style={styles.sectionHeading}>8. Contact Information</Text>
         <Text style={styles.normalTxtJustify}>For questions, concerns, or requests regarding your personal data or these Terms, please contact:</Text>
         <Text style={styles.normalTxt}>AlertDavao Support Team {'\n'}
           Email: [Insert Support Email] {'\n'}

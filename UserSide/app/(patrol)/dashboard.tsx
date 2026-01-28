@@ -27,19 +27,59 @@ export default function PatrolDashboard() {
     }, []);
 
     const loadUserData = async () => {
-        const name = await AsyncStorage.getItem('userName');
-        setUserName(name || 'Officer');
+        try {
+            const stored = await AsyncStorage.getItem('userData');
+            if (!stored) {
+                setUserName('Officer');
+                return;
+            }
+            const user = JSON.parse(stored);
+            const first = user?.firstname || user?.firstName || '';
+            const last = user?.lastname || user?.lastName || '';
+            const full = `${first} ${last}`.trim();
+            setUserName(full || user?.email || 'Officer');
+        } catch {
+            setUserName('Officer');
+        }
     };
 
     const loadDispatches = async () => {
-        // TODO: Implement dispatch loading from backend
-        setLoading(false);
+        setLoading(true);
+        try {
+            const stored = await AsyncStorage.getItem('userData');
+            const user = stored ? JSON.parse(stored) : null;
+            const userId = user?.id?.toString() || user?.userId?.toString();
+            if (!userId) {
+                setActiveDispatches([]);
+                setLoading(false);
+                return;
+            }
+
+            const response = await fetch(`${API_URL}/patrol/dispatches?userId=${encodeURIComponent(userId)}`);
+            const data = await response.json();
+            if (response.ok && data?.success) {
+                setActiveDispatches(data.data || []);
+            } else {
+                setActiveDispatches([]);
+            }
+        } catch {
+            setActiveDispatches([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const toggleDutyStatus = async () => {
         try {
-            const userId = await AsyncStorage.getItem('userId');
-            const response = await fetch(`${API_URL}/api/user/duty-status`, {
+            const stored = await AsyncStorage.getItem('userData');
+            const user = stored ? JSON.parse(stored) : null;
+            const userId = user?.id?.toString() || user?.userId?.toString();
+            if (!userId) {
+                Alert.alert('Error', 'Missing user session');
+                return;
+            }
+
+            const response = await fetch(`${API_URL}/user/duty-status`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -52,6 +92,7 @@ export default function PatrolDashboard() {
             if (data.success) {
                 setIsOnDuty(!isOnDuty);
                 Alert.alert('Success', `You are now ${!isOnDuty ? 'ON' : 'OFF'} duty`);
+                loadDispatches();
             }
         } catch (error) {
             Alert.alert('Error', 'Failed to update duty status');
@@ -122,9 +163,17 @@ export default function PatrolDashboard() {
                         </View>
                     ) : (
                         activeDispatches.map((dispatch: any) => (
-                            <TouchableOpacity key={dispatch.id} style={styles.dispatchCard}>
-                                <Text style={styles.dispatchTitle}>{dispatch.crime_type}</Text>
-                                <Text style={styles.dispatchLocation}>{dispatch.location}</Text>
+                            <TouchableOpacity
+                                key={dispatch.dispatch_id}
+                                style={styles.dispatchCard}
+                                onPress={() => router.push({ pathname: '/(patrol)/dispatch-details' as any, params: { id: String(dispatch.dispatch_id) } })}
+                            >
+                                <Text style={styles.dispatchTitle}>
+                                    {Array.isArray(dispatch?.report?.report_type) ? dispatch.report.report_type.join(', ') : (dispatch?.report?.report_type || 'Dispatch')}
+                                </Text>
+                                <Text style={styles.dispatchLocation}>
+                                    {dispatch?.report?.location?.barangay || 'Location unavailable'}
+                                </Text>
                             </TouchableOpacity>
                         ))
                     )}
@@ -134,11 +183,17 @@ export default function PatrolDashboard() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Quick Actions</Text>
                     <View style={styles.actionsGrid}>
-                        <TouchableOpacity style={styles.actionCard}>
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => Alert.alert('Coming soon', 'Dispatch History will be available in a future update.')}
+                        >
                             <Ionicons name="list-outline" size={32} color="#3b82f6" />
                             <Text style={styles.actionText}>Dispatch History</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionCard}>
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => Alert.alert('Coming soon', 'Map view will be available in a future update.')}
+                        >
                             <Ionicons name="map-outline" size={32} color="#10b981" />
                             <Text style={styles.actionText}>View Map</Text>
                         </TouchableOpacity>

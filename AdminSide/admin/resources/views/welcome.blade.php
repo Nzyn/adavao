@@ -662,12 +662,6 @@
                 <div class="stat-title">Verification</div>
                 <div class="stat-value">{{ $pendingVerificationsCount }}</div>
             </a>
-
-            <!-- Personnel -->
-            <a href="{{ route('personnel') }}" class="stat-card" style="border-left-color: #6366f1;">
-                <div class="stat-title">Personnel</div>
-                <div class="stat-value">{{ $totalPoliceOfficers }}</div>
-            </a>
             
             <!-- Statistics -->
             <a href="{{ route('statistics') }}" class="stat-card" style="border-left-color: #14b8a6;">

@@ -402,7 +402,7 @@ const Login = () => {
         } catch (error) {
           console.error('Failed to initialize push notifications:', error);
         }
-        router.replace('/(patrol)/dashboard');
+        router.replace('/(patrol)/dashboard' as any);
       } else {
         console.log('🚀 Navigating to /(tabs) (home)...');
         router.replace('/(tabs)');

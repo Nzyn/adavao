@@ -509,6 +509,68 @@
             border: 1px solid #d1d5db;
         }
 
+        .overdue-badge {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: #991b1b;
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+            white-space: nowrap;
+        }
+
+        .timeline-section {
+            margin-top: 1rem;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+
+        .timeline-header {
+            font-weight: 700;
+            color: #1f2937;
+            margin: 0 0 0.75rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .timeline-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.6rem 0;
+            border-bottom: 1px dashed #e5e7eb;
+        }
+
+        .timeline-item:last-child {
+            border-bottom: none;
+        }
+
+        .timeline-event {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #111827;
+        }
+
+        .timeline-meta {
+            font-size: 0.75rem;
+            color: #6b7280;
+            white-space: nowrap;
+        }
+
+        .timeline-notes {
+            margin-top: 0.25rem;
+            font-size: 0.8rem;
+            color: #374151;
+            white-space: pre-wrap;
+        }
+
         .action-btn {
             display: inline-flex;
             align-items: center;
@@ -718,6 +780,49 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             position: relative;
             cursor: pointer;
+        }
+
+        .media-item.sensitive img,
+        .media-item.sensitive video {
+            filter: blur(14px);
+        }
+
+        .media-item.sensitive.revealed img,
+        .media-item.sensitive.revealed video {
+            filter: none;
+        }
+
+        .sensitive-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: rgba(17, 24, 39, 0.45);
+            color: #fff;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .media-item.sensitive.revealed .sensitive-overlay {
+            display: none;
+        }
+
+        .sensitive-overlay .reveal-btn {
+            border: none;
+            background: rgba(255, 255, 255, 0.92);
+            color: #111827;
+            padding: 0.45rem 0.7rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .sensitive-overlay .reveal-btn:hover {
+            background: #ffffff;
         }
 
         .media-item img {
@@ -1220,7 +1325,7 @@
         @endif
 
         <!-- ITEM 15: DATE RANGE FILTER -->
-        <form action="{{ route('reports') }}" method="GET" style="display: flex; gap: 0.5rem; align-items: center; background: white; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <form action="{{ route('reports') }}" method="GET" style="display: flex; gap: 0.75rem; align-items: center; background: white; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); flex-wrap: wrap;">
             @if(request('status'))
                 <input type="hidden" name="status" value="{{ request('status') }}">
             @endif
@@ -1233,8 +1338,34 @@
                 <label style="font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">To</label>
                 <input type="date" name="date_to" value="{{ request('date_to') }}" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; color: #374151;">
             </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <label style="font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">Sort</label>
+                <select name="sort" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; color: #374151; height: 26px;">
+                    <option value="newest" {{ request('sort', 'newest') === 'newest' ? 'selected' : '' }}>Newest</option>
+                    <option value="oldest" {{ request('sort') === 'oldest' ? 'selected' : '' }}>Oldest</option>
+                    <option value="urgent" {{ request('sort') === 'urgent' ? 'selected' : '' }}>Urgent</option>
+                    <option value="severe" {{ request('sort') === 'severe' ? 'selected' : '' }}>Severe (Focus)</option>
+                    <option value="needs_info" {{ request('sort') === 'needs_info' ? 'selected' : '' }}>Needs Info</option>
+                </select>
+            </div>
+
+            <div style="display: flex; flex-direction: column; justify-content: flex-end;">
+                <label style="font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">Flags</label>
+                <div style="display:flex; gap: 0.5rem; align-items:center; height: 26px;">
+                    <label style="display:flex; gap: 0.35rem; align-items:center; font-size: 0.78rem; color: #374151;">
+                        <input type="checkbox" name="overdue" value="1" {{ request('overdue') ? 'checked' : '' }}>
+                        24h+
+                    </label>
+                    <label style="display:flex; gap: 0.35rem; align-items:center; font-size: 0.78rem; color: #374151;">
+                        <input type="checkbox" name="focus" value="1" {{ request('focus') ? 'checked' : '' }}>
+                        Focus
+                    </label>
+                </div>
+            </div>
+
             <button type="submit" style="background: #3b82f6; color: white; border: none; padding: 0 1rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; cursor: pointer; margin-left: 0.5rem; height: 38px; transition: background 0.2s;">Filter</button>
-            @if(request('date_from') || request('date_to') || request('status'))
+            @if(request('date_from') || request('date_to') || request('status') || request('sort') || request('overdue') || request('focus'))
                 <a href="{{ route('reports') }}" style="color: #6b7280; text-decoration: none; font-size: 0.8rem; margin-left: 0.5rem; padding: 0.5rem; border-radius: 4px; background: #f3f4f6;">Reset</a>
             @endif
         </form>
@@ -1317,6 +1448,15 @@
                                     <span class="urgency-badge urgency-{{ $urgencyClass }}" title="Urgency Score: {{ $urgencyScore }}">
                                         {{ $urgencyIcon }} {{ $urgencyLabel }}
                                     </span>
+
+                                    @php
+                                        $isOverdue24h = in_array($report->status, ['pending', 'investigating'], true)
+                                            && $report->created_at
+                                            && $report->created_at->lte(\Carbon\Carbon::now()->subHours(24));
+                                    @endphp
+                                    @if($isOverdue24h)
+                                        <span class="overdue-badge" title="Unaddressed for 24+ hours">⏰ 24H+</span>
+                                    @endif
                                 </td>
                                 <td>{{ \Illuminate\Support\Str::limit($report->title, 30) }}</td>
                                 <td>
@@ -1660,6 +1800,29 @@ window.downloadModalAsPDF = function() {};
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script>
+        function revealSensitiveMedia(mediaId) {
+            const item = document.getElementById(`media-item-${mediaId}`);
+            if (!item) return;
+
+            item.classList.add('revealed');
+            item.dataset.revealed = '1';
+
+            const img = item.querySelector('img');
+            if (img) {
+                const imageIndexRaw = item.dataset.imageIndex;
+                const imageUrlsRaw = item.dataset.imageUrls;
+                if (imageIndexRaw && imageUrlsRaw) {
+                    const imageIndex = Number(imageIndexRaw);
+                    const imageUrlsJson = imageUrlsRaw;
+                    item.onclick = () => openLightbox(imageIndex, imageUrlsJson);
+                }
+            }
+
+            const vid = item.querySelector('video');
+            if (vid) {
+                vid.controls = true;
+            }
+        }
         // ========== GLOBAL VARIABLES ==========
         let currentImages = [];
         let currentImageIndex = 0;
@@ -2151,23 +2314,53 @@ window.downloadModalAsPDF = function() {};
                                 const mediaType = (media.media_type || '').toLowerCase();
                                 const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(mediaType);
                                 const isVideo = ['mp4', 'mov', 'avi', 'webm'].includes(mediaType);
+                                const isSensitive = Boolean(media.is_sensitive);
+                                const mediaId = media.media_id ?? index;
 
                                 if (isImage) {
                                     const imageIndex = imageUrls.indexOf(mediaUrl);
                                     const imageUrlsJson = JSON.stringify(imageUrls).replace(/"/g, '&quot;');
-                                    mediaContent += `
-                                        <div class="media-item" onclick="openLightbox(${imageIndex}, '${imageUrlsJson}')">
-                                            <img src="${mediaUrl}" alt="Evidence ${index + 1}" onerror="this.src='https://placehold.co/200x150?text=Image+Not+Found'" loading="lazy">
-                                            <span class="media-type-badge">📷 Photo</span>
-                                        </div>
-                                    `;
+                                    if (isSensitive) {
+                                        mediaContent += `
+                                            <div class="media-item sensitive" id="media-item-${mediaId}" data-image-index="${imageIndex}" data-image-urls='${imageUrlsJson}'>
+                                                <img src="${mediaUrl}" alt="Evidence ${index + 1}" onerror="this.src='https://placehold.co/200x150?text=Image+Not+Found'" loading="lazy">
+                                                <div class="sensitive-overlay">
+                                                    <div style="font-weight: 800; font-size: 0.8rem;">Sensitive content</div>
+                                                    <div style="font-size: 0.7rem; opacity: 0.9;">Click reveal to view</div>
+                                                    <button class="reveal-btn" onclick="event.stopPropagation(); revealSensitiveMedia(${mediaId});">Reveal</button>
+                                                </div>
+                                                <span class="media-type-badge">📷 Photo</span>
+                                            </div>
+                                        `;
+                                    } else {
+                                        mediaContent += `
+                                            <div class="media-item" onclick="openLightbox(${imageIndex}, '${imageUrlsJson}')">
+                                                <img src="${mediaUrl}" alt="Evidence ${index + 1}" onerror="this.src='https://placehold.co/200x150?text=Image+Not+Found'" loading="lazy">
+                                                <span class="media-type-badge">📷 Photo</span>
+                                            </div>
+                                        `;
+                                    }
                                 } else if (isVideo) {
-                                    mediaContent += `
-                                        <div class="media-item">
-                                            <video src="${mediaUrl}" style="width: 100%; height: 150px; object-fit: cover;" controls></video>
-                                            <span class="media-type-badge">🎥 Video</span>
-                                        </div>
-                                    `;
+                                    if (isSensitive) {
+                                        mediaContent += `
+                                            <div class="media-item sensitive" id="media-item-${mediaId}">
+                                                <video src="${mediaUrl}" style="width: 100%; height: 150px; object-fit: cover;" playsinline></video>
+                                                <div class="sensitive-overlay">
+                                                    <div style="font-weight: 800; font-size: 0.8rem;">Sensitive content</div>
+                                                    <div style="font-size: 0.7rem; opacity: 0.9;">Click reveal to view</div>
+                                                    <button class="reveal-btn" onclick="event.stopPropagation(); revealSensitiveMedia(${mediaId});">Reveal</button>
+                                                </div>
+                                                <span class="media-type-badge">🎥 Video</span>
+                                            </div>
+                                        `;
+                                    } else {
+                                        mediaContent += `
+                                            <div class="media-item">
+                                                <video src="${mediaUrl}" style="width: 100%; height: 150px; object-fit: cover;" controls></video>
+                                                <span class="media-type-badge">🎥 Video</span>
+                                            </div>
+                                        `;
+                                    }
                                 } else {
                                     mediaContent += `
                                         <div class="media-item">
@@ -2206,8 +2399,54 @@ window.downloadModalAsPDF = function() {};
                             `;
                         }
 
+                        // Build report timeline/history
+                        const timeline = Array.isArray(report.timelines) ? report.timelines : [];
+                        const timelineRows = timeline.map((entry) => {
+                            const when = entry.created_at
+                                ? new Date(entry.created_at).toLocaleString('en-US', {
+                                    timeZone: 'Asia/Manila',
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })
+                                : 'Unknown time';
+
+                            const actorName = entry.actor
+                                ? `${entry.actor.firstname || ''} ${entry.actor.lastname || ''}`.trim() || `User #${entry.actor.id}`
+                                : (entry.changed_by ? `User #${entry.changed_by}` : 'System');
+
+                            const change = (entry.from_value || entry.to_value)
+                                ? `${entry.from_value ?? ''}${entry.from_value && entry.to_value ? ' → ' : ''}${entry.to_value ?? ''}`
+                                : '';
+
+                            const eventLabel = entry.event_type === 'status_change'
+                                ? 'Status'
+                                : entry.event_type === 'validity_change'
+                                    ? 'Validity'
+                                    : (entry.event_type || 'Update');
+
+                            return `
+                                <div class="timeline-item">
+                                    <div>
+                                        <div class="timeline-event">${eventLabel}${change ? `: ${change}` : ''}</div>
+                                        ${entry.notes ? `<div class="timeline-notes">${entry.notes}</div>` : ''}
+                                    </div>
+                                    <div class="timeline-meta">${when}<br>${actorName}</div>
+                                </div>
+                            `;
+                        }).join('');
+
+                        const timelineContent = `
+                            <div class="timeline-section">
+                                <h3 class="timeline-header">🕒 Report Timeline</h3>
+                                ${timeline.length ? timelineRows : `<div style="color:#6b7280; font-size: 0.85rem;">No status/history recorded yet.</div>`}
+                            </div>
+                        `;
+
                         // Combine all sections
-                        modalBody.innerHTML = reportInfo + mapContainer + mediaContent;
+                        modalBody.innerHTML = reportInfo + timelineContent + mapContainer + mediaContent;
                         
                         // Store current report ID and data globally
                         window.currentReportId = reportId;

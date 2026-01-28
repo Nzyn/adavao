@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Report;
 use App\Models\ReportMedia;
 use App\Models\Barangay;
+use App\Models\ReportTimeline;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class ReportController extends Controller
 {
@@ -174,6 +176,17 @@ class ReportController extends Controller
             $query->whereDate('reports.created_at', '<=', $request->date_to);
         }
 
+        // 24-hour validity marker filter (unaddressed reports older than 24 hours)
+        if ($request->boolean('overdue')) {
+            $query->whereIn('reports.status', ['pending', 'investigating'])
+                  ->where('reports.created_at', '<=', Carbon::now()->subHours(24));
+        }
+
+        // Focus crimes (severe cases) filter
+        if ($request->boolean('focus')) {
+            $query->where('reports.is_focus_crime', true);
+        }
+
         // ROLE CHECK: Police role takes precedence over admin
         $user = auth()->user();
         $isAdmin = false;
@@ -240,9 +253,29 @@ class ReportController extends Controller
             $query->whereRaw('1 = 0');
         }
         
-        $reports = $query->select('reports.*')
-                         ->orderBy('reports.created_at', 'desc')
-                         ->paginate(10)
+        // Sorting
+        $sort = $request->input('sort', 'newest');
+        $query->select('reports.*');
+
+        if ($sort === 'oldest') {
+            $query->orderBy('reports.created_at', 'asc');
+        } elseif ($sort === 'urgent') {
+            $query->orderByDesc('reports.urgency_score')
+                  ->orderByDesc('reports.created_at');
+        } elseif ($sort === 'severe') {
+            $query->orderByDesc('reports.is_focus_crime')
+                  ->orderByDesc('reports.urgency_score')
+                  ->orderByDesc('reports.created_at');
+        } elseif ($sort === 'needs_info') {
+            $query->orderBy('reports.has_sufficient_info', 'asc')
+                  ->orderByDesc('reports.urgency_score')
+                  ->orderByDesc('reports.created_at');
+        } else {
+            // newest (default)
+            $query->orderBy('reports.created_at', 'desc');
+        }
+
+        $reports = $query->paginate(10)
                          ->withQueryString();
         
         \Log::info('Reports query result', [
@@ -305,8 +338,22 @@ class ReportController extends Controller
             ]);
 
             $report = Report::findOrFail($id);
-            $report->status = $request->status;
-            $report->save();
+            $oldStatus = $report->status;
+            $newStatus = $request->status;
+
+            if ($oldStatus !== $newStatus) {
+                $report->status = $newStatus;
+                $report->save();
+
+                ReportTimeline::create([
+                    'report_id' => $report->report_id,
+                    'event_type' => 'status_change',
+                    'from_value' => $oldStatus,
+                    'to_value' => $newStatus,
+                    'notes' => null,
+                    'changed_by' => auth()->id(),
+                ]);
+            }
 
             return response()->json(['success' => true, 'message' => 'Status updated successfully']);
         } catch (\Exception $e) {
@@ -327,6 +374,7 @@ class ReportController extends Controller
             ]);
 
             $report = Report::findOrFail($id);
+            $oldValidity = $report->is_valid;
             
             // Handle both 'validity' and 'is_valid' field names
             $validityValue = $request->validity ?? $request->is_valid;
@@ -365,6 +413,17 @@ class ReportController extends Controller
                 }
                 
                 $report->save();
+
+                if ($oldValidity !== $validityValue) {
+                    ReportTimeline::create([
+                        'report_id' => $report->report_id,
+                        'event_type' => 'validity_change',
+                        'from_value' => $oldValidity,
+                        'to_value' => $validityValue,
+                        'notes' => $validityValue === 'invalid' ? ($request->rejection_reason ?? null) : null,
+                        'changed_by' => auth()->id(),
+                    ]);
+                }
             }
 
             return response()->json(['success' => true, 'message' => 'Report validity status updated successfully']);
@@ -692,7 +751,7 @@ class ReportController extends Controller
     public function getDetails($id)
     {
         try {
-            $report = Report::with(['user.verification', 'location', 'media', 'policeStation'])->findOrFail($id);
+            $report = Report::with(['user.verification', 'location', 'media', 'policeStation', 'timelines.actor'])->findOrFail($id);
 
             // Get authenticated user and role
             $authUser = auth()->user();

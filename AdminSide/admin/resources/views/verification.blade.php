@@ -996,6 +996,11 @@ async function viewVerification(verificationId) {
                         ${verification.status.charAt(0).toUpperCase() + verification.status.slice(1)}
                     </span>
                 </div>
+                ${(verification.status || '').toLowerCase() === 'rejected' && verification.rejection_reason ? `
+                <div class="status-detail">
+                    <strong>Rejection Reason:</strong> ${escapeHtml(verification.rejection_reason)}
+                </div>
+                ` : ''}
                 <div class="status-detail">
                     <strong>Submitted:</strong> ${verification.created_at ? new Date(verification.created_at).toLocaleString('en-US', { 
                         year: 'numeric', 
@@ -1127,6 +1132,12 @@ async function rejectVerification(verificationId, userId) {
     if (!confirm('Are you sure you want to reject this verification request?')) {
         return;
     }
+
+    const rejectionReason = prompt('Please provide a rejection reason (required):');
+    if (!rejectionReason || !rejectionReason.trim()) {
+        alert('Rejection reason is required.');
+        return;
+    }
     
     try {
         const response = await fetch('/api/verification/reject', {
@@ -1139,7 +1150,8 @@ async function rejectVerification(verificationId, userId) {
             },
             body: JSON.stringify({
                 verificationId: verificationId,
-                userId: userId
+                userId: userId,
+                rejection_reason: rejectionReason.trim()
             })
         });
         

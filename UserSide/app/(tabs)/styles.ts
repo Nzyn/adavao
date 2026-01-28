@@ -219,15 +219,33 @@ const styles = StyleSheet.create({
   },
 
   normalTxtJustify: {
-    margin: 5,
-    color: 'gray',
-    paddingBottom: 5,
-    textAlign: 'justify'
+    marginVertical: spacing.xs,
+    marginHorizontal: 0,
+    color: '#4b5563',
+    paddingBottom: 0,
+    fontSize: fontSize.md,
+    lineHeight: Math.round(fontSize.md * 1.45),
+    textAlign: 'justify',
   },
   normalTxt: {
-    margin: 1,
-    color: 'gray',
-    paddingBottom: 1,
+    marginVertical: spacing.xs,
+    marginHorizontal: 0,
+    color: '#4b5563',
+    paddingBottom: 0,
+    fontSize: fontSize.md,
+    lineHeight: Math.round(fontSize.md * 1.45),
+  },
+  sectionHeading: {
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  scrollContent: {
+    paddingTop: containerPadding.vertical + 10,
+    paddingHorizontal: containerPadding.horizontal,
+    paddingBottom: containerPadding.vertical + 40,
   },
   termsBox: {
     flex: 1,
@@ -257,7 +275,19 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, marginVertical: 8 },
   textArea: { height: 100, textAlignVertical: 'top' },
   subheadingAlt: { fontSize: 18, fontWeight: '600', marginVertical: 12 },
-  card: { padding: 8, backgroundColor: '#f9f9f9', borderRadius: 8, marginBottom: 16 },
+  card: {
+    padding: cardPadding,
+    backgroundColor: '#ffffff',
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   checkboxBox: {
     width: 24,
@@ -305,26 +335,25 @@ const styles = StyleSheet.create({
   },
   reportButton: {
     backgroundColor: "#1D3557",
-    paddingVertical: 15,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
-    marginVertical: 20,
+    marginVertical: 12,
   },
 
   reportButtonPressed: {
     backgroundColor: "#1a2e4d", // Darkened background color
-    paddingVertical: 15,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
-    marginVertical: 20,
+    marginVertical: 12,
     transform: [{ scale: 0.95 }], // Slightly smaller when pressed
   },
 
   reportButtonText: {
     color: "#fff",
-    backgroundColor: "#1D3557",
-    padding: 10,
-    borderRadius: 5,
+    fontSize: 16,
+    fontWeight: "700",
     textAlign: "center",
   },
 

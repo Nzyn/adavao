@@ -40,6 +40,10 @@ Located in `docs/` folder:
 - **SARIMA_Implementation.docx** - Crime forecasting details
 - **Testing_Scenarios.docx** - Testing procedures
 
+Additional guides:
+- `docs/evidence-requirements.md` - Photo/video evidence requirements
+- `docs/render-deployment.md` - Render deployment notes
+
 ## ✨ Key Features
 
 - 🚨 Real-time crime reporting
