@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\UserAdmin;
+use App\Models\PendingUserAdminRegistration;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -94,42 +95,62 @@ class AuthController extends Controller
             $userRole = 'police'; // Default to police if invalid
         }
 
-        // Create user_admin with verification token (email not verified yet)
-        // Store user_role temporarily - users_public entry will be created AFTER email verification
-        $userAdmin = UserAdmin::create([
-            'firstname' => $request->firstname,
-            'lastname' => $request->lastname,
+        // Strict verification: do NOT create a real user_admin record until the email link is clicked.
+        // Store registration in a pending table.
+        $existingVerified = UserAdmin::where('email', $request->email)->first();
+        if ($existingVerified) {
+            return back()->withErrors([
+                'email' => 'This email is already registered in the system'
+            ])->withInput();
+        }
+
+        $pending = PendingUserAdminRegistration::where('email', $request->email)->first();
+        if ($pending) {
+            // Refresh token + expiry and resend
+            $pending->update([
+                'firstname' => $request->firstname,
+                'lastname' => $request->lastname,
+                'contact' => $request->contact,
+                'password' => Hash::make($request->password),
+                'user_role' => $userRole,
+                'verification_token' => $verificationToken,
+                'token_expires_at' => $tokenExpiresAt,
+            ]);
+        } else {
+            $pending = PendingUserAdminRegistration::create([
+                'firstname' => $request->firstname,
+                'lastname' => $request->lastname,
+                'email' => $request->email,
+                'contact' => $request->contact,
+                'password' => Hash::make($request->password),
+                'verification_token' => $verificationToken,
+                'token_expires_at' => $tokenExpiresAt,
+                'user_role' => $userRole,
+            ]);
+        }
+
+        \Log::info('Pending registration created, awaiting email verification', [
             'email' => $request->email,
-            'contact' => $request->contact,
-            'password' => Hash::make($request->password),
-            'verification_token' => $verificationToken,
-            'token_expires_at' => $tokenExpiresAt,
-            'email_verified_at' => null, // Not verified yet
-            'user_role' => $userRole, // Store for later use during verification
+            'user_role' => $userRole,
+            'pending_id' => $pending->id,
         ]);
 
-        // Note: users_public entry will be created AFTER email verification
-        \Log::info('User registered, awaiting email verification', [
-            'email' => $request->email,
-            'user_role' => $userRole
-        ]);
-
-        // Generate verification URL
-        $verificationUrl = route('email.verify', ['token' => $verificationToken]);
+        // Generate verification URL (prefer query-param variant)
+        $verificationUrl = url('/email/verify') . '?token=' . rawurlencode($verificationToken);
 
         // Send verification email
         try {
-            \Mail::to($userAdmin->email)->send(new \App\Mail\VerifyEmail($verificationUrl, $userAdmin->firstname));
+            \Mail::to($pending->email)->send(new \App\Mail\VerifyEmail($verificationUrl, $pending->firstname));
             
-            $successMessage = 'Registration successful! Please check your email (' . $userAdmin->email . ') for a verification link to activate your account. The link will expire in 24 hours.';
+            $successMessage = 'Registration submitted! Please check your email (' . $pending->email . ') for a verification link to activate your account. The link will expire in 24 hours.';
             if ($userRole === 'patrol_officer') {
-                $successMessage .= ' Your patrol officer account has been created. You can login to the mobile app after verification.';
+                $successMessage .= ' Your patrol officer account will be created after verification. You can login to the mobile app after verification.';
             }
             
             return redirect()->route('login')->with('success', $successMessage);
         } catch (\Exception $e) {
-            // Reverted: Delete user if email fails to send (Strict verification requested)
-            $userAdmin->delete();
+            // Strict verification: delete pending if email fails to send
+            $pending->delete();
             \Log::error('Email verification failed: ' . $e->getMessage());
             
             return back()->withErrors(['email' => 'Failed to send verification email. Error: ' . $e->getMessage()])->withInput();
@@ -720,8 +741,117 @@ class AuthController extends Controller
             return is_string($t) && strlen($t) > 0;
         })));
 
-        $userAdmin = null;
         $matchedToken = null;
+
+        // 1) New flow: check pending registrations first
+        $pending = null;
+        foreach ($tokensToTry as $tryToken) {
+            $candidate = PendingUserAdminRegistration::where('verification_token', $tryToken)->first();
+            if ($candidate) {
+                $pending = $candidate;
+                $matchedToken = $tryToken;
+                break;
+            }
+        }
+
+        if ($pending) {
+            // Expired (or missing expiry) -> auto-resend a fresh link
+            if (empty($pending->token_expires_at) || Carbon::parse($pending->token_expires_at)->lessThanOrEqualTo(Carbon::now())) {
+                $verificationToken = Str::random(64);
+                $tokenExpiresAt = Carbon::now()->addHours(24);
+
+                $pending->update([
+                    'verification_token' => $verificationToken,
+                    'token_expires_at' => $tokenExpiresAt,
+                ]);
+
+                $verificationUrl = url('/email/verify') . '?token=' . rawurlencode($verificationToken);
+
+                try {
+                    \Mail::to($pending->email)->send(new \App\Mail\VerifyEmail($verificationUrl, $pending->firstname));
+                } catch (\Exception $e) {
+                    \Log::error('Failed to resend verification email (pending): ' . $e->getMessage(), [
+                        'email' => $pending->email,
+                    ]);
+
+                    return redirect()->route('login')->withErrors([
+                        'token' => 'This verification link has expired. We could not resend a new link right now. Please use the resend option.'
+                    ]);
+                }
+
+                return redirect()->route('login')->with('success', 'Your verification link expired. We sent you a new verification email. Please check your inbox.');
+            }
+
+            // Create the real user_admin record now (strict verification)
+            $existing = UserAdmin::where('email', $pending->email)->first();
+            if ($existing) {
+                // If somehow created already, clean up pending and treat as success
+                $pending->delete();
+                if (!is_null($existing->email_verified_at)) {
+                    return redirect()->route('login')->with('success', 'Your email is already verified. You can now login.');
+                }
+                $existing->update([
+                    'email_verified_at' => Carbon::now(),
+                    'verification_token' => null,
+                    'token_expires_at' => null,
+                ]);
+                $userAdmin = $existing;
+            } else {
+                $userAdmin = UserAdmin::create([
+                    'firstname' => $pending->firstname,
+                    'lastname' => $pending->lastname,
+                    'email' => $pending->email,
+                    'contact' => $pending->contact,
+                    'password' => $pending->password,
+                    'user_role' => $pending->user_role,
+                    'email_verified_at' => Carbon::now(),
+                    'verification_token' => null,
+                    'token_expires_at' => null,
+                ]);
+            }
+
+            // Pending fulfilled
+            $pending->delete();
+
+            // If patrol officer, create entry in users_public table (after verification)
+            if ($userAdmin->user_role === 'patrol_officer') {
+                try {
+                    $existingUser = \DB::table('users_public')
+                        ->where('email', $userAdmin->email)
+                        ->first();
+
+                    if (!$existingUser) {
+                        \DB::table('users_public')->insert([
+                            'firstname' => $userAdmin->firstname,
+                            'lastname' => $userAdmin->lastname,
+                            'email' => $userAdmin->email,
+                            'contact' => $userAdmin->contact,
+                            'password' => $userAdmin->password,
+                            'user_role' => 'patrol_officer',
+                            'is_on_duty' => false,
+                            'email_verified_at' => Carbon::now(),
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now(),
+                        ]);
+                        \Log::info('Patrol officer account created in users_public after email verification (pending flow)', [
+                            'email' => $userAdmin->email
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Failed to create patrol officer in users_public during verification (pending flow): ' . $e->getMessage());
+                }
+            }
+
+            $successMessage = 'Email verified successfully! You can now login to your account.';
+            if ($userAdmin->user_role === 'patrol_officer') {
+                $successMessage .= ' Your patrol officer account is now active and you can login to the mobile app.';
+            }
+
+            return redirect()->route('login')->with('success', $successMessage);
+        }
+
+        // 2) Legacy flow: check user_admin table (older deployments)
+        $userAdmin = null;
         foreach ($tokensToTry as $tryToken) {
             $candidate = UserAdmin::where('verification_token', $tryToken)->first();
             if ($candidate) {
@@ -834,12 +964,40 @@ class AuthController extends Controller
     public function resendVerification(Request $request)
     {
         $request->validate([
-            'email' => 'required|email|exists:user_admin,email'
-        ], [
-            'email.exists' => 'We could not find an admin/police account with that email address.'
+            'email' => 'required|email'
         ]);
 
+        // Prefer pending flow
+        $pending = PendingUserAdminRegistration::where('email', $request->email)->first();
+        if ($pending) {
+            $verificationToken = Str::random(64);
+            $tokenExpiresAt = Carbon::now()->addHours(24);
+
+            $pending->update([
+                'verification_token' => $verificationToken,
+                'token_expires_at' => $tokenExpiresAt,
+            ]);
+
+            $verificationUrl = url('/email/verify') . '?token=' . rawurlencode($verificationToken);
+
+            try {
+                \Mail::to($pending->email)->send(new \App\Mail\VerifyEmail($verificationUrl, $pending->firstname));
+                return back()->with('success', 'Verification email has been sent! Please check your inbox.');
+            } catch (\Exception $e) {
+                \Log::error('Email verification resend failed (pending): ' . $e->getMessage());
+                return back()->withErrors([
+                    'email' => 'Failed to send verification email. Please try again later.'
+                ])->withInput();
+            }
+        }
+
+        // Legacy support: unverified user_admin rows
         $userAdmin = UserAdmin::where('email', $request->email)->first();
+        if (!$userAdmin) {
+            return back()->withErrors([
+                'email' => 'We could not find a pending registration or admin/police account with that email address.'
+            ])->withInput();
+        }
 
         if ($userAdmin->email_verified_at) {
             return back()->withErrors([
@@ -847,7 +1005,6 @@ class AuthController extends Controller
             ])->withInput();
         }
 
-        // Generate new verification token
         $verificationToken = Str::random(64);
         $tokenExpiresAt = Carbon::now()->addHours(24);
 
@@ -856,18 +1013,13 @@ class AuthController extends Controller
             'token_expires_at' => $tokenExpiresAt,
         ]);
 
-        // Generate verification URL
-        $verificationUrl = route('email.verify', ['token' => $verificationToken]);
+        $verificationUrl = url('/email/verify') . '?token=' . rawurlencode($verificationToken);
 
-        // Send verification email
         try {
             $userAdmin->notify(new EmailVerification($verificationUrl, $userAdmin->firstname));
-            
-            return back()->with('success', 
-                'Verification email has been sent! Please check your inbox.');
+            return back()->with('success', 'Verification email has been sent! Please check your inbox.');
         } catch (\Exception $e) {
             \Log::error('Email verification resend failed: ' . $e->getMessage());
-            
             return back()->withErrors([
                 'email' => 'Failed to send verification email. Please try again later.'
             ])->withInput();
