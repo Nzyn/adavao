@@ -532,7 +532,7 @@
                             <polyline points="9 22 9 12 15 12 15 22"/>
                         </svg>
                     </button>
-                    @if($officer->policeStation)
+                    @if($officer->user && $officer->user->station_id)
                     <button type="button" class="action-btn unassign-station-btn" data-user-id="{{ $officer->user_id }}" title="Unassign from Station">
                         <svg class="action-icon" viewBox="0 0 24 24">
                             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
