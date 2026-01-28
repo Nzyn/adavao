@@ -18,7 +18,7 @@ class DispatchController extends Controller
      */
     public function index(Request $request)
     {
-        $query = PatrolDispatch::with(['report', 'station', 'patrolOfficer', 'dispatcher'])
+        $query = PatrolDispatch::with(['report.user', 'station', 'patrolOfficer', 'dispatcher'])
             ->orderBy('dispatched_at', 'desc');
 
         // Filter by status

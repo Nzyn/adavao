@@ -4,336 +4,395 @@
 
 @section('styles')
 <style>
-    .dispatches-container {
-        max-width: 1400px;
-        margin: 0 auto;
+    /* Copied/Adapted from reports.blade.php */
+    .reports-container {
+        padding: 1.5rem;
     }
 
-    .dispatches-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .dispatch-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1.25rem;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-
-    .dispatch-card .label {
-        font-size: 0.8rem;
-        color: #6b7280;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 600;
-        margin-bottom: 0.25rem;
-    }
-
-    .dispatch-card .value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #111827;
-    }
-
-    .filter-bar {
-        background: white;
-        border-radius: 12px;
-        padding: 1.25rem;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        margin-bottom: 1.5rem;
-    }
-
-    .filter-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 0.75rem;
-        align-items: end;
-    }
-
-    .filter-grid label {
-        display: block;
-        font-size: 0.85rem;
-        color: #374151;
-        font-weight: 600;
-        margin-bottom: 0.4rem;
-    }
-
-    .filter-grid select,
-    .filter-grid input {
-        width: 100%;
-        padding: 0.6rem 0.75rem;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        background: white;
-        font-size: 0.9rem;
-    }
-
-    .filter-actions {
+    .header-section {
         display: flex;
-        gap: 0.5rem;
-        justify-content: flex-end;
-        flex-wrap: wrap;
-        margin-top: 0.75rem;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
     }
 
-    .btn {
-        padding: 0.6rem 0.9rem;
-        border-radius: 8px;
-        border: 1px solid #d1d5db;
-        background: white;
-        cursor: pointer;
-        font-weight: 600;
-        font-size: 0.9rem;
-    }
-
-    .btn.primary {
-        background: #1D3557;
-        border-color: #1D3557;
-        color: white;
-    }
-
-    .table-wrap {
+    .reports-table-container {
         background: white;
         border-radius: 12px;
-        border: 1px solid #e5e7eb;
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        overflow-x: auto;
+        overflow-y: visible;
     }
 
-    table {
+    .reports-table {
         width: 100%;
+        min-width: 1200px;
         border-collapse: collapse;
     }
 
-    thead {
-        background: #f9fafb;
-        border-bottom: 1px solid #e5e7eb;
-    }
-
-    th, td {
-        padding: 0.9rem 1rem;
+    .reports-table th {
+        padding: 0.5rem 0.35rem;
         text-align: left;
-        border-bottom: 1px solid #f3f4f6;
-        font-size: 0.9rem;
-        vertical-align: top;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        background-color: #f9fafb;
     }
 
-    th {
+    .reports-table td {
+        padding: 0.5rem 0.35rem;
+        font-size: 0.8rem;
+        color: #374151;
+        border-bottom: 1px solid #f3f4f6;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .reports-table tr:hover {
+        background-color: #f9fafb;
+    }
+
+    /* Badges */
+    .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-align: center;
+    }
+    .badge.green { background: #d1fae5; color: #065f46; }
+    .badge.red { background: #fee2e2; color: #991b1b; }
+    .badge.blue { background: #dbeafe; color: #1e40af; }
+    .badge.gray { background: #f3f4f6; color: #374151; }
+
+    .urgency-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-align: center;
+    }
+    .urgency-critical { background-color: #fee2e2; color: #991b1b; }
+    .urgency-high { background-color: #fed7aa; color: #9a3412; }
+    .urgency-medium { background-color: #fef3c7; color: #92400e; }
+    .urgency-low { background-color: #f3f4f6; color: #6b7280; }
+
+    .sla-timer {
+        font-family: monospace;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+        min-width: 60px;
+        text-align: center;
+    }
+    .sla-timer.countdown { background-color: #dbeafe; color: #1e40af; }
+    .sla-timer.exceeded { background-color: #fee2e2; color: #991b1b; }
+
+    .validity-badge {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    .validity-badge.valid { color: #065f46; background-color: #d1fae5; }
+    .validity-badge.invalid { color: #991b1b; background-color: #fee2e2; }
+    .validity-badge.checking_for_report_validity { color: #3730a3; background-color: #e0e7ff; }
+
+    /* Action Buttons */
+    .action-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.1rem;
+        padding: 4px;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+    .action-btn:hover {
+        background-color: #f3f4f6;
+    }
+
+    /* Modal Styles */
+    .modal {
+        display: none; 
+        position: fixed; 
+        z-index: 1000; 
+        left: 0;
+        top: 0;
+        width: 100%; 
+        height: 100%; 
+        overflow: auto; 
+        background-color: rgba(0,0,0,0.5); 
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto; 
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%; 
+        max-width: 800px;
+        border-radius: 12px;
+    }
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .close:hover, .close:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    
+    /* Report Detail Styles inside Modal */
+    .report-info-section {
+        padding: 1rem;
+    }
+    .info-row {
+        display: flex;
+        gap: 2rem;
+        margin-bottom: 1rem;
+    }
+    .detail-item {
+        flex: 1;
+    }
+    .detail-label {
         font-size: 0.75rem;
         color: #6b7280;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 700;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
     }
-
-    .badge {
-        display: inline-block;
-        padding: 0.25rem 0.6rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
-        font-weight: 700;
-    }
-
-    .badge.gray { background: #f3f4f6; color: #374151; }
-    .badge.blue { background: #dbeafe; color: #1e40af; }
-    .badge.yellow { background: #fef3c7; color: #92400e; }
-    .badge.purple { background: #ede9fe; color: #5b21b6; }
-    .badge.green { background: #d1fae5; color: #065f46; }
-    .badge.red { background: #fee2e2; color: #991b1b; }
-
-    .muted {
-        color: #6b7280;
-        font-size: 0.85rem;
-    }
-
-    .mono {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        font-size: 0.85rem;
-        color: #374151;
+    .detail-value {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #111827;
     }
 </style>
 @endsection
 
 @section('content')
-<div class="dispatches-container">
-    <div class="content-header">
-        <h1 class="content-title">🚓 Patrol Dispatches</h1>
-        <p class="content-subtitle">Track dispatch lifecycle and 3-minute response compliance.</p>
+<div class="reports-container">
+    <div class="header-section">
+        <h1>🚓 Patrol Dispatches</h1>
+        <!-- Filter Bar can be added here -->
     </div>
 
-    <div class="dispatches-grid">
-        <div class="dispatch-card">
-            <div class="label">Total Dispatches</div>
-            <div class="value">{{ number_format($stats['total'] ?? 0) }}</div>
-        </div>
-        <div class="dispatch-card">
-            <div class="label">Active</div>
-            <div class="value">{{ number_format($stats['active'] ?? 0) }}</div>
-        </div>
-        <div class="dispatch-card">
-            <div class="label">Completed</div>
-            <div class="value">{{ number_format($stats['completed'] ?? 0) }}</div>
-        </div>
-        <div class="dispatch-card">
-            <div class="label">3-Min Compliance</div>
-            <div class="value">{{ ($stats['three_minute_compliance'] ?? 0) }}%</div>
-            <div class="muted">Based on dispatches with arrival time</div>
-        </div>
-        <div class="dispatch-card">
-            <div class="label">Avg Response Time</div>
-            <div class="value">{{ number_format($stats['avg_response_time'] ?? 0) }}s</div>
-            <div class="muted">Arrival minus dispatched time</div>
-        </div>
-    </div>
-
-    <div class="filter-bar">
-        <form method="GET" action="{{ route('dispatches') }}">
-            <div class="filter-grid">
-                <div>
-                    <label for="status">Status</label>
-                    <select id="status" name="status">
-                        @php($statusVal = request('status', 'all'))
-                        <option value="all" {{ $statusVal === 'all' ? 'selected' : '' }}>All</option>
-                        <option value="pending" {{ $statusVal === 'pending' ? 'selected' : '' }}>Pending</option>
-                        <option value="accepted" {{ $statusVal === 'accepted' ? 'selected' : '' }}>Accepted</option>
-                        <option value="declined" {{ $statusVal === 'declined' ? 'selected' : '' }}>Declined</option>
-                        <option value="en_route" {{ $statusVal === 'en_route' ? 'selected' : '' }}>En Route</option>
-                        <option value="arrived" {{ $statusVal === 'arrived' ? 'selected' : '' }}>Arrived</option>
-                        <option value="completed" {{ $statusVal === 'completed' ? 'selected' : '' }}>Completed</option>
-                        <option value="cancelled" {{ $statusVal === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="station_id">Station</label>
-                    <select id="station_id" name="station_id">
-                        <option value="">All</option>
-                        @foreach($stations as $station)
-                            <option value="{{ $station->station_id }}" {{ (string)request('station_id') === (string)$station->station_id ? 'selected' : '' }}>
-                                {{ $station->station_name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label for="officer_id">Patrol Officer</label>
-                    <select id="officer_id" name="officer_id">
-                        <option value="">All</option>
-                        @foreach($officers as $officer)
-                            <option value="{{ $officer->id }}" {{ (string)request('officer_id') === (string)$officer->id ? 'selected' : '' }}>
-                                {{ $officer->name ?? ($officer->firstname . ' ' . $officer->lastname) }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label for="date_from">From</label>
-                    <input id="date_from" type="date" name="date_from" value="{{ request('date_from') }}" />
-                </div>
-
-                <div>
-                    <label for="date_to">To</label>
-                    <input id="date_to" type="date" name="date_to" value="{{ request('date_to') }}" />
-                </div>
-            </div>
-
-            <div class="filter-actions">
-                <button type="submit" class="btn primary">Apply</button>
-                <a class="btn" href="{{ route('dispatches') }}">Clear</a>
-            </div>
-        </form>
-    </div>
-
-    <div class="table-wrap">
-        <table>
+    <div class="reports-table-container">
+        <table class="reports-table">
             <thead>
                 <tr>
-                    <th>Dispatch</th>
-                    <th>Report</th>
-                    <th>Crime</th>
-                    <th>Station</th>
-                    <th>Officer</th>
-                    <th>Status</th>
-                    <th>Dispatched</th>
-                    <th>3-Min Rule</th>
-                    <th>Time Remaining</th>
-                    <th>Response</th>
+                    <th style="width: 70px;">Report ID</th>
+                    <th style="width: 100px;">User</th>
+                    <th style="width: 80px;">Urgency</th>
+                    <th style="width: 120px;">SLA Status</th>
+                    <th style="width: 110px;">Validated At</th>
+                    <th style="width: 100px;">Date</th>
+                    <th style="width: 120px;">Patrol Dispatched</th>
+                    <th style="width: 100px;">Validity</th>
+                    <th style="width: 120px;">Personnel Incharge</th>
+                    <th style="width: 80px;">Details</th>
+                    <th style="width: 60px;">Transfer</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($dispatches as $dispatch)
-                    @php
-                        $statusColor = $dispatch->status_color ?? 'gray';
-                        $ruleBadge = $dispatch->three_minute_rule_badge ?? 'gray';
-
-                        $timeRemaining = $dispatch->time_remaining ?? 0;
-                        $isOverdue = $dispatch->is_overdue ?? false;
-                        $hasRuleResult = !is_null($dispatch->three_minute_rule_met);
-
-                        $formatSeconds = function ($seconds) {
-                            $seconds = (int)abs($seconds);
-                            $m = intdiv($seconds, 60);
-                            $s = $seconds % 60;
-                            return sprintf('%02d:%02d', $m, $s);
-                        };
-                    @endphp
                     <tr>
-                        <td class="mono">#{{ $dispatch->dispatch_id }}</td>
-                        <td class="mono">#{{ $dispatch->report_id }}</td>
+                        <td>#{{ $dispatch->report_id }}</td>
+                        <td>{{ $dispatch->report->user->name ?? 'Anonymous' }}</td>
                         <td>
-                            {{ is_string($dispatch->report?->report_type) ? $dispatch->report->report_type : (is_array($dispatch->report?->report_type) ? implode(', ', $dispatch->report->report_type) : 'N/A') }}
-                        </td>
-                        <td>{{ $dispatch->station?->station_name ?? 'N/A' }}</td>
-                        <td>{{ $dispatch->patrolOfficer?->name ?? 'Unassigned' }}</td>
-                        <td><span class="badge {{ $statusColor }}">{{ ucfirst(str_replace('_', ' ', $dispatch->status)) }}</span></td>
-                        <td class="muted">{{ optional($dispatch->dispatched_at)->timezone('Asia/Manila')->format('Y-m-d H:i') ?? 'N/A' }}</td>
-                        <td>
-                            @if($hasRuleResult)
-                                <span class="badge {{ $ruleBadge }}">{{ $dispatch->three_minute_rule_met ? 'Met' : 'Missed' }}</span>
-                                <div class="muted">{{ number_format($dispatch->three_minute_rule_time ?? $dispatch->response_time ?? 0) }}s</div>
-                            @elseif($isOverdue)
-                                <span class="badge red">Overdue</span>
-                            @else
-                                <span class="badge gray">Pending</span>
-                            @endif
+                            @php $urgency = $dispatch->report->urgency_score ?? 0; @endphp
+                            <span class="urgency-badge urgency-{{ $urgency >= 80 ? 'critical' : ($urgency >= 50 ? 'high' : ($urgency >= 20 ? 'medium' : 'low')) }}">
+                                {{ $urgency }}
+                            </span>
                         </td>
                         <td>
-                            @if(in_array($dispatch->status, ['arrived', 'completed', 'cancelled', 'declined']))
-                                <span class="muted">-</span>
-                            @else
-                                @if($timeRemaining >= 0)
-                                    <span class="badge blue">{{ $formatSeconds($timeRemaining) }}</span>
+                            @if($dispatch->report->validated_at)
+                                @php
+                                    $diffInSeconds = Carbon\Carbon::parse($dispatch->report->created_at)->diffInSeconds($dispatch->report->validated_at);
+                                    $isWithinSLA = $diffInSeconds <= 180;
+                                    $minutes = floor($diffInSeconds / 60);
+                                    $seconds = $diffInSeconds % 60;
+                                    $timeString = sprintf('%02d:%02d', $minutes, $seconds);
+                                @endphp
+                                @if($isWithinSLA)
+                                    <span class="badge green">Within SLA</span>
                                 @else
-                                    <span class="badge red">+{{ $formatSeconds($timeRemaining) }}</span>
+                                    <span class="badge red">Exceeded (+{{ $timeString }})</span>
                                 @endif
+                            @else
+                                <div class="sla-timer" data-created-at="{{ $dispatch->report->created_at->timestamp }}">Pending</div>
                             @endif
                         </td>
+                        <td>{{ optional($dispatch->report->validated_at)->format('Y-m-d H:i') ?? '-' }}</td>
+                        <td>{{ $dispatch->report->created_at->format('Y-m-d') }}</td>
+                        <td>{{ optional($dispatch->dispatched_at)->format('Y-m-d H:i') }}</td>
                         <td>
-                            @if(!is_null($dispatch->response_time))
-                                <span class="badge purple">{{ number_format($dispatch->response_time) }}s</span>
-                            @else
-                                <span class="muted">N/A</span>
-                            @endif
+                            <span class="validity-badge {{ $dispatch->report->is_valid }}">
+                                {{ ucfirst(str_replace('_', ' ', $dispatch->report->is_valid)) }}
+                            </span>
+                        </td>
+                        <td>{{ $dispatch->patrolOfficer->name ?? 'Unassigned' }}</td>
+                        <td>
+                            <button class="action-btn" onclick="showReportDetails({{ $dispatch->report_id }})" title="View Details">👁️</button>
+                        </td>
+                        <td>
+                             <button class="action-btn" title="Transfer Patrol" onclick="openTransferModal({{ $dispatch->report_id }})">🔁</button>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="muted" style="text-align:center; padding: 1.5rem;">No dispatches found for the selected filters.</td>
+                        <td colspan="11" style="text-align: center; padding: 2rem;">No dispatches found.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
-
+    
     <div style="margin-top: 1rem;">
         {{ $dispatches->links() }}
     </div>
 </div>
+
+<!-- Details Modal -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div id="modalBody">Loading...</div>
+    </div>
+</div>
+
+@endsection
+
+@section('scripts')
+<script>
+    // SLA Timer Logic
+    function updateSLATimers() {
+        const timers = document.querySelectorAll('.sla-timer');
+        const now = Math.floor(Date.now() / 1000);
+        
+        timers.forEach(timer => {
+            const createdAt = parseInt(timer.getAttribute('data-created-at'));
+            if (!createdAt) return;
+            
+            const elapsedSeconds = now - createdAt;
+            const threeMinutes = 180;
+            
+            if (elapsedSeconds < threeMinutes) {
+                const remainingSeconds = threeMinutes - elapsedSeconds;
+                const minutes = Math.floor(remainingSeconds / 60);
+                const seconds = remainingSeconds % 60;
+                timer.textContent = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+                timer.className = 'sla-timer countdown';
+            } else {
+                const exceededSeconds = elapsedSeconds - threeMinutes;
+                const minutes = Math.floor(exceededSeconds / 60);
+                const seconds = exceededSeconds % 60;
+                timer.textContent = '+' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+                timer.className = 'sla-timer exceeded';
+            }
+        });
+    }
+    
+    // Start timers
+    updateSLATimers();
+    setInterval(updateSLATimers, 1000);
+
+    // Modal Functions
+    function closeModal() {
+        document.getElementById('detailsModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        if (event.target == document.getElementById('detailsModal')) {
+            closeModal();
+        }
+    }
+
+    function showReportDetails(reportId) {
+        const modal = document.getElementById('detailsModal');
+        const modalBody = document.getElementById('modalBody');
+        modal.style.display = 'block';
+        modalBody.innerHTML = '<div style="text-align:center; padding: 2rem;">Loading details...</div>';
+
+        const userId = '{{ auth()->id() }}';
+
+        fetch(`/reports/${reportId}/details`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const report = data.data;
+                    
+                    // Helper checks
+                    const getType = (t) => Array.isArray(t) ? t.join(', ') : (t || 'N/A');
+                    const formatDate = (d) => d ? new Date(d).toLocaleString() : 'N/A';
+                    
+                    const html = `
+                        <div class="report-info-section">
+                            <h3>🚨 Report #${report.report_id}</h3>
+                             <div class="info-row">
+                                <div class="detail-item">
+                                    <div class="detail-label">Title</div>
+                                    <div class="detail-value">${report.title || 'No Title'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Type</div>
+                                    <div class="detail-value">${getType(report.report_type)}</div>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="detail-item">
+                                    <div class="detail-label">Description</div>
+                                    <div class="detail-value">${report.description || 'No description'}</div>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="detail-item">
+                                    <div class="detail-label">Location</div>
+                                    <div class="detail-value">${report.location ? (report.location.address || report.location.barangay || 'Unknown') : 'Unknown'}</div>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="detail-item">
+                                    <div class="detail-label">Reported By</div>
+                                    <div class="detail-value">${report.user ? (report.user.firstname + ' ' + report.user.lastname) : 'Anonymous'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Date Reported</div>
+                                    <div class="detail-value">${formatDate(report.date_reported || report.created_at)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    modalBody.innerHTML = html;
+                } else {
+                    modalBody.innerHTML = '<p class="text-danger">Failed to load details.</p>';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                modalBody.innerHTML = '<p class="text-danger">Error loading details.</p>';
+            });
+    }
+
+    function openTransferModal(reportId) {
+        // Placeholder for transfer functionality as implementation is complex
+        alert('Transfer/Reassign functionality will be available via the main Reports page or can be implemented here.');
+    }
+</script>
 @endsection
