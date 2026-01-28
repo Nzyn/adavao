@@ -133,64 +133,54 @@ async function runMigrations() {
     await safeQuery('idx_users_public_is_on_duty', `CREATE INDEX IF NOT EXISTS idx_users_public_is_on_duty ON users_public(is_on_duty)`);
 
     // Test patrol accounts helper (for QA/dev)
-    // Ensures that test patrol accounts can log into the mobile app.
-    console.log('🧪 Ensuring patrol test accounts can log in...');
-    // Only these email patterns will be treated as patrol accounts for UserSide login.
-    // Keep default narrow; expand via Render env var TEST_PATROL_EMAIL_PATTERNS if needed.
-    const testPatrolPatternsRaw = process.env.TEST_PATROL_EMAIL_PATTERNS || 'dansoypatrol%@mailsac.com';
-    const testPatrolPatterns = testPatrolPatternsRaw.split(',').map(s => s.trim()).filter(Boolean);
+    // Creates test patrol accounts DIRECTLY in users_public with known credentials.
+    // No AdminSide registration/verification needed - these are purely for mobile app testing.
+    console.log('🧪 Creating/ensuring test patrol accounts in users_public...');
 
-    for (const pattern of testPatrolPatterns) {
-      await safeQuery(
-        `promote user_admin patrol_officer (${pattern})`,
-        `UPDATE user_admin
-         SET user_role = 'patrol_officer',
-             email_verified_at = COALESCE(email_verified_at, NOW())
-         WHERE email ILIKE $1`,
-        [pattern]
-      );
-    }
+    // bcrypt hash of "Patrol123!" - a simple test password
+    // Generated via: require('bcryptjs').hashSync('Patrol123!', 10)
+    const testPatrolPasswordHash = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
 
-    // Sync ONLY configured test patrol officers from AdminSide (user_admin) into UserSide (users_public)
-    // This prevents central admins/police accounts from being able to log into the mobile app.
-    for (const pattern of testPatrolPatterns) {
+    // Define test patrol accounts to create directly in users_public
+    const testPatrolAccounts = [
+      { email: 'tpatrol@mailsac.com', firstname: 'Test', lastname: 'Patrol', contact: '09170000001' },
+      { email: 'testpatrol1@mailsac.com', firstname: 'Test', lastname: 'Patrol1', contact: '09170000002' },
+      { email: 'testpatrol2@mailsac.com', firstname: 'Test', lastname: 'Patrol2', contact: '09170000003' },
+      { email: 'testpatrol3@mailsac.com', firstname: 'Test', lastname: 'Patrol3', contact: '09170000004' },
+      { email: 'dansoypatrol1@mailsac.com', firstname: 'Dansoy', lastname: 'Patrol1', contact: '09170000005' },
+      { email: 'dansoypatrol2@mailsac.com', firstname: 'Dansoy', lastname: 'Patrol2', contact: '09170000006' },
+    ];
+
+    for (const acct of testPatrolAccounts) {
+      // Insert if not exists, do nothing if already exists
       await safeQuery(
-        `sync user_admin patrol_officer -> users_public (${pattern})`,
+        `create test patrol ${acct.email}`,
         `INSERT INTO users_public (
             firstname, lastname, email, contact, password,
-            user_role, is_on_duty,
-            email_verified_at,
+            user_role, is_on_duty, email_verified_at,
             created_at, updated_at
           )
-          SELECT
-            ua.firstname,
-            ua.lastname,
-            ua.email,
-            ua.contact,
-            ua.password,
-            'patrol_officer',
-            FALSE,
-            COALESCE(ua.email_verified_at, NOW()),
-            NOW(), NOW()
-          FROM user_admin ua
-          WHERE ua.user_role = 'patrol_officer'
-            AND ua.email ILIKE $1
-            AND NOT EXISTS (
-              SELECT 1 FROM users_public up
-              WHERE LOWER(up.email) = LOWER(ua.email)
-            )`,
-        [pattern]
+          SELECT $1, $2, $3, $4, $5, 'patrol_officer', FALSE, NOW(), NOW(), NOW()
+          WHERE NOT EXISTS (
+            SELECT 1 FROM users_public WHERE LOWER(TRIM(email)) = LOWER(TRIM($3))
+          )`,
+        [acct.firstname, acct.lastname, acct.email, acct.contact, testPatrolPasswordHash]
       );
 
+      // Ensure role and verified status even if row already existed
       await safeQuery(
-        `ensure users_public patrol_officer verified (${pattern})`,
+        `ensure test patrol verified ${acct.email}`,
         `UPDATE users_public
          SET user_role = 'patrol_officer',
-             email_verified_at = COALESCE(email_verified_at, NOW())
-         WHERE email ILIKE $1`,
-        [pattern]
+             email_verified_at = COALESCE(email_verified_at, NOW()),
+             updated_at = NOW()
+         WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+        [acct.email]
       );
     }
+
+    console.log(`✅ Test patrol accounts ready: ${testPatrolAccounts.map(a => a.email).join(', ')}`);
+    console.log('   Password for all test patrol accounts: Patrol123!');
 
     console.log('📝 Ensuring patrol_dispatches table exists...');
     await safeQuery('create patrol_dispatches', `
