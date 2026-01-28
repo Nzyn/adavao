@@ -62,6 +62,33 @@ const handleLogin = async (req, res) => {
 
         if (adminRows.length === 0) {
           console.log('ℹ️ Patrol fallback: no user_admin row found for email (same DB):', sanitizedEmail);
+
+          // If AdminSide now uses strict verification (pending table), provide a clearer message.
+          try {
+            const [reg] = await db.query(
+              "SELECT to_regclass('public.pending_user_admin_registrations') AS pending",
+              []
+            );
+            if (reg?.[0]?.pending) {
+              const [pendingRows] = await db.query(
+                "SELECT email, user_role, token_expires_at FROM pending_user_admin_registrations WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1",
+                [sanitizedEmail]
+              );
+              if (pendingRows.length > 0) {
+                console.log('ℹ️ Patrol fallback: pending admin registration exists (not yet verified):', {
+                  email: pendingRows[0].email,
+                  user_role: pendingRows[0].user_role,
+                });
+                return res.status(403).json({
+                  message: 'Your account registration is pending email verification. Please click the verification link sent to your email, then try logging in again.',
+                  emailNotVerified: true,
+                  email: sanitizedEmail,
+                });
+              }
+            }
+          } catch (pendingErr) {
+            console.warn('⚠️ Patrol fallback: pending lookup skipped/failed:', pendingErr.message);
+          }
         }
 
         if (adminRows.length > 0) {

@@ -63,6 +63,12 @@ function buildUpdateQuery(tableName, idColumnName, idValue, updatesObject) {
     };
 }
 
+async function tableExists(pool, tableName) {
+    const qualified = tableName.includes('.') ? tableName : `public.${tableName}`;
+    const result = await pool.query('SELECT to_regclass($1) AS reg', [qualified]);
+    return Boolean(result?.rows?.[0]?.reg);
+}
+
 async function encryptAllSensitiveData() {
     const pool = new Pool({
         connectionString: process.env.DATABASE_URL || 'postgresql://alertdavao_user:rcXDr9MjmEJ8Kk6l2Nw7SbDLnOaS1m0l@dpg-d4t0k8u3jp1c73fhvulg-a.singapore-postgres.render.com/alertdavao_f2ij',
@@ -76,29 +82,32 @@ async function encryptAllSensitiveData() {
         // 1. ENCRYPT USER CONTACT & ADDRESS
         // ========================================
         console.log('📱 Encrypting user contact and address fields...');
-        const users = await pool.query(
-            'SELECT id, contact, address FROM users_public WHERE (contact IS NOT NULL AND contact != \'\') OR (address IS NOT NULL AND address != \'\')'
-        );
-
         let userEncrypted = 0;
-        for (const user of users.rows) {
-            const updates = {};
+        if (!(await tableExists(pool, 'users_public'))) {
+            console.warn('⚠️ users_public table does not exist yet. Skipping user contact/address encryption.');
+        } else {
+            const users = await pool.query(
+                'SELECT id, contact, address FROM users_public WHERE (contact IS NOT NULL AND contact != \'\') OR (address IS NOT NULL AND address != \'\')'
+            );
+            for (const user of users.rows) {
+                const updates = {};
 
-            if (user.contact && !isAlreadyEncrypted(user.contact)) {
-                updates.contact = encrypt(user.contact);
-                console.log(`  ✅ User ${user.id}: Encrypted contact`);
-            }
+                if (user.contact && !isAlreadyEncrypted(user.contact)) {
+                    updates.contact = encrypt(user.contact);
+                    console.log(`  ✅ User ${user.id}: Encrypted contact`);
+                }
 
-            if (user.address && !isAlreadyEncrypted(user.address)) {
-                updates.address = encrypt(user.address);
-                console.log(`  ✅ User ${user.id}: Encrypted address`);
-            }
+                if (user.address && !isAlreadyEncrypted(user.address)) {
+                    updates.address = encrypt(user.address);
+                    console.log(`  ✅ User ${user.id}: Encrypted address`);
+                }
 
-            const updateKeys = Object.keys(updates);
-            if (updateKeys.length > 0) {
-                const q = buildUpdateQuery('users_public', 'id', user.id, updates);
-                await pool.query(q.text, q.values);
-                userEncrypted++;
+                const updateKeys = Object.keys(updates);
+                if (updateKeys.length > 0) {
+                    const q = buildUpdateQuery('users_public', 'id', user.id, updates);
+                    await pool.query(q.text, q.values);
+                    userEncrypted++;
+                }
             }
         }
 
@@ -106,34 +115,38 @@ async function encryptAllSensitiveData() {
         // 2. ENCRYPT VERIFICATION IMAGES
         // ========================================
         console.log('\n🖼️  Encrypting verification document paths...');
-        const verifications = await pool.query(
-            'SELECT id, id_picture, selfie_with_id, billing_document FROM user_verifications WHERE id_picture IS NOT NULL OR selfie_with_id IS NOT NULL OR billing_document IS NOT NULL'
-        );
-
         let verificationEncrypted = 0;
-        for (const verification of verifications.rows) {
-            const updates = {};
+        if (!(await tableExists(pool, 'user_verifications'))) {
+            console.warn('⚠️ user_verifications table does not exist yet. Skipping verification document encryption.');
+        } else {
+            const verifications = await pool.query(
+                'SELECT id, id_picture, selfie_with_id, billing_document FROM user_verifications WHERE id_picture IS NOT NULL OR selfie_with_id IS NOT NULL OR billing_document IS NOT NULL'
+            );
 
-            if (verification.id_picture && !isAlreadyEncrypted(verification.id_picture)) {
-                updates.id_picture = encrypt(verification.id_picture);
-                console.log(`  ✅ Verification ${verification.id}: Encrypted ID picture path`);
-            }
+            for (const verification of verifications.rows) {
+                const updates = {};
 
-            if (verification.selfie_with_id && !isAlreadyEncrypted(verification.selfie_with_id)) {
-                updates.selfie_with_id = encrypt(verification.selfie_with_id);
-                console.log(`  ✅ Verification ${verification.id}: Encrypted selfie path`);
-            }
+                if (verification.id_picture && !isAlreadyEncrypted(verification.id_picture)) {
+                    updates.id_picture = encrypt(verification.id_picture);
+                    console.log(`  ✅ Verification ${verification.id}: Encrypted ID picture path`);
+                }
 
-            if (verification.billing_document && !isAlreadyEncrypted(verification.billing_document)) {
-                updates.billing_document = encrypt(verification.billing_document);
-                console.log(`  ✅ Verification ${verification.id}: Encrypted billing document path`);
-            }
+                if (verification.selfie_with_id && !isAlreadyEncrypted(verification.selfie_with_id)) {
+                    updates.selfie_with_id = encrypt(verification.selfie_with_id);
+                    console.log(`  ✅ Verification ${verification.id}: Encrypted selfie path`);
+                }
 
-            const updateKeys = Object.keys(updates);
-            if (updateKeys.length > 0) {
-                const q = buildUpdateQuery('user_verifications', 'id', verification.id, updates);
-                await pool.query(q.text, q.values);
-                verificationEncrypted++;
+                if (verification.billing_document && !isAlreadyEncrypted(verification.billing_document)) {
+                    updates.billing_document = encrypt(verification.billing_document);
+                    console.log(`  ✅ Verification ${verification.id}: Encrypted billing document path`);
+                }
+
+                const updateKeys = Object.keys(updates);
+                if (updateKeys.length > 0) {
+                    const q = buildUpdateQuery('user_verifications', 'id', verification.id, updates);
+                    await pool.query(q.text, q.values);
+                    verificationEncrypted++;
+                }
             }
         }
 
@@ -146,7 +159,7 @@ async function encryptAllSensitiveData() {
         console.log('\n' + '='.repeat(60));
         console.log('📊 ENCRYPTION SUMMARY');
         console.log('='.repeat(60));
-        console.log(`✅ Users encrypted (contact/address): ${userEncrypted}`);
+        console.log(`✅ Users encrypted (contact/address): ${typeof userEncrypted === 'number' ? userEncrypted : 0}`);
         console.log(`✅ Verifications encrypted (images): ${verificationEncrypted}`);
         console.log('='.repeat(60));
         console.log('\n🎉 Encryption complete! Checking finished.');
