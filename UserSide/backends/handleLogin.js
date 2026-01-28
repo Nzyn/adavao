@@ -9,21 +9,7 @@ const sanitizeEmail = (email) => {
   return email.toString().trim().toLowerCase().replace(/[<>'"]/g, '');
 };
 
-const wildcardToRegex = (pattern) => {
-  // Support SQL-style % and glob-style * wildcards
-  const escaped = pattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/%/g, '.*')
-    .replace(/\*/g, '.*');
-  return new RegExp(`^${escaped}$`, 'i');
-};
-
-const isAllowedTestPatrolEmail = (email) => {
-  const patternsRaw = process.env.TEST_PATROL_EMAIL_PATTERNS || 'dansoypatrol%@mailsac.com';
-  const patterns = patternsRaw.split(',').map(s => s.trim()).filter(Boolean);
-  if (patterns.length === 0) return false;
-  return patterns.some(p => wildcardToRegex(p).test(email));
-};
+const normalizeRole = (role) => String(role || '').trim().toLowerCase();
 
 const handleLogin = async (req, res) => {
   const { email, password } = req.body;
@@ -51,21 +37,38 @@ const handleLogin = async (req, res) => {
 
     if (rows.length === 0) {
       // User not found in users_public.
-      // For patrol testing only: allow pulling a patrol_officer account from AdminSide (user_admin)
-      // and syncing it into users_public (mobile app source of truth).
+      // Patrol login fallback:
+      // If the account exists in AdminSide (user_admin) AND has patrol_officer role,
+      // auto-create/sync it into users_public (mobile app source of truth) then continue.
       console.log("⚠️ User not found in users_public table for:", sanitizedEmail);
 
-      if (isAllowedTestPatrolEmail(sanitizedEmail)) {
-        try {
-          const [adminRows] = await db.query(
-            'SELECT id, firstname, lastname, email, contact, password, email_verified_at, user_role FROM user_admin WHERE email = $1 LIMIT 1',
-            [sanitizedEmail]
-          );
+      try {
+        // Use RBAC: ONLY patrol_officer accounts from user_admin can cross-login into UserSide.
+        // Prefer explicit user_admin.user_role; fallback to roles table if present.
+        const [adminRows] = await db.query(
+          `SELECT
+             ua.id,
+             ua.firstname,
+             ua.lastname,
+             ua.email,
+             ua.contact,
+             ua.password,
+             ua.email_verified_at,
+             ua.user_role,
+             r.role_name AS rbac_role
+           FROM user_admin ua
+           LEFT JOIN user_admin_roles uar ON uar.user_admin_id = ua.id
+           LEFT JOIN roles r ON r.role_id = uar.role_id
+           WHERE ua.email = $1
+           LIMIT 1`,
+          [sanitizedEmail]
+        );
 
-          if (adminRows.length > 0 && String(adminRows[0].user_role || '').toLowerCase() === 'patrol_officer') {
-            const adminUser = adminRows[0];
+        if (adminRows.length > 0) {
+          const adminUser = adminRows[0];
+          const effectiveRole = normalizeRole(adminUser.user_role || adminUser.rbac_role);
 
-            // Ensure the patrol user exists in users_public for UserSide login
+          if (effectiveRole === 'patrol_officer') {
             await db.query(
               `INSERT INTO users_public (
                   firstname, lastname, email, contact, password,
@@ -80,7 +83,6 @@ const handleLogin = async (req, res) => {
               [adminUser.firstname, adminUser.lastname, adminUser.email, adminUser.contact, adminUser.password, adminUser.email_verified_at]
             );
 
-            // Ensure role + verified timestamp are set (testing convenience)
             await db.query(
               `UPDATE users_public
                SET user_role = 'patrol_officer',
@@ -92,13 +94,15 @@ const handleLogin = async (req, res) => {
 
             const [syncedRows] = await db.query('SELECT * FROM users_public WHERE email = $1', [sanitizedEmail]);
             if (syncedRows.length > 0) {
-              console.log('✅ Synced patrol user from user_admin into users_public:', sanitizedEmail);
+              console.log('✅ Synced patrol_officer from user_admin into users_public:', sanitizedEmail);
               rows.push(syncedRows[0]);
             }
+          } else {
+            console.log('🚫 AdminSide account exists but is not patrol_officer:', { email: sanitizedEmail, effectiveRole });
           }
-        } catch (syncError) {
-          console.warn('⚠️ Patrol sync attempt failed:', syncError.message);
         }
+      } catch (syncError) {
+        console.warn('⚠️ Patrol RBAC sync attempt failed:', syncError.message);
       }
 
       if (rows.length === 0) {
