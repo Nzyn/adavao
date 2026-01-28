@@ -44,6 +44,28 @@ class DispatchController extends Controller
             $query->whereDate('dispatched_at', '<=', $request->date_to);
         }
 
+        // Search functionality
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                // Search by Report ID or Title
+                $q->whereHas('report', function($rq) use ($search) {
+                    $rq->where('report_id', 'like', "%$search%")
+                       ->orWhere('title', 'like', "%$search%")
+                       // Search by Reporter Name
+                       ->orWhereHas('user', function($uq) use ($search) {
+                           $uq->where('firstname', 'like', "%$search%")
+                              ->orWhere('lastname', 'like', "%$search%");
+                       });
+                })
+                // Search by Patrol Officer Name
+                ->orWhereHas('patrolOfficer', function($pq) use ($search) {
+                    $pq->where('firstname', 'like', "%$search%")
+                       ->orWhere('lastname', 'like', "%$search%");
+                });
+            });
+        }
+
         $dispatches = $query->paginate(20)->withQueryString();
 
         // Get statistics
