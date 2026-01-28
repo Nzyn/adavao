@@ -1138,8 +1138,13 @@ class AuthController extends Controller
                 return redirect()->route('auth.google.phone');
             }
             
-            // Proceed to OTP
-            return $this->initiateOtpLogin($userAdmin, request());
+            // Direct login without OTP (temporarily disabled)
+            // TODO: Re-enable OTP for production by uncommenting the line below
+            // return $this->initiateOtpLogin($userAdmin, request());
+            
+            Auth::login($userAdmin);
+            request()->session()->regenerate();
+            return redirect()->intended('dashboard');
             
         } catch (\Exception $e) {
             \Log::error('Google Auth Failed: ' . $e->getMessage());
