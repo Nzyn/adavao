@@ -11,6 +11,8 @@ const sanitizeEmail = (email) => {
 
 const normalizeRole = (role) => String(role || '').trim().toLowerCase();
 
+const emailWhereClause = (columnName) => `LOWER(TRIM(${columnName})) = LOWER(TRIM($1))`;
+
 const handleLogin = async (req, res) => {
   const { email, password } = req.body;
 
@@ -32,7 +34,10 @@ const handleLogin = async (req, res) => {
     console.log("📩 Login attempt:", { email: sanitizedEmail });
 
     // 1. Query user from users_public table (UserSide app users only)
-    const [rows] = await db.query("SELECT * FROM users_public WHERE email = $1", [sanitizedEmail]);
+    const [rows] = await db.query(
+      `SELECT * FROM users_public WHERE ${emailWhereClause('email')}`,
+      [sanitizedEmail]
+    );
     console.log("📊 Query result:", rows.length > 0 ? "User found" : "User not found");
 
     if (rows.length === 0) {
@@ -43,30 +48,55 @@ const handleLogin = async (req, res) => {
       console.log("⚠️ User not found in users_public table for:", sanitizedEmail);
 
       try {
+        console.log('🔎 Patrol fallback: checking AdminSide user_admin for', sanitizedEmail);
+
         // Use RBAC: ONLY patrol_officer accounts from user_admin can cross-login into UserSide.
-        // Prefer explicit user_admin.user_role; fallback to roles table if present.
+        // Prefer explicit user_admin.user_role; optionally fallback to RBAC join if those tables exist.
         const [adminRows] = await db.query(
-          `SELECT
-             ua.id,
-             ua.firstname,
-             ua.lastname,
-             ua.email,
-             ua.contact,
-             ua.password,
-             ua.email_verified_at,
-             ua.user_role,
-             r.role_name AS rbac_role
-           FROM user_admin ua
-           LEFT JOIN user_admin_roles uar ON uar.user_admin_id = ua.id
-           LEFT JOIN roles r ON r.role_id = uar.role_id
-           WHERE ua.email = $1
+          `SELECT id, firstname, lastname, email, contact, password, email_verified_at, user_role
+           FROM user_admin
+           WHERE ${emailWhereClause('email')}
            LIMIT 1`,
           [sanitizedEmail]
         );
 
+        if (adminRows.length === 0) {
+          console.log('ℹ️ Patrol fallback: no user_admin row found for email (same DB):', sanitizedEmail);
+        }
+
         if (adminRows.length > 0) {
           const adminUser = adminRows[0];
-          const effectiveRole = normalizeRole(adminUser.user_role || adminUser.rbac_role);
+
+          let rbacRole = null;
+          try {
+            const [reg] = await db.query(
+              "SELECT to_regclass('public.user_admin_roles') AS uar, to_regclass('public.roles') AS roles",
+              []
+            );
+            if (reg?.[0]?.uar && reg?.[0]?.roles) {
+              const [rbacRows] = await db.query(
+                `SELECT r.role_name AS rbac_role
+                 FROM user_admin ua
+                 INNER JOIN user_admin_roles uar ON uar.user_admin_id = ua.id
+                 INNER JOIN roles r ON r.role_id = uar.role_id
+                 WHERE ${emailWhereClause('ua.email')}
+                 LIMIT 1`,
+                [sanitizedEmail]
+              );
+              if (rbacRows.length > 0) {
+                rbacRole = rbacRows[0].rbac_role;
+              }
+            }
+          } catch (rbacErr) {
+            console.warn('⚠️ Patrol fallback: RBAC role lookup skipped/failed:', rbacErr.message);
+          }
+
+          const effectiveRole = normalizeRole(adminUser.user_role || rbacRole);
+          console.log('🔐 Patrol fallback: AdminSide user found:', {
+            email: adminUser.email,
+            effectiveRole,
+            emailVerified: Boolean(adminUser.email_verified_at),
+          });
 
           if (effectiveRole === 'patrol_officer') {
             await db.query(
@@ -78,7 +108,7 @@ const handleLogin = async (req, res) => {
                 )
                 SELECT $1, $2, $3, $4, $5, 'patrol_officer', FALSE, COALESCE($6, NOW()), NOW(), NOW()
                 WHERE NOT EXISTS (
-                  SELECT 1 FROM users_public WHERE LOWER(email) = LOWER($3)
+                  SELECT 1 FROM users_public WHERE LOWER(TRIM(email)) = LOWER(TRIM($3))
                 )`,
               [adminUser.firstname, adminUser.lastname, adminUser.email, adminUser.contact, adminUser.password, adminUser.email_verified_at]
             );
@@ -88,14 +118,19 @@ const handleLogin = async (req, res) => {
                SET user_role = 'patrol_officer',
                    email_verified_at = COALESCE(email_verified_at, COALESCE($2, NOW())),
                    updated_at = NOW()
-               WHERE LOWER(email) = LOWER($1)`,
+               WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
               [adminUser.email, adminUser.email_verified_at]
             );
 
-            const [syncedRows] = await db.query('SELECT * FROM users_public WHERE email = $1', [sanitizedEmail]);
+            const [syncedRows] = await db.query(
+              `SELECT * FROM users_public WHERE ${emailWhereClause('email')}`,
+              [sanitizedEmail]
+            );
             if (syncedRows.length > 0) {
               console.log('✅ Synced patrol_officer from user_admin into users_public:', sanitizedEmail);
               rows.push(syncedRows[0]);
+            } else {
+              console.log('⚠️ Patrol fallback: attempted sync but users_public row still not found for:', sanitizedEmail);
             }
           } else {
             console.log('🚫 AdminSide account exists but is not patrol_officer:', { email: sanitizedEmail, effectiveRole });
