@@ -751,6 +751,12 @@ class AuthController extends Controller
             $rawToken = $request->query('token');
         }
 
+        \Log::info('📧 Email verification attempt', [
+            'raw_token_from_path' => $token,
+            'raw_token_from_query' => $request->query('token'),
+            'full_url' => $request->fullUrl(),
+        ]);
+
         $rawToken = trim((string) $rawToken);
         $decodedToken = rawurldecode($rawToken);
         // Some email clients/browsers may convert '+' to space in URLs; undo that.
@@ -779,6 +785,13 @@ class AuthController extends Controller
         }
 
         if ($pending) {
+            \Log::info('📧 Found pending registration', [
+                'email' => $pending->email,
+                'user_role' => $pending->user_role,
+                'token_expires_at' => $pending->token_expires_at,
+                'created_at' => $pending->created_at,
+            ]);
+
             // Expired (or missing expiry) -> auto-resend a fresh link
             if (empty($pending->token_expires_at) || Carbon::parse($pending->token_expires_at)->lessThanOrEqualTo(Carbon::now())) {
                 $verificationToken = Str::random(64);
@@ -809,6 +822,7 @@ class AuthController extends Controller
             // Create the real user_admin record now (strict verification)
             $existing = UserAdmin::where('email', $pending->email)->first();
             if ($existing) {
+                \Log::info('📧 User already exists in user_admin, updating verification', ['email' => $existing->email]);
                 // If somehow created already, clean up pending and treat as success
                 $pending->delete();
                 if (!is_null($existing->email_verified_at)) {
@@ -821,6 +835,7 @@ class AuthController extends Controller
                 ]);
                 $userAdmin = $existing;
             } else {
+                \Log::info('📧 Creating new user_admin record from pending registration', ['email' => $pending->email]);
                 $userAdmin = UserAdmin::create([
                     'firstname' => $pending->firstname,
                     'lastname' => $pending->lastname,
@@ -832,6 +847,7 @@ class AuthController extends Controller
                     'verification_token' => null,
                     'token_expires_at' => null,
                 ]);
+                \Log::info('📧 User_admin record created successfully', ['user_admin_id' => $userAdmin->id, 'email' => $userAdmin->email]);
             }
 
             // Pending fulfilled
@@ -891,6 +907,10 @@ class AuthController extends Controller
 
             return redirect()->route('login')->with('success', $successMessage);
         }
+
+        \Log::info('📧 No pending registration found, checking legacy user_admin table', [
+            'tokens_tried' => $tokensToTry,
+        ]);
 
         // 2) Legacy flow: check user_admin table (older deployments)
         $userAdmin = null;
