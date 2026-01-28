@@ -560,17 +560,18 @@ class UserController extends Controller
         try {
             \Log::info('assignStation called', ['user_id' => $id, 'request_data' => $request->all()]);
             
-            // Try to find user in users_public first
+            // Personnel page shows UserAdmin users, so check UserAdmin FIRST
             $user = null;
-            $userType = 'user';
+            $userType = 'admin';
             
             try {
-                $user = User::findOrFail($id);
+                $user = \App\Models\UserAdmin::findOrFail($id);
+                $userType = 'admin';
             } catch (ModelNotFoundException $e) {
-                // If not found, try UserAdmin
+                // If not found in UserAdmin, try users_public
                 try {
-                    $user = \App\Models\UserAdmin::findOrFail($id);
-                    $userType = 'admin';
+                    $user = User::findOrFail($id);
+                    $userType = 'user';
                 } catch (ModelNotFoundException $e2) {
                     throw $e; // Throw original exception if not found in either
                 }
@@ -579,8 +580,22 @@ class UserController extends Controller
             \Log::info('User found', ['user_id' => $user->id, 'type' => $userType, 'current_role' => $user->role ?? $user->user_role]);
             
             // Validate that user is police or admin
-            // UserAdmin uses 'user_role' column, User uses 'role' column
+            // UserAdmin uses 'user_role' column OR adminRoles relation, User uses 'role' column
             $role = $user->role ?? $user->user_role ?? null;
+            
+            // For UserAdmin, also check adminRoles relation (RBAC)
+            if ($userType === 'admin' && method_exists($user, 'adminRoles')) {
+                $adminRoles = $user->adminRoles()->pluck('role_name')->toArray();
+                \Log::info('AdminRoles found', ['roles' => $adminRoles]);
+                
+                if (in_array('super_admin', $adminRoles) || in_array('admin', $adminRoles)) {
+                    $role = 'admin';
+                } elseif (in_array('police', $adminRoles)) {
+                    $role = 'police';
+                } elseif (in_array('patrol_officer', $adminRoles)) {
+                    $role = 'patrol_officer';
+                }
+            }
             
             // For admin users, 'admin' role should be allowed to assign stations
             if ($userType === 'admin' && empty($role)) {
@@ -589,7 +604,7 @@ class UserController extends Controller
             
             \Log::info('Role check', ['role' => $role, 'userType' => $userType]);
             
-            if ($role !== 'admin' && $role !== 'police' && $role !== 'patrol_officer') {
+            if ($role !== 'admin' && $role !== 'police' && $role !== 'patrol_officer' && $role !== 'staff') {
                 return response()->json([
                     'success' => false,
                     'message' => 'Only police and admin users can be assigned to police stations'
