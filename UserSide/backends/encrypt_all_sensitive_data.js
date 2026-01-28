@@ -43,6 +43,26 @@ function isAlreadyEncrypted(value) {
     return value.length > 50 && /^[A-Za-z0-9+/=]+$/.test(value);
 }
 
+function buildUpdateQuery(tableName, idColumnName, idValue, updatesObject) {
+    const setClauses = [];
+    const values = [];
+    let index = 1;
+
+    for (const [columnName, columnValue] of Object.entries(updatesObject)) {
+        setClauses.push(`${columnName} = $${index++}`);
+        values.push(columnValue);
+    }
+
+    // WHERE id = $N
+    const whereIndex = index;
+    values.push(idValue);
+
+    return {
+        text: `UPDATE ${tableName} SET ${setClauses.join(', ')} WHERE ${idColumnName} = $${whereIndex}`,
+        values,
+    };
+}
+
 async function encryptAllSensitiveData() {
     const pool = new Pool({
         connectionString: process.env.DATABASE_URL || 'postgresql://alertdavao_user:rcXDr9MjmEJ8Kk6l2Nw7SbDLnOaS1m0l@dpg-d4t0k8u3jp1c73fhvulg-a.singapore-postgres.render.com/alertdavao_f2ij',
@@ -62,27 +82,22 @@ async function encryptAllSensitiveData() {
 
         let userEncrypted = 0;
         for (const user of users.rows) {
-            const updates = [];
-            const values = [user.id];
-            let paramIndex = 2;
+            const updates = {};
 
             if (user.contact && !isAlreadyEncrypted(user.contact)) {
-                updates.push(`contact = $${paramIndex++}`);
-                values.splice(values.length - 1, 0, encrypt(user.contact));
+                updates.contact = encrypt(user.contact);
                 console.log(`  ✅ User ${user.id}: Encrypted contact`);
             }
 
             if (user.address && !isAlreadyEncrypted(user.address)) {
-                updates.push(`address = $${paramIndex++}`);
-                values.splice(values.length - 1, 0, encrypt(user.address));
+                updates.address = encrypt(user.address);
                 console.log(`  ✅ User ${user.id}: Encrypted address`);
             }
 
-            if (updates.length > 0) {
-                await pool.query(
-                    `UPDATE users_public SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
-                    values
-                );
+            const updateKeys = Object.keys(updates);
+            if (updateKeys.length > 0) {
+                const q = buildUpdateQuery('users_public', 'id', user.id, updates);
+                await pool.query(q.text, q.values);
                 userEncrypted++;
             }
         }
@@ -97,33 +112,27 @@ async function encryptAllSensitiveData() {
 
         let verificationEncrypted = 0;
         for (const verification of verifications.rows) {
-            const updates = [];
-            const values = [verification.id];
-            let paramIndex = 2;
+            const updates = {};
 
             if (verification.id_picture && !isAlreadyEncrypted(verification.id_picture)) {
-                updates.push(`id_picture = $${paramIndex++}`);
-                values.splice(values.length - 1, 0, encrypt(verification.id_picture));
+                updates.id_picture = encrypt(verification.id_picture);
                 console.log(`  ✅ Verification ${verification.id}: Encrypted ID picture path`);
             }
 
             if (verification.selfie_with_id && !isAlreadyEncrypted(verification.selfie_with_id)) {
-                updates.push(`selfie_with_id = $${paramIndex++}`);
-                values.splice(values.length - 1, 0, encrypt(verification.selfie_with_id));
+                updates.selfie_with_id = encrypt(verification.selfie_with_id);
                 console.log(`  ✅ Verification ${verification.id}: Encrypted selfie path`);
             }
 
             if (verification.billing_document && !isAlreadyEncrypted(verification.billing_document)) {
-                updates.push(`billing_document = $${paramIndex++}`);
-                values.splice(values.length - 1, 0, encrypt(verification.billing_document));
+                updates.billing_document = encrypt(verification.billing_document);
                 console.log(`  ✅ Verification ${verification.id}: Encrypted billing document path`);
             }
 
-            if (updates.length > 0) {
-                await pool.query(
-                    `UPDATE user_verifications SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
-                    values
-                );
+            const updateKeys = Object.keys(updates);
+            if (updateKeys.length > 0) {
+                const q = buildUpdateQuery('user_verifications', 'id', verification.id, updates);
+                await pool.query(q.text, q.values);
                 verificationEncrypted++;
             }
         }
