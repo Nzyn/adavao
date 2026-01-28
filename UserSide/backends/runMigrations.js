@@ -122,6 +122,58 @@ async function runMigrations() {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_users_public_assigned_station_id ON users_public(assigned_station_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_users_public_is_on_duty ON users_public(is_on_duty)`);
 
+    // Test patrol accounts helper (for QA/dev)
+    // Ensures that known test patrol accounts can log into the mobile app.
+    // Scope is intentionally narrow to avoid impacting real users.
+    console.log('🧪 Ensuring test patrol accounts have patrol role...');
+    const testPatrolEmailPattern = 'dansoypatrol%@mailsac.com';
+
+    // 1) Ensure user_admin rows (if present) have patrol_officer role + verified (for testing)
+    await db.query(
+      `UPDATE user_admin
+       SET user_role = 'patrol_officer',
+           email_verified_at = COALESCE(email_verified_at, NOW())
+       WHERE email ILIKE $1`,
+      [testPatrolEmailPattern]
+    );
+
+    // 2) If test patrol accounts exist only in user_admin, create matching users_public rows
+    // Do NOT rely on UNIQUE(email) existing; use NOT EXISTS instead.
+    await db.query(
+      `INSERT INTO users_public (
+          firstname, lastname, email, contact, password,
+          user_role, is_on_duty,
+          email_verified_at,
+          created_at, updated_at
+        )
+        SELECT
+          ua.firstname,
+          ua.lastname,
+          ua.email,
+          ua.contact,
+          ua.password,
+          'patrol_officer',
+          FALSE,
+          COALESCE(ua.email_verified_at, NOW()),
+          NOW(), NOW()
+        FROM user_admin ua
+        WHERE ua.email ILIKE $1
+          AND NOT EXISTS (
+            SELECT 1 FROM users_public up
+            WHERE LOWER(up.email) = LOWER(ua.email)
+          )`,
+      [testPatrolEmailPattern]
+    );
+
+    // 3) Ensure users_public rows have patrol_officer role + verified (for testing)
+    await db.query(
+      `UPDATE users_public
+       SET user_role = 'patrol_officer',
+           email_verified_at = COALESCE(email_verified_at, NOW())
+       WHERE email ILIKE $1`,
+      [testPatrolEmailPattern]
+    );
+
     console.log('📝 Ensuring patrol_dispatches table exists...');
     await db.query(`
       CREATE TABLE IF NOT EXISTS patrol_dispatches (
