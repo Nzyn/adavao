@@ -152,35 +152,36 @@ async function runMigrations() {
     ];
 
     for (const acct of testPatrolAccounts) {
-      // Insert if not exists, do nothing if already exists
-      await safeQuery(
-        `create test patrol ${acct.email}`,
-        `INSERT INTO users_public (
-            firstname, lastname, email, contact, password,
-            user_role, is_on_duty, email_verified_at,
-            created_at, updated_at
-          )
-          SELECT $1, $2, $3, $4, $5, 'patrol_officer', FALSE, NOW(), NOW(), NOW()
-          WHERE NOT EXISTS (
-            SELECT 1 FROM users_public WHERE LOWER(TRIM(email)) = LOWER(TRIM($3))
-          )`,
-        [acct.firstname, acct.lastname, acct.email, acct.contact, testPatrolPasswordHash]
-      );
+      try {
+        // Check if exists first
+        const [existingRows] = await db.query(
+          `SELECT id, email, user_role FROM users_public WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [acct.email]
+        );
 
-      // Ensure role and verified status even if row already existed
-      await safeQuery(
-        `ensure test patrol verified ${acct.email}`,
-        `UPDATE users_public
-         SET user_role = 'patrol_officer',
-             email_verified_at = COALESCE(email_verified_at, NOW()),
-             updated_at = NOW()
-         WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-        [acct.email]
-      );
+        if (existingRows.length > 0) {
+          console.log(`   ✅ Test patrol ${acct.email} already exists (id=${existingRows[0].id}, role=${existingRows[0].user_role})`);
+          // Ensure it has patrol_officer role
+          await db.query(
+            `UPDATE users_public SET user_role = 'patrol_officer', email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $1`,
+            [existingRows[0].id]
+          );
+        } else {
+          // Insert new account
+          const [insertResult] = await db.query(
+            `INSERT INTO users_public (firstname, lastname, email, contact, password, user_role, is_on_duty, email_verified_at, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 'patrol_officer', FALSE, NOW(), NOW(), NOW())
+             RETURNING id`,
+            [acct.firstname, acct.lastname, acct.email, acct.contact, testPatrolPasswordHash]
+          );
+          console.log(`   ✅ Created test patrol ${acct.email} (id=${insertResult[0]?.id})`);
+        }
+      } catch (err) {
+        console.error(`   ❌ Failed to create/update test patrol ${acct.email}:`, err.message);
+      }
     }
 
-    console.log(`✅ Test patrol accounts ready: ${testPatrolAccounts.map(a => a.email).join(', ')}`);
-    console.log('   Password for all test patrol accounts: Patrol123!');
+    console.log('🧪 Test patrol accounts setup complete. Password for all: Patrol123!');
 
     console.log('📝 Ensuring patrol_dispatches table exists...');
     await safeQuery('create patrol_dispatches', `
