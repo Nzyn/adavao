@@ -5,6 +5,8 @@ namespace App\Mail\Transport;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
 use Symfony\Component\Mime\MessageConverter;
+use Symfony\Component\Mime\Part\AbstractPart;
+use Symfony\Component\Mime\Part\TextPart;
 use SendGrid;
 use SendGrid\Mail\Mail;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -13,6 +15,44 @@ use Psr\Log\LoggerInterface;
 class SendGridTransport extends AbstractTransport
 {
     protected $apiKey;
+
+    private function findTextPart(AbstractPart $part, string $wantedSubtype): ?TextPart
+    {
+        if ($part instanceof TextPart) {
+            if (method_exists($part, 'getMediaSubtype') && $part->getMediaSubtype() === $wantedSubtype) {
+                return $part;
+            }
+        }
+
+        if (method_exists($part, 'getParts')) {
+            foreach ($part->getParts() as $child) {
+                $found = $this->findTextPart($child, $wantedSubtype);
+                if ($found) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function textPartBody(?TextPart $part): ?string
+    {
+        if (!$part) {
+            return null;
+        }
+
+        $body = $part->getBody();
+        if (is_resource($body)) {
+            $body = stream_get_contents($body);
+        }
+
+        if (!is_string($body)) {
+            return null;
+        }
+
+        return $body;
+    }
 
     public function __construct(string $apiKey, EventDispatcherInterface $dispatcher = null, LoggerInterface $logger = null)
     {
@@ -24,28 +64,37 @@ class SendGridTransport extends AbstractTransport
     {
         $email = new Mail();
         $originalMessage = $message->getOriginalMessage();
+        $originalEmail = MessageConverter::toEmail($originalMessage);
         
         // Set from
-        $from = $originalMessage->getFrom()[0];
+        $from = $originalEmail->getFrom()[0];
         $email->setFrom($from->getAddress(), $from->getName() ?? 'AlertDavao');
 
         // Set to
-        foreach ($originalMessage->getTo() as $recipient) {
+        foreach ($originalEmail->getTo() as $recipient) {
             $email->addTo($recipient->getAddress(), $recipient->getName() ?? '');
         }
 
         // Set subject
-        $email->setSubject($originalMessage->getSubject());
+        $email->setSubject($originalEmail->getSubject());
 
         // Set content
-        $body = $originalMessage->getBody()->toString();
-        $contentTypeHeader = $originalMessage->getHeaders()->get('Content-Type');
-        $isHtml = $contentTypeHeader && str_contains($contentTypeHeader->getBodyAsString(), 'text/html');
-        
-        if ($isHtml) {
-            $email->addContent("text/html", $body);
-        } else {
-            $email->addContent("text/plain", $body);
+        // IMPORTANT: don't use Part::toString() here; it includes MIME headers and quoted-printable encoding.
+        // Extract the raw body from the relevant MIME parts.
+        $bodyPart = $originalEmail->getBody();
+        $textBody = $this->textPartBody($this->findTextPart($bodyPart, 'plain'));
+        $htmlBody = $this->textPartBody($this->findTextPart($bodyPart, 'html'));
+
+        if ($textBody !== null && $textBody !== '') {
+            $email->addContent('text/plain', $textBody);
+        }
+
+        if ($htmlBody !== null && $htmlBody !== '') {
+            $email->addContent('text/html', $htmlBody);
+        }
+
+        if (($htmlBody === null || $htmlBody === '') && ($textBody === null || $textBody === '')) {
+            $email->addContent('text/plain', 'Email content could not be rendered.');
         }
 
         // Disable click tracking and open tracking to prevent URL wrapping
