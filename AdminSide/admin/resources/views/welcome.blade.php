@@ -730,7 +730,6 @@
                 <h1 class="content-title">Dashboard Overview</h1>
                 <p class="content-subtitle">System-wide statistics and overview</p>
             @endif
-            @endif
         </div>
 
         @if($userRole === 'admin' || $userRole === 'super_admin')
