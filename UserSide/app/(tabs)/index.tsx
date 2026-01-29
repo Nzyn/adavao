@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: containerPadding.horizontal,
-        paddingTop: containerPadding.vertical + 40,
+        paddingTop: containerPadding.vertical + 10,
         paddingBottom: spacing.md,
         backgroundColor: COLORS.white,
         borderBottomWidth: 1,
@@ -972,6 +972,7 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
         marginTop: 4,
         fontWeight: '600',
+        textAlign: 'center',
     },
     chatBadge: {
         position: 'absolute',

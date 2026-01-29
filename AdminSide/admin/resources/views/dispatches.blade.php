@@ -131,41 +131,38 @@
     .badge {
         display: inline-flex;
         align-items: center;
-        padding: 2px 8px;
-        border-radius: 9999px;
+        padding: 2px 0;
         font-size: 0.75rem;
         font-weight: 600;
         line-height: 1.25;
     }
-    .badge-success { background: #d1fae5; color: #065f46; }
-    .badge-danger { background: #fee2e2; color: #991b1b; }
-    .badge-warning { background: #fef3c7; color: #92400e; }
-    .badge-info { background: #dbeafe; color: #1e40af; }
-    .badge-gray { background: #f3f4f6; color: #374151; }
+    .badge-success { color: #065f46; }
+    .badge-danger { color: #991b1b; }
+    .badge-warning { color: #92400e; }
+    .badge-info { color: #1e40af; }
+    .badge-gray { color: #374151; }
 
     /* Urgency Badges */
     .urgency-badge {
-        padding: 2px 8px;
-        border-radius: 9999px;
+        padding: 2px 0;
         font-size: 0.75rem;
         font-weight: 600;
     }
-    .urgency-critical { background-color: #fee2e2; color: #991b1b; }
-    .urgency-high { background-color: #fed7aa; color: #9a3412; }
-    .urgency-medium { background-color: #fef3c7; color: #92400e; }
-    .urgency-low { background-color: #f3f4f6; color: #6b7280; }
+    .urgency-critical { color: #991b1b; }
+    .urgency-high { color: #9a3412; }
+    .urgency-medium { color: #92400e; }
+    .urgency-low { color: #6b7280; }
 
     /* Validity Badges */
     .validity-badge {
-        padding: 2px 8px;
-        border-radius: 9999px;
+        padding: 2px 0;
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: capitalize;
     }
-    .validity-badge.valid { color: #065f46; background-color: #d1fae5; }
-    .validity-badge.invalid { color: #991b1b; background-color: #fee2e2; }
-    .validity-badge.checking_for_report_validity { color: #3730a3; background-color: #e0e7ff; }
+    .validity-badge.valid { color: #065f46; }
+    .validity-badge.invalid { color: #991b1b; }
+    .validity-badge.checking_for_report_validity { color: #3730a3; }
 
     /* SLA Timer */
     .sla-timer {

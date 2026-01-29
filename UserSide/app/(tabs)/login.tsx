@@ -516,7 +516,7 @@ const Login = () => {
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: Platform.OS === 'ios' ? 60 : 40,
+          paddingTop: Platform.OS === 'ios' ? 50 : 20,
           paddingBottom: 100,
           paddingHorizontal: isSmallScreen ? 16 : 20,
           alignItems: 'center',

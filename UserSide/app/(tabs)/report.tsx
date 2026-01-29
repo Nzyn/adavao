@@ -1009,7 +1009,7 @@ export default function ReportCrime() {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ paddingBottom: 48 }}
+                contentContainerStyle={{ paddingBottom: 48, paddingHorizontal: 16 }}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={true}
                 scrollEnabled={true}
@@ -1034,14 +1034,14 @@ export default function ReportCrime() {
 
                 {/* Title removed - will be auto-generated from crime type + location + date */}
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 8 }}>
                     <Text style={styles.subheading}>Select the type of </Text>
                     <Link href={{ pathname: "/guidelines", params: { scrollToSection: "crime-types" } }} asChild>
                         <TouchableOpacity>
                             <Text style={[styles.subheading, { color: '#0066cc', textDecorationLine: 'underline' }]}>crimes</Text>
                         </TouchableOpacity>
                     </Link>
-                    <Text style={styles.subheading}> *</Text>
+                    <Text style={{ color: '#E63946', fontWeight: '700', fontSize: 18 }}> *</Text>
                 </View>
                 <View style={[styles.card, isFlagged && { opacity: 0.6, pointerEvents: 'none' }]}>
                     {/* Render each opened category */}
@@ -1147,7 +1147,10 @@ export default function ReportCrime() {
                     </View>
                 </View>
 
-                <Text style={styles.label}>Location *</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+                    <Text style={[styles.label, { marginVertical: 0 }]}>Location</Text>
+                    <Text style={{ color: '#E63946', fontWeight: '700', fontSize: 16 }}> *</Text>
+                </View>
 
                 {/* Minimal Location Info (no map/coordinate preview) */}
                 <View style={{
@@ -1171,7 +1174,10 @@ export default function ReportCrime() {
                     </Text>
                 </TouchableOpacity>
 
-                <Text style={styles.label}>Description *</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+                    <Text style={[styles.label, { marginVertical: 0 }]}>Description</Text>
+                    <Text style={{ color: '#E63946', fontWeight: '700', fontSize: 16 }}> *</Text>
+                </View>
 
                 <TextInput
                     style={[styles.input, styles.textArea]}
@@ -1230,8 +1236,11 @@ export default function ReportCrime() {
                     </View>
                 )}
 
-                <Text style={styles.label}>Evidence (Photo + Video) *</Text>
-                <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, marginTop: -8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+                    <Text style={[styles.label, { marginVertical: 0 }]}>Evidence (Photo + Video)</Text>
+                    <Text style={{ color: '#E63946', fontWeight: '700', fontSize: 16 }}> *</Text>
+                </View>
+                <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
                     Required for most crime types. If required, upload BOTH a photo AND a video of the incident, damage, or suspect.
                 </Text>
                 {/* Evidence Warning */}

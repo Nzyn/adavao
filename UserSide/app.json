@@ -11,7 +11,7 @@
     ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "owner": "jdans",
+    "owner": "danserdas",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.imiyataox.alertdavao",
@@ -64,7 +64,7 @@
       "apiBaseUrl": "https://node-server-gk1u.onrender.com",
       "router": {},
       "eas": {
-        "projectId": "3118ce30-1192-46e5-9e48-8bb1b2b8bfe6"
+        "projectId": "7e912ea7-65eb-47c1-9c2a-495e3e667caf"
       }
     }
   }

@@ -13,7 +13,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingTop: containerPadding.vertical + 30,
+    paddingTop: containerPadding.vertical,
     paddingHorizontal: containerPadding.horizontal,
   },
   textTitle: {
@@ -272,7 +272,8 @@ const styles = StyleSheet.create({
   },
 
   screen: { padding: 16, backgroundColor: '#fff' },
-  label: { fontSize: 16, marginVertical: 8 },
+  label: { fontSize: 16, marginVertical: 8, fontWeight: '600', color: '#333' },
+  labelRequired: { color: '#E63946', fontWeight: '700' },
   textArea: { height: 100, textAlignVertical: 'top' },
   subheadingAlt: { fontSize: 18, fontWeight: '600', marginVertical: 12 },
   card: {
@@ -646,7 +647,9 @@ const styles = StyleSheet.create({
   headerHistory: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    marginTop: 0,
   },
   headerTitleHistory: {
     flex: 1,

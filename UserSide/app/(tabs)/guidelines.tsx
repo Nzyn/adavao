@@ -372,8 +372,8 @@ const Guidelines = () => {
                 backgroundColor: COLORS.white,
                 borderBottomWidth: 1,
                 borderBottomColor: COLORS.border,
-                height: Platform.OS === 'ios' ? 100 : 80,
-                paddingTop: Platform.OS === 'ios' ? 50 : 30,
+                height: Platform.OS === 'ios' ? 90 : 60,
+                paddingTop: Platform.OS === 'ios' ? 44 : 10,
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingHorizontal: 16,
@@ -396,7 +396,7 @@ const Guidelines = () => {
 
             <ScrollView
                 ref={scrollViewRef}
-                style={{ flex: 1, marginTop: Platform.OS === 'ios' ? 100 : 80 }}
+                style={{ flex: 1, marginTop: Platform.OS === 'ios' ? 90 : 60 }}
                 contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
                 showsVerticalScrollIndicator={false}
             >

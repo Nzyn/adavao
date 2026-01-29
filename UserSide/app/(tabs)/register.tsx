@@ -411,7 +411,7 @@ const Register = () => {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: '#fff' }}
-      contentContainerStyle={{ paddingTop: 20, paddingBottom: 150, paddingHorizontal: 20, alignItems: 'center' }}
+      contentContainerStyle={{ paddingTop: 10, paddingBottom: 150, paddingHorizontal: 20, alignItems: 'center' }}
       keyboardShouldPersistTaps="handled"
     >
       <View style={{ width: '100%', maxWidth: 440 }}>

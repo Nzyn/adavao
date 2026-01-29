@@ -512,36 +512,27 @@
         /* Urgency Badge Styles */
         .urgency-badge {
             display: inline-block;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.7rem;
+            padding: 2px 0;
+            font-size: 0.75rem;
             font-weight: 600;
             text-align: center;
             white-space: nowrap;
         }
 
         .urgency-critical {
-            background-color: #fee2e2;
             color: #991b1b;
-            border: 1px solid #fca5a5;
         }
 
         .urgency-high {
-            background-color: #fed7aa;
-            color: #9a3412;
-            border: 1px solid #fdba74;
+            color: #c2410c;
         }
 
         .urgency-medium {
-            background-color: #fef3c7;
             color: #92400e;
-            border: 1px solid #fde047;
         }
 
         .urgency-low {
-            background-color: #f3f4f6;
             color: #6b7280;
-            border: 1px solid #d1d5db;
         }
 
         .overdue-badge {
@@ -560,8 +551,7 @@
         /* SLA Timer Badge Styles */
         .sla-timer {
             display: inline-block;
-            padding: 4px 10px;
-            border-radius: 6px;
+            padding: 2px 0;
             font-size: 0.8rem;
             font-weight: 600;
             font-family: 'Courier New', monospace;
@@ -569,44 +559,33 @@
         }
 
         .sla-timer.countdown {
-            background-color: #dbeafe;
             color: #1e40af;
-            border: 1px solid #93c5fd;
         }
 
         .sla-timer.exceeded {
-            background-color: #fee2e2;
             color: #991b1b;
-            border: 1px solid #fca5a5;
         }
 
         /* Rule Status Badge Styles */
         .rule-status {
             display: inline-block;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.7rem;
+            padding: 2px 0;
+            font-size: 0.75rem;
             font-weight: 600;
             text-align: center;
             white-space: nowrap;
         }
 
         .rule-status.within-sla {
-            background-color: #d1fae5;
             color: #065f46;
-            border: 1px solid #6ee7b7;
         }
 
         .rule-status.exceeded {
-            background-color: #fee2e2;
             color: #991b1b;
-            border: 1px solid #fca5a5;
         }
 
         .rule-status.pending {
-            background-color: #f3f4f6;
             color: #6b7280;
-            border: 1px solid #d1d5db;
         }
 
         .timeline-section {
@@ -1704,11 +1683,11 @@
                         </td>
                         <td>
                             @if($csvReport->assigned_station_id)
-                                <span class="badge" style="background-color: #3b82f6; color: white; padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-size: 0.75rem;">
+                                <span style="font-size: 0.75rem; color: #1e40af; font-weight: 600;">
                                     Station {{ $csvReport->assigned_station_id }}
                                 </span>
                             @else
-                                <span class="badge" style="background-color: #f59e0b; color: white; padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-size: 0.75rem;">
+                                <span style="font-size: 0.75rem; color: #92400e; font-weight: 600;">
                                     Unassigned
                                 </span>
                             @endif
