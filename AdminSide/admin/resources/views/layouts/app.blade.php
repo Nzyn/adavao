@@ -460,11 +460,15 @@
                     <div class="user-menu" id="userMenu">
                         <button class="user-button" onclick="toggleUserMenu()">
                             <div class="user-avatar">
-                                {{ strtoupper(substr(auth()->user()->firstname, 0, 1)) }}{{ strtoupper(substr(auth()->user()->lastname, 0, 1)) }}
+                                @if(auth()->user() && auth()->user()->firstname)
+                                    {{ strtoupper(substr(auth()->user()->firstname, 0, 1)) }}{{ strtoupper(substr(auth()->user()->lastname ?? '', 0, 1)) }}
+                                @else
+                                    A
+                                @endif
                             </div>
                             <div class="user-info">
-                                <span class="user-name">{{ auth()->user()->firstname }} {{ auth()->user()->lastname }}</span>
-                                <span class="user-email">{{ auth()->user()->email }}</span>
+                                <span class="user-name">{{ auth()->user()->firstname ?? 'Admin' }} {{ auth()->user()->lastname ?? '' }}</span>
+                                <span class="user-email">{{ auth()->user()->email ?? '' }}</span>
                             </div>
                             <svg class="dropdown-icon" viewBox="0 0 20 20">
                                 <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
