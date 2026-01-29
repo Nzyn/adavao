@@ -46,37 +46,248 @@ import { validateDavaoLocation } from '../../utils/geofence';
 
 
 
-const CRIME_CATEGORIES = {
-    'Crime Against Persons': [
-        'Homicide',
-        'Murder',
-        'Physical Injury',
-        'Sexual Assault',
-        'Rape',
-        'Domestic Violence',
-        'Harassment',
-        'Threats',
-        'Missing Person'
-    ],
-    'Crime Against Property': [
-        'Theft',
-        'Robbery',
-        'Burglary',
-        'Break-in',
-        'Carnapping',
-        'Motornapping'
-    ],
-    'Crime Against Society': [
-        'Fraud',
-        'Cybercrime'
-    ],
-    'Uncategorized': [
-        'Others'
-    ]
+// Define crime categories with subcategories and pre-defined complaint texts
+const CRIME_CATEGORIES: Record<string, Record<string, string[]>> = {
+    'Crimes Against Person': {
+        'Physical Assault': [
+            'I was physically attacked by an unknown individual.',
+            'I witnessed a physical altercation between two or more individuals.',
+            'I was assaulted by someone I know without provocation.',
+            'A physical fight broke out and people were injured.'
+        ],
+        'Domestic Violence': [
+            'I am experiencing physical violence from a family member.',
+            'I am being emotionally or psychologically abused at home.',
+            'I am being threatened with harm by a relative or partner.',
+            'I witnessed domestic violence in my neighborhood.'
+        ],
+        'Robbery/Holdup': [
+            'I was robbed at gunpoint/knifepoint.',
+            'My personal belongings were forcibly taken from me.',
+            'I witnessed a robbery happening in a public place.',
+            'A group of individuals held someone up and took their valuables.'
+        ],
+        'Threats/Intimidation': [
+            'I received death threats from an individual.',
+            'I am being intimidated and threatened to remain silent.',
+            'Someone threatened me with a weapon.',
+            'I am being threatened online and in person.'
+        ],
+        'Sexual Harassment': [
+            'I experienced unwanted sexual advances or comments.',
+            'I was touched inappropriately without consent.',
+            'I am being harassed with sexual remarks at work/school.',
+            'I received explicit messages or images without consent.'
+        ],
+        'Kidnapping/Abduction': [
+            'A person was taken against their will.',
+            'A child was abducted from a public area.',
+            'I witnessed someone being forcibly taken.',
+            'A family member has been kidnapped and ransom is demanded.'
+        ],
+        'Stabbing/Shooting Incident': [
+            'I witnessed a stabbing incident.',
+            'I heard gunshots and saw a victim.',
+            'Someone was attacked with a bladed weapon.',
+            'A shooting occurred in a populated area.'
+        ],
+        'Murder/Homicide': [
+            'I found a deceased person under suspicious circumstances.',
+            'I witnessed a killing in progress.',
+            'I have information about a murder case.',
+            'A dead body was discovered in my area.'
+        ]
+    },
+    'Property-Related Crimes': {
+        'Theft/Pickpocketing': [
+            'My wallet/phone was stolen without my knowledge.',
+            'I caught someone trying to steal from me.',
+            'My belongings were taken while I was distracted.',
+            'Theft occurred in a crowded area.'
+        ],
+        'House Break-in/Burglary': [
+            'My house was broken into while we were away.',
+            'Someone entered my property without permission and stole items.',
+            'I discovered signs of forced entry in my home.',
+            'Valuables were taken from inside my residence.'
+        ],
+        'Vehicle Theft (Carnapping)': [
+            'My car/motorcycle was stolen.',
+            'I witnessed a vehicle being taken without the owner\'s consent.',
+            'My vehicle was forcibly taken from me.',
+            'An abandoned stolen vehicle was found.'
+        ],
+        'Vandalism': [
+            'Someone damaged my property deliberately.',
+            'My car was scratched or broken into.',
+            'Public property was defaced or destroyed.',
+            'My home was vandalized with graffiti or damage.'
+        ],
+        'Arson': [
+            'A fire was intentionally set on property.',
+            'I witnessed someone starting a fire.',
+            'My property was burned deliberately.',
+            'There are signs of arson in my area.'
+        ],
+        'Scam/Fraud': [
+            'I was tricked into sending money to a scammer.',
+            'I fell victim to an online scam.',
+            'Someone posed as an official to defraud me.',
+            'I have evidence of a fraudulent scheme.'
+        ],
+        'Trespassing': [
+            'An unknown person entered my property without permission.',
+            'Someone is illegally occupying my land.',
+            'I witnessed trespassing on private property.',
+            'Unauthorized individuals are using my property.'
+        ]
+    },
+    'Public Safety Incidents': {
+        'Fire Emergency': [
+            'A fire broke out in my area.',
+            'I see smoke or flames coming from a building.',
+            'There is an uncontrolled fire nearby.',
+            'A fire hazard needs immediate attention.'
+        ],
+        'Road Accident': [
+            'A vehicular accident occurred.',
+            'I witnessed a hit-and-run incident.',
+            'Multiple vehicles were involved in a collision.',
+            'There are injuries from a road accident.'
+        ],
+        'Medical Emergency': [
+            'Someone needs urgent medical attention.',
+            'A person collapsed and is unresponsive.',
+            'There is a medical emergency in my area.',
+            'An ambulance is needed immediately.'
+        ],
+        'Natural Disaster (Flood, etc.)': [
+            'Flooding is affecting my area.',
+            'Landslide has occurred nearby.',
+            'Strong winds/storm caused damage.',
+            'People are stranded due to natural disaster.'
+        ],
+        'Hazardous Materials': [
+            'A chemical spill occurred.',
+            'There is a gas leak in my area.',
+            'Hazardous waste was dumped illegally.',
+            'Dangerous materials are exposed to the public.'
+        ],
+        'Building Collapse/Structural Danger': [
+            'A building has collapsed.',
+            'There are signs of structural instability.',
+            'A wall/roof is about to collapse.',
+            'People may be trapped under debris.'
+        ]
+    },
+    'Public Order Issues': {
+        'Public Intoxication': [
+            'An intoxicated person is causing disturbance.',
+            'Someone is drunk and behaving aggressively.',
+            'A person under the influence is endangering others.',
+            'Public drinking is happening in a prohibited area.'
+        ],
+        'Noise Complaint': [
+            'Excessive noise is disturbing the peace.',
+            'Loud parties are happening late at night.',
+            'Construction noise is beyond reasonable hours.',
+            'Repeated noise violations from a neighbor.'
+        ],
+        'Illegal Gambling': [
+            'Illegal gambling is happening in my area.',
+            'A gambling den is operating nearby.',
+            'People are gambling in public spaces.',
+            'I have information about an illegal betting operation.'
+        ],
+        'Loitering/Suspicious Activity': [
+            'Suspicious individuals are loitering near my property.',
+            'Someone is acting strangely in my neighborhood.',
+            'A group is gathering and behaving suspiciously.',
+            'I noticed unusual activity that may be criminal.'
+        ]
+    },
+    'Cyber-Related Crimes': {
+        'Online Scam/Phishing': [
+            'I received a phishing email/message.',
+            'Someone impersonated a company to steal my info.',
+            'I was scammed through an online platform.',
+            'My personal data was used fraudulently.'
+        ],
+        'Hacking/Unauthorized Access': [
+            'My account was hacked.',
+            'Someone accessed my system without permission.',
+            'I detected unauthorized login attempts.',
+            'My data was stolen through hacking.'
+        ],
+        'Cyberbullying': [
+            'I am being harassed online.',
+            'Someone is spreading false information about me.',
+            'I am receiving threatening messages online.',
+            'A person is defaming me on social media.'
+        ],
+        'Identity Theft': [
+            'Someone is using my identity without consent.',
+            'My personal information was stolen.',
+            'Fraudulent accounts were created using my name.',
+            'I discovered unauthorized transactions in my name.'
+        ],
+        'Online Threats': [
+            'I received death threats online.',
+            'Someone is threatening me through social media.',
+            'I am being blackmailed online.',
+            'Threatening messages were sent to my accounts.'
+        ],
+        'Sextortion/Image-Based Abuse': [
+            'Someone is threatening to share my intimate images.',
+            'I am being blackmailed with private photos.',
+            'My intimate images were shared without consent.',
+            'I am a victim of revenge porn.'
+        ]
+    },
+    'Moral and Exploitation Crimes': {
+        'Drug-Related Incident': [
+            'I witnessed drug use or dealing in my area.',
+            'Someone is selling illegal drugs nearby.',
+            'A drug den is operating in my neighborhood.',
+            'I have information about drug trafficking.'
+        ],
+        'Human Trafficking': [
+            'I suspect human trafficking is happening.',
+            'Someone is being held against their will.',
+            'I have information about trafficking victims.',
+            'A person is being exploited for labor/sex.'
+        ],
+        'Child Abuse/Exploitation': [
+            'A child is being abused or neglected.',
+            'I witnessed child exploitation.',
+            'A minor is being mistreated.',
+            'I have information about child abuse.'
+        ],
+        'Illegal Firearms/Weapons': [
+            'Someone is carrying an illegal firearm.',
+            'Illegal weapons are being sold in my area.',
+            'I witnessed someone brandishing a weapon.',
+            'Firearms were discharged illegally.'
+        ]
+    },
+    'Other/Unknown': {
+        'Others': [
+            'An incident occurred that doesn\'t fit other categories.',
+            'I want to report something unusual.',
+            'I have information about a potential crime.',
+            'I witnessed something suspicious.'
+        ],
+        'Unidentified Incident': [
+            'I\'m not sure what category this falls under.',
+            'Something happened but I can\'t classify it.',
+            'I need to report an unclear incident.',
+            'There was an incident of unknown nature.'
+        ]
+    }
 };
 
-// Flatten for backward compatibility
-const CRIME_TYPES = Object.values(CRIME_CATEGORIES).flat();
+// Flatten for backward compatibility - get all subcategory names
+const CRIME_TYPES = Object.values(CRIME_CATEGORIES).flatMap(category => Object.keys(category));
 
 
 // ✅ Type for CheckRow props
@@ -112,27 +323,13 @@ export default function ReportCrime() {
     const [titleError, setTitleError] = useState('');
     const [selectedCrimes, setSelectedCrimes] = useState<string[]>([]);
     const [openedCategories, setOpenedCategories] = useState<string[]>([]);
+    const [expandedSubcategories, setExpandedSubcategories] = useState<string[]>([]);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [location, setLocation] = useState('');
     const [barangay, setBarangay] = useState('');
     const [barangayId, setBarangayId] = useState<number | null>(null);
     const [streetAddress, setStreetAddress] = useState('');
     const [description, setDescription] = useState('');
-
-    // Item #2: Report Templates
-    const [showTemplateModal, setShowTemplateModal] = useState(false);
-
-    const REPORT_TEMPLATES: { [key: string]: string } = {
-        'Theft': 'Item stolen: ___\nLocation where it happened: ___\nApproximate time: ___\nSuspect description (if seen): ___\nEstimated value: ___',
-        'Robbery': 'What was taken: ___\nWeapon used (if any): ___\nNumber of suspects: ___\nSuspect description: ___\nDirection suspects fled: ___',
-        'Noise Complaint': 'Type of noise: ___\nDuration: ___\nFrequency (daily/weekly): ___\nSource of noise: ___',
-        'Suspicious Activity': 'Activity observed: ___\nNumber of people involved: ___\nVehicle description (if any): ___\nHow long has this been happening: ___',
-        'Missing Person': 'Name: ___\nAge: ___\nLast seen: ___\nWearing: ___\nDistinguishing features: ___',
-        'Physical Injury': 'Type of injury: ___\nHow it happened: ___\nSuspect name/description: ___\nWitnesses present: ___',
-        'Domestic Violence': 'Relationship to suspect: ___\nType of violence: ___\nInjuries sustained: ___\nIs this ongoing: ___',
-        'Burglary': 'Entry point: ___\nItems taken: ___\nTime discovered: ___\nSigns of forced entry: ___',
-        'Vandalism': 'Property damaged: ___\nType of damage: ___\nEstimated repair cost: ___\nWitnesses: ___',
-    };
 
     const [showLocationPicker, setShowLocationPicker] = useState(false);
     const [locationCoordinates, setLocationCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -861,6 +1058,11 @@ export default function ReportCrime() {
                                 <TouchableOpacity
                                     onPress={() => {
                                         setOpenedCategories(prev => prev.filter(c => c !== category));
+                                        // Also remove any expanded subcategories from this category
+                                        const subcats = Object.keys(CRIME_CATEGORIES[category] || {});
+                                        setExpandedSubcategories(prev => prev.filter(s => !subcats.includes(s)));
+                                        // Remove any selected crimes from this category
+                                        setSelectedCrimes(prev => prev.filter(c => !subcats.includes(c)));
                                     }}
                                     style={{ padding: 4 }}
                                 >
@@ -868,15 +1070,36 @@ export default function ReportCrime() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Crime Types for this Category */}
+                            {/* Subcategories for this Category */}
                             <View style={{ paddingLeft: 8 }}>
-                                {CRIME_CATEGORIES[category as keyof typeof CRIME_CATEGORIES].map((crime) => (
-                                    <CheckRow
-                                        key={crime}
-                                        label={crime}
-                                        checked={selectedCrimes.includes(crime)}
-                                        onToggle={() => toggleCrimeType(crime)}
-                                    />
+                                {Object.keys(CRIME_CATEGORIES[category] || {}).map((subcategory) => (
+                                    <View key={subcategory} style={{ marginBottom: 8 }}>
+                                        <TouchableOpacity
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                paddingVertical: 10,
+                                                paddingHorizontal: 8,
+                                                backgroundColor: selectedCrimes.includes(subcategory) ? '#E3F2FD' : '#f8f9fa',
+                                                borderRadius: 6,
+                                                borderWidth: selectedCrimes.includes(subcategory) ? 2 : 1,
+                                                borderColor: selectedCrimes.includes(subcategory) ? '#1D3557' : '#ddd',
+                                            }}
+                                            onPress={() => toggleCrimeType(subcategory)}
+                                        >
+                                            <View style={[styles.checkboxBox, selectedCrimes.includes(subcategory) && styles.checkboxBoxChecked]}>
+                                                {selectedCrimes.includes(subcategory) && <Text style={styles.checkboxTick}>✓</Text>}
+                                            </View>
+                                            <Text style={{
+                                                flex: 1,
+                                                fontSize: 15,
+                                                color: '#333',
+                                                fontWeight: selectedCrimes.includes(subcategory) ? '600' : '400'
+                                            }}>
+                                                {subcategory}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 ))}
                             </View>
                         </View>
@@ -940,16 +1163,6 @@ export default function ReportCrime() {
 
                 <Text style={styles.label}>Description *</Text>
 
-                {/* Item #2: Template Button */}
-                {selectedCrimes.length > 0 && Object.keys(REPORT_TEMPLATES).some(t => selectedCrimes.includes(t)) && (
-                    <TouchableOpacity
-                        style={styles.templateButton}
-                        onPress={() => setShowTemplateModal(true)}>
-                        <Ionicons name="document-text-outline" size={18} color="#1D3557" style={{ marginRight: 6 }} />
-                        <Text style={styles.templateButtonText}>📋 Use Template</Text>
-                    </TouchableOpacity>
-                )}
-
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     placeholder="Describe what happened in detail..."
@@ -958,10 +1171,77 @@ export default function ReportCrime() {
                     multiline
                 />
 
+                {/* Pre-defined Complaint Texts */}
+                {selectedCrimes.length > 0 && (
+                    <View style={{ marginTop: 12, marginBottom: 16 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#1D3557', marginBottom: 8 }}>
+                            💡 Quick fill suggestions (tap to use):
+                        </Text>
+                        <ScrollView 
+                            horizontal 
+                            showsHorizontalScrollIndicator={false}
+                            style={{ marginHorizontal: -16 }}
+                            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                        >
+                            {selectedCrimes.flatMap(crimeType => {
+                                // Find the category that contains this crime type
+                                for (const [categoryName, subcategories] of Object.entries(CRIME_CATEGORIES)) {
+                                    if (subcategories[crimeType]) {
+                                        return subcategories[crimeType].map((text, idx) => ({
+                                            text,
+                                            key: `${crimeType}-${idx}`
+                                        }));
+                                    }
+                                }
+                                return [];
+                            }).slice(0, 8).map(({ text, key }) => (
+                                <TouchableOpacity
+                                    key={key}
+                                    style={{
+                                        backgroundColor: '#f0f7ff',
+                                        paddingVertical: 10,
+                                        paddingHorizontal: 14,
+                                        borderRadius: 20,
+                                        borderWidth: 1,
+                                        borderColor: '#1D3557',
+                                        maxWidth: 280,
+                                    }}
+                                    onPress={() => setDescription(text)}
+                                >
+                                    <Text style={{ fontSize: 13, color: '#1D3557' }} numberOfLines={2}>
+                                        {text}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <Text style={{ fontSize: 11, color: '#888', marginTop: 8, fontStyle: 'italic' }}>
+                            These are suggestions only. You can edit or write your own description above.
+                        </Text>
+                    </View>
+                )}
+
                 <Text style={styles.label}>Evidence (Photo + Video) *</Text>
-                <Text style={{ fontSize: 12, color: '#666', marginBottom: 8, marginTop: -8 }}>
+                <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, marginTop: -8 }}>
                     Required for most crime types. If required, upload BOTH a photo AND a video of the incident, damage, or suspect.
                 </Text>
+                {/* Evidence Warning */}
+                <View style={{ 
+                    backgroundColor: '#fff3cd', 
+                    borderLeftWidth: 4, 
+                    borderLeftColor: '#ffc107', 
+                    padding: 10, 
+                    borderRadius: 6, 
+                    marginBottom: 12 
+                }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                        <Ionicons name="warning" size={16} color="#856404" style={{ marginRight: 6, marginTop: 2 }} />
+                        <Text style={{ fontSize: 12, color: '#856404', flex: 1, lineHeight: 18 }}>
+                            <Text style={{ fontWeight: '700' }}>Important:</Text> Only attach relevant and appropriate evidence. 
+                            Do not upload sensitive or explicit content, including nudity, sexual content, or graphic violence 
+                            unless directly related to the crime being reported.
+                        </Text>
+                    </View>
+                </View>
 
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                     <TouchableOpacity
@@ -1387,64 +1667,6 @@ export default function ReportCrime() {
                     />
                 )}
             </ScrollView>
-
-            {/* Item #2: Template Selection Modal */}
-            <Modal
-                visible={showTemplateModal}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowTemplateModal(false)}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-                    <View style={{ backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1D3557' }}>Select Template</Text>
-                            <TouchableOpacity onPress={() => setShowTemplateModal(false)}>
-                                <Ionicons name="close" size={28} color="#666" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView>
-                            {selectedCrimes.filter(crime => REPORT_TEMPLATES[crime]).map(crime => (
-                                <TouchableOpacity
-                                    key={crime}
-                                    style={{
-                                        backgroundColor: '#F5F5F5',
-                                        padding: 16,
-                                        borderRadius: 8,
-                                        marginBottom: 12,
-                                        borderWidth: 1,
-                                        borderColor: '#ddd'
-                                    }}
-                                    onPress={() => {
-                                        setDescription(REPORT_TEMPLATES[crime]);
-                                        setShowTemplateModal(false);
-                                    }}>
-                                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#1D3557', marginBottom: 8 }}>{crime}</Text>
-                                    <Text style={{ fontSize: 12, color: '#666', lineHeight: 18 }} numberOfLines={3}>
-                                        {REPORT_TEMPLATES[crime]}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-
-                            <TouchableOpacity
-                                style={{
-                                    backgroundColor: '#E3F2FD',
-                                    padding: 16,
-                                    borderRadius: 8,
-                                    borderWidth: 1,
-                                    borderColor: '#1D3557',
-                                    alignItems: 'center'
-                                }}
-                                onPress={() => {
-                                    setDescription('');
-                                    setShowTemplateModal(false);
-                                }}>
-                                <Text style={{ fontSize: 14, fontWeight: '600', color: '#1D3557' }}>Write Custom Description</Text>
-                            </TouchableOpacity>
-                        </ScrollView>
-                    </View>
-                </View>
-            </Modal>
 
             {/* Location Picker Modal - Moved outside ScrollView */}
             {showLocationPicker && (
