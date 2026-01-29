@@ -2019,8 +2019,15 @@ setInterval(updateSLATimers, 1000);
                     if (newRowCount !== currentRowCount) {
                         console.log('New reports detected! Updating table...');
                         
-                        // Show notification
-                        showNewReportNotification(newRowCount - currentRowCount);
+                        // Get the first new report ID for the notification
+                        const newRows = newTableBody.querySelectorAll('tr[data-report-id]');
+                        const currentIds = new Set(Array.from(currentTableBody.querySelectorAll('tr[data-report-id]')).map(r => r.dataset.reportId));
+                        let firstNewReportId = null;
+                        newRows.forEach(row => {
+                            if (!currentIds.has(row.dataset.reportId) && !firstNewReportId) {
+                                firstNewReportId = row.dataset.reportId;
+                            }
+                        });
                         
                         // Update the table
                         currentTableBody.innerHTML = newTableBody.innerHTML;
@@ -2031,6 +2038,12 @@ setInterval(updateSLATimers, 1000);
                         if (newPagination && currentPagination) {
                             currentPagination.innerHTML = newPagination.innerHTML;
                         }
+                        
+                        // Auto-sort by urgency after update
+                        sortTableByUrgency();
+                        
+                        // Show notification with click to view
+                        showNewReportNotification(newRowCount - currentRowCount, firstNewReportId);
                     }
                 }
             })
@@ -2039,48 +2052,121 @@ setInterval(updateSLATimers, 1000);
             });
         }
 
-        function showNewReportNotification(count) {
+        function showNewReportNotification(count, reportId = null) {
             // Create notification element
             const notification = document.createElement('div');
             notification.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
-                background: #10b981;
+                background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
                 color: white;
                 padding: 16px 24px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(220, 38, 38, 0.4);
                 z-index: 9999;
-                font-weight: 500;
-                animation: slideIn 0.3s ease-out;
+                font-weight: 600;
+                animation: slideIn 0.3s ease-out, pulse 2s infinite;
+                cursor: ${reportId ? 'pointer' : 'default'};
+                max-width: 350px;
+                border: 2px solid rgba(255,255,255,0.2);
             `;
-            notification.textContent = count === 1 
-                ? '🚨 New report received!' 
-                : `🚨 ${count} new reports received!`;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="font-size: 28px; animation: shake 0.5s ease-in-out infinite;">🚨</div>
+                    <div>
+                        <div style="font-size: 16px; font-weight: 700;">${count === 1 ? 'NEW REPORT RECEIVED!' : count + ' NEW REPORTS!'}</div>
+                        ${reportId ? '<div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">👆 Click to view report details</div>' : ''}
+                    </div>
+                </div>
+            `;
+            
+            // Make notification clickable to open report
+            if (reportId) {
+                notification.onclick = function() {
+                    notification.remove();
+                    // Find and click the view button for this report
+                    const row = document.querySelector(`tr[data-report-id="${reportId}"]`);
+                    if (row) {
+                        const viewBtn = row.querySelector('.action-btn');
+                        if (viewBtn) viewBtn.click();
+                    } else {
+                        // Fallback: fetch and show report directly
+                        showReport(reportId);
+                    }
+                };
+            }
             
             document.body.appendChild(notification);
             
-            // Remove notification after 5 seconds
+            // Remove notification after 10 seconds (longer so user can click)
             setTimeout(() => {
                 notification.style.animation = 'slideOut 0.3s ease-in';
                 setTimeout(() => notification.remove(), 300);
-            }, 5000);
+            }, 10000);
             
-            // Play notification sound (optional)
+            // Play notification sound
             try {
                 const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77eafTRALT6fk77RgGwU7k9bxy3ktBSJ1xe/glEILElyx6OyrVhYMQp3e8bhlHQYogczx2Ik2CBlouezmn00QC06m5O+0YRsGOJHX8ct5LQUidMXu4ZVDBBFYrOfqrFgWDT+a3vK6aB4HI33H8NqJNwgZaLvt559NEAtOpuTvtGEbBjiR1/HLeS0FInXF7+KWRAUSVqnm6axaGQ0+m97yuWgeBx9+yPDaiTYHGGi77+SfTBEMTKbk7bNhHAQ4kdXzyn0tBSJ1xe/jl0QGEVan5eitWhsMPpne87ppHwcdfMbv2ok3CBdpvO7kn0wRDU2m4+60YRsGOZPY88p9LQQhdsfv45dFBhFWp+XprVsbDD6Y3/K6ah8HHn7J79qKNggXabzv5J9MEAJQ');
+                audio.volume = 0.5;
                 audio.play();
             } catch (e) {
                 // Ignore audio errors
             }
         }
+        
+        // Function to sort table by urgency (Critical -> High -> Medium -> Low)
+        function sortTableByUrgency() {
+            const table = document.getElementById('reportsTable');
+            if (!table) return;
+            
+            const tbody = table.getElementsByTagName('tbody')[0];
+            if (!tbody) return;
+            
+            const rows = Array.from(tbody.getElementsByTagName('tr'));
+            
+            // Urgency priority mapping
+            const urgencyPriority = {
+                'CRITICAL': 1,
+                'HIGH': 2,
+                'MEDIUM': 3,
+                'LOW': 4
+            };
+            
+            rows.sort((a, b) => {
+                // Column 3 is urgency (0-indexed)
+                const aUrgencyCell = a.getElementsByTagName('td')[3];
+                const bUrgencyCell = b.getElementsByTagName('td')[3];
+                
+                if (!aUrgencyCell || !bUrgencyCell) return 0;
+                
+                const aText = aUrgencyCell.textContent.trim().toUpperCase();
+                const bText = bUrgencyCell.textContent.trim().toUpperCase();
+                
+                // Extract urgency level
+                let aPriority = 5, bPriority = 5;
+                for (const [key, val] of Object.entries(urgencyPriority)) {
+                    if (aText.includes(key)) aPriority = val;
+                    if (bText.includes(key)) bPriority = val;
+                }
+                
+                return aPriority - bPriority;
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+            console.log('Table sorted by urgency: Critical → High → Medium → Low');
+        }
 
         // Start auto-refresh when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            // Check for new reports every 3 seconds for real-time updates
-            autoRefreshInterval = setInterval(checkForNewReports, 3000);
-            console.log('Auto-refresh enabled: Checking for new reports every 3 seconds');
+            // Check for new reports every 2 seconds for real-time updates
+            autoRefreshInterval = setInterval(checkForNewReports, 2000);
+            console.log('Auto-refresh enabled: Checking for new reports every 2 seconds');
+            
+            // Auto-sort table by urgency on page load
+            sortTableByUrgency();
         });
 
         // Stop auto-refresh when page is hidden/user switches tabs
@@ -2092,7 +2178,7 @@ setInterval(updateSLATimers, 1000);
                 }
             } else {
                 if (!autoRefreshInterval) {
-                    autoRefreshInterval = setInterval(checkForNewReports, 3000);
+                    autoRefreshInterval = setInterval(checkForNewReports, 2000);
                     console.log('Auto-refresh resumed (page visible)');
                     // Check immediately when page becomes visible
                     checkForNewReports();
@@ -2122,6 +2208,15 @@ setInterval(updateSLATimers, 1000);
                     transform: translateX(400px);
                     opacity: 0;
                 }
+            }
+            @keyframes shake {
+                0%, 100% { transform: rotate(0deg); }
+                25% { transform: rotate(-10deg); }
+                75% { transform: rotate(10deg); }
+            }
+            @keyframes pulse {
+                0%, 100% { box-shadow: 0 8px 32px rgba(220, 38, 38, 0.4); }
+                50% { box-shadow: 0 8px 48px rgba(220, 38, 38, 0.6); }
             }
         `;
         document.head.appendChild(style);
@@ -2676,16 +2771,20 @@ function getVerificationBadge(report) {
      
      let buttons = '';
      
-     // For admin users - always show assign/reassign button
+     // For admin users - show assign/reassign button AND dispatch patrol button
      if (userRole === 'admin') {
          const buttonText = isUnassigned ? 'Assign to Station' : 'Reassign Station';
          buttons = `
-             <div>
+             <div style="display: flex; flex-direction: column; gap: 8px;">
                  <button class="btn btn-sm btn-primary" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start;" onclick="openAssignStationModal(${report.report_id})">
                      <svg style="width: 16px; height: 16px; margin-right: 8px;" viewBox="0 0 24 24" fill="currentColor">
                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                      </svg>
                      ${buttonText}
+                 </button>
+                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="openDispatchModal(${report.report_id})">
+                     <span style="font-size: 18px; margin-right: 8px;">🚓</span>
+                     Dispatch Patrol
                  </button>
              </div>
          `;
@@ -2693,12 +2792,16 @@ function getVerificationBadge(report) {
      // For police users
      else if (userRole === 'police') {
          buttons = `
-             <div>
+             <div style="display: flex; flex-direction: column; gap: 8px;">
                  <button class="btn btn-sm btn-warning" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start;" onclick="openReassignmentModal(${report.report_id})">
                      <svg style="width: 16px; height: 16px; margin-right: 8px;" viewBox="0 0 24 24" fill="currentColor">
                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                      </svg>
                      Request Reassignment
+                 </button>
+                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="openDispatchModal(${report.report_id})">
+                     <span style="font-size: 18px; margin-right: 8px;">🚓</span>
+                     Dispatch Patrol
                  </button>
              </div>
          `;

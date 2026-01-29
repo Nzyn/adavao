@@ -161,7 +161,7 @@ export default function UserDashboard() {
                             fetchFlagStatusFromBackend();
                         }
                     },
-                    3000
+                    2000 // Poll every 2 seconds for real-time updates
                 );
             }
             return () => {

@@ -194,11 +194,22 @@ const history = () => {
     fetchReports();
   }, [user]);
 
-  // Refresh when screen comes into focus
+  // Refresh when screen comes into focus AND start polling for real-time updates
   useFocusEffect(
     React.useCallback(() => {
       console.log('History screen focused, refreshing reports...');
       fetchReports();
+      
+      // Poll for updates every 2 seconds for real-time status changes
+      const pollInterval = setInterval(() => {
+        console.log('Polling for report updates...');
+        fetchReports();
+      }, 2000);
+      
+      return () => {
+        console.log('History screen unfocused, stopping polling...');
+        clearInterval(pollInterval);
+      };
     }, [user])
   );
 
