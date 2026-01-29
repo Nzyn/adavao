@@ -731,8 +731,18 @@ export default function ReportCrime() {
         console.log('✅ Description validated');
 
         // ⚠️ Evidence validation - Required for most crime types
+        // These subcategories don't require mandatory photo+video evidence
         const EVIDENCE_OPTIONAL_CRIMES = [
-            'Threats', 'Harassment', 'Missing Person', 'Suspicious Activity', 'Noise Complaint'
+            'Threats/Intimidation', 
+            'Noise Complaint', 
+            'Loitering/Suspicious Activity',
+            'Public Intoxication',
+            'Online Threats',
+            'Cyberbullying',
+            'Online Scam/Phishing',
+            'Identity Theft',
+            'Others',
+            'Unidentified Incident'
         ];
 
         const selectedCrimesLower = selectedCrimes.map(c => (c || '').toLowerCase().trim());
