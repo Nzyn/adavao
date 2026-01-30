@@ -340,6 +340,8 @@ export default function ReportCrime() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
+    const [selectedCrimeForGuidelines, setSelectedCrimeForGuidelines] = useState<string>('');
 
     type ConfirmSnapshot = {
         crimeTypes: string[];
@@ -364,6 +366,52 @@ export default function ReportCrime() {
     const [flagNotification, setFlagNotification] = useState<Notification | null>(null);
     const [isFlagged, setIsFlagged] = useState(false);
     const [userId, setUserId] = useState<string>('');
+
+    // Crime type guidelines for anonymous reporting
+    const getCrimeGuidelines = (crimeType: string): string[] => {
+        // Evidence requirements for different crime types
+        const EVIDENCE_OPTIONAL_CRIMES = [
+            'Threats/Intimidation', 
+            'Noise Complaint', 
+            'Loitering/Suspicious Activity',
+            'Public Intoxication',
+            'Online Threats',
+            'Cyberbullying',
+            'Online Scam/Phishing',
+            'Identity Theft',
+            'Others',
+            'Unidentified Incident'
+        ];
+        
+        const requiresEvidence = !EVIDENCE_OPTIONAL_CRIMES.map(c => c.toLowerCase()).includes(crimeType.toLowerCase());
+        
+        const baseGuidelines = [
+            'Provide accurate and truthful information',
+            'Include specific details about time and location',
+            'Describe suspects or vehicles if applicable',
+            'Do not exaggerate or fabricate details',
+        ];
+        
+        if (requiresEvidence) {
+            baseGuidelines.push('Photo or video evidence is required for this crime type');
+        } else {
+            baseGuidelines.push('Photo or video evidence is optional but recommended');
+        }
+        
+        // Add crime-specific guidelines
+        const specificGuidelines: Record<string, string[]> = {
+            'Physical Assault': ['Note any visible injuries', 'Identify witnesses if possible'],
+            'Domestic Violence': ['Your safety is the priority', 'Include any history of incidents'],
+            'Robbery/Holdup': ['Note descriptions of suspects', 'List stolen items and their value'],
+            'Sexual Harassment': ['Your identity is protected', 'Include any witness information'],
+            'Theft/Pickpocketing': ['Describe stolen items clearly', 'Note the time and location precisely'],
+            'Vehicle Theft (Carnapping)': ['Include vehicle plate number', 'Note last known location'],
+            'Fire Emergency': ['Call 911 first for emergencies', 'Note if anyone is trapped'],
+            'Medical Emergency': ['Call 911 first for emergencies', 'Provide exact location'],
+        };
+        
+        return [...baseGuidelines, ...(specificGuidelines[crimeType] || [])];
+    };
 
     // Load user ID and check flag status when component mounts or comes into focus
     // Polling for real-time restriction status
@@ -731,7 +779,7 @@ export default function ReportCrime() {
         console.log('✅ Description validated');
 
         // ⚠️ Evidence validation - Required for most crime types
-        // These subcategories don't require mandatory photo+video evidence
+        // These subcategories don't require mandatory evidence
         const EVIDENCE_OPTIONAL_CRIMES = [
             'Threats/Intimidation', 
             'Noise Complaint', 
@@ -750,11 +798,12 @@ export default function ReportCrime() {
             EVIDENCE_OPTIONAL_CRIMES.map(c => c.toLowerCase()).includes(crime)
         );
 
-        if (requiresEvidence && (!selectedPhotoEvidence || !selectedVideoEvidence)) {
+        // Evidence is required: EITHER a photo OR a video (not both)
+        if (requiresEvidence && !selectedPhotoEvidence && !selectedVideoEvidence) {
             console.log('❌ Validation failed: Evidence required but not provided');
             Alert.alert(
                 'Evidence Required',
-                `Please upload BOTH a photo AND a video of this incident.\n\nThis helps police verify and respond faster to your report.\n\nEvidence is required for: ${selectedCrimes.join(', ')}`
+                `Please upload a photo OR a video of this incident.\n\nThis helps police verify and respond faster to your report.\n\nEvidence is required for: ${selectedCrimes.join(', ')}`
             );
             return;
         }
@@ -1084,31 +1133,50 @@ export default function ReportCrime() {
                             <View style={{ paddingLeft: 8 }}>
                                 {Object.keys(CRIME_CATEGORIES[category] || {}).map((subcategory) => (
                                     <View key={subcategory} style={{ marginBottom: 8 }}>
-                                        <TouchableOpacity
-                                            style={{
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                paddingVertical: 10,
-                                                paddingHorizontal: 8,
-                                                backgroundColor: selectedCrimes.includes(subcategory) ? '#E3F2FD' : '#f8f9fa',
-                                                borderRadius: 6,
-                                                borderWidth: selectedCrimes.includes(subcategory) ? 2 : 1,
-                                                borderColor: selectedCrimes.includes(subcategory) ? '#1D3557' : '#ddd',
-                                            }}
-                                            onPress={() => toggleCrimeType(subcategory)}
-                                        >
-                                            <View style={[styles.checkboxBox, selectedCrimes.includes(subcategory) && styles.checkboxBoxChecked]}>
-                                                {selectedCrimes.includes(subcategory) && <Text style={styles.checkboxTick}>✓</Text>}
-                                            </View>
-                                            <Text style={{
-                                                flex: 1,
-                                                fontSize: 15,
-                                                color: '#333',
-                                                fontWeight: selectedCrimes.includes(subcategory) ? '600' : '400'
-                                            }}>
-                                                {subcategory}
-                                            </Text>
-                                        </TouchableOpacity>
+                                        <View style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            paddingVertical: 10,
+                                            paddingHorizontal: 8,
+                                            backgroundColor: selectedCrimes.includes(subcategory) ? '#E3F2FD' : '#f8f9fa',
+                                            borderRadius: 6,
+                                            borderWidth: selectedCrimes.includes(subcategory) ? 2 : 1,
+                                            borderColor: selectedCrimes.includes(subcategory) ? '#1D3557' : '#ddd',
+                                        }}>
+                                            <TouchableOpacity
+                                                style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                                                onPress={() => toggleCrimeType(subcategory)}
+                                            >
+                                                <View style={[styles.checkboxBox, selectedCrimes.includes(subcategory) && styles.checkboxBoxChecked]}>
+                                                    {selectedCrimes.includes(subcategory) && <Text style={styles.checkboxTick}>✓</Text>}
+                                                </View>
+                                                <Text style={{
+                                                    flex: 1,
+                                                    fontSize: 15,
+                                                    color: '#333',
+                                                    fontWeight: selectedCrimes.includes(subcategory) ? '600' : '400'
+                                                }}>
+                                                    {subcategory}
+                                                </Text>
+                                            </TouchableOpacity>
+                                            {/* Info button for guidelines (especially useful in anonymous mode) */}
+                                            {isAnonymous && (
+                                                <TouchableOpacity
+                                                    style={{
+                                                        padding: 6,
+                                                        marginLeft: 4,
+                                                        backgroundColor: '#E3F2FD',
+                                                        borderRadius: 14,
+                                                    }}
+                                                    onPress={() => {
+                                                        setSelectedCrimeForGuidelines(subcategory);
+                                                        setShowGuidelinesModal(true);
+                                                    }}
+                                                >
+                                                    <Ionicons name="information-circle" size={20} color="#1D3557" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
                                     </View>
                                 ))}
                             </View>
@@ -1237,11 +1305,11 @@ export default function ReportCrime() {
                 )}
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
-                    <Text style={[styles.label, { marginVertical: 0 }]}>Evidence (Photo + Video)</Text>
+                    <Text style={[styles.label, { marginVertical: 0 }]}>Evidence (Photo or Video)</Text>
                     <Text style={{ color: '#E63946', fontWeight: '700', fontSize: 16 }}> *</Text>
                 </View>
                 <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-                    Required for most crime types. If required, upload BOTH a photo AND a video of the incident, damage, or suspect.
+                    Required for most crime types. Upload a photo OR a video of the incident, damage, or suspect.
                 </Text>
                 {/* Evidence Warning */}
                 <View style={{ 
@@ -1703,6 +1771,153 @@ export default function ReportCrime() {
                     }}
                 />
             )}
+
+            {/* Crime Type Guidelines Modal for Anonymous Reporting */}
+            <Modal
+                visible={showGuidelinesModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowGuidelinesModal(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 0, maxHeight: '80%', overflow: 'hidden' }}>
+                        {/* Header */}
+                        <View style={{ 
+                            backgroundColor: '#1D3557', 
+                            paddingHorizontal: 20, 
+                            paddingVertical: 16,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <Ionicons name="information-circle" size={24} color="#fff" />
+                                <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', marginLeft: 10 }}>
+                                    Reporting Guidelines
+                                </Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowGuidelinesModal(false)}>
+                                <Ionicons name="close" size={26} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+                            {/* Crime Type Badge */}
+                            <View style={{ 
+                                backgroundColor: '#E3F2FD', 
+                                paddingHorizontal: 14, 
+                                paddingVertical: 8, 
+                                borderRadius: 20,
+                                alignSelf: 'flex-start',
+                                marginBottom: 16
+                            }}>
+                                <Text style={{ color: '#1D3557', fontWeight: '600', fontSize: 14 }}>
+                                    {selectedCrimeForGuidelines}
+                                </Text>
+                            </View>
+
+                            {/* Anonymous Warning */}
+                            <View style={{ 
+                                backgroundColor: '#fff3cd', 
+                                padding: 14, 
+                                borderRadius: 10, 
+                                marginBottom: 20,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#ffc107'
+                            }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                    <Ionicons name="eye-off" size={20} color="#856404" style={{ marginRight: 10, marginTop: 2 }} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: '#856404', fontWeight: '700', marginBottom: 4, fontSize: 14 }}>
+                                            Anonymous Reporting
+                                        </Text>
+                                        <Text style={{ color: '#856404', fontSize: 13, lineHeight: 18 }}>
+                                            You will NOT receive updates about your report. Provide accurate details to help police respond effectively.
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Guidelines List */}
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: '#1D3557', marginBottom: 12 }}>
+                                Guidelines for "{selectedCrimeForGuidelines}":
+                            </Text>
+                            
+                            {getCrimeGuidelines(selectedCrimeForGuidelines).map((guideline, index) => (
+                                <View 
+                                    key={index} 
+                                    style={{ 
+                                        flexDirection: 'row', 
+                                        alignItems: 'flex-start', 
+                                        marginBottom: 10,
+                                        backgroundColor: index % 2 === 0 ? '#f8f9fa' : '#fff',
+                                        padding: 12,
+                                        borderRadius: 8
+                                    }}
+                                >
+                                    <View style={{
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: 12,
+                                        backgroundColor: '#1D3557',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        marginRight: 12
+                                    }}>
+                                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{index + 1}</Text>
+                                    </View>
+                                    <Text style={{ flex: 1, fontSize: 14, color: '#333', lineHeight: 20 }}>
+                                        {guideline}
+                                    </Text>
+                                </View>
+                            ))}
+
+                            {/* False Report Warning */}
+                            <View style={{ 
+                                backgroundColor: '#fee2e2', 
+                                padding: 14, 
+                                borderRadius: 10, 
+                                marginTop: 16,
+                                marginBottom: 8,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#dc2626'
+                            }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                    <Ionicons name="warning" size={20} color="#dc2626" style={{ marginRight: 10, marginTop: 2 }} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: '#991b1b', fontWeight: '700', marginBottom: 4, fontSize: 14 }}>
+                                            Warning
+                                        </Text>
+                                        <Text style={{ color: '#991b1b', fontSize: 13, lineHeight: 18 }}>
+                                            Filing false or misleading reports is punishable by law. Only report genuine incidents.
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </ScrollView>
+
+                        {/* Close Button */}
+                        <View style={{ paddingHorizontal: 20, paddingBottom: 20, paddingTop: 8 }}>
+                            <TouchableOpacity
+                                style={{ 
+                                    backgroundColor: '#1D3557', 
+                                    paddingVertical: 14, 
+                                    borderRadius: 10, 
+                                    alignItems: 'center',
+                                    shadowColor: '#1D3557',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 4,
+                                    elevation: 3
+                                }}
+                                onPress={() => setShowGuidelinesModal(false)}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>I Understand</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }

@@ -957,7 +957,9 @@ async function submitReport(req, res) {
         const isSensitive = Boolean(moderationMeta?.is_sensitive);
         const moderationProvider = moderationMeta?.moderation_provider || null;
         const moderationStatus = moderationMeta?.moderation_status || null;
-        const moderationRaw = moderationMeta?.moderation_raw || null;
+        // Ensure moderation_raw is properly serialized as JSON string for PostgreSQL JSONB column
+        const moderationRawData = moderationMeta?.moderation_raw || null;
+        const moderationRaw = moderationRawData ? JSON.stringify(moderationRawData) : null;
 
         try {
           let mediaResult;

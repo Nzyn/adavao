@@ -8,6 +8,23 @@ import { messageService, Message } from '../../services/messageService';
 import { userService } from '../../services/userService';
 import { BACKEND_URL } from '../../config/backend';
 
+// Color palette matching dashboard
+const COLORS = {
+    primary: '#1D3557',
+    primaryDark: '#152741',
+    primaryLight: '#2a4a7a',
+    accent: '#E63946',
+    white: '#ffffff',
+    background: '#f5f7fa',
+    cardBg: '#ffffff',
+    textPrimary: '#1D3557',
+    textSecondary: '#6b7280',
+    textMuted: '#9ca3af',
+    border: '#e5e7eb',
+    success: '#10b981',
+    warning: '#f59e0b',
+};
+
 const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', {
@@ -22,15 +39,26 @@ const ChatMessage = React.memo(({ item, userId }: { item: Message, userId: strin
 
     return (
         <View style={[
-            styles.messageContainer,
-            isUserMessage ? styles.userMsg : styles.officerMsg
+            localStyles.messageWrapper,
+            isUserMessage ? localStyles.userMessageWrapper : localStyles.officerMessageWrapper
         ]}>
-            <Text style={[styles.messageText, isUserMessage && { color: '#fff' }]}>
-                {item.message}
-            </Text>
-            <Text style={[styles.timeText, isUserMessage && { color: '#e0e0e0' }]}>
-                {formatTime(item.sent_at)}
-            </Text>
+            <View style={[
+                localStyles.messageBubble,
+                isUserMessage ? localStyles.userBubble : localStyles.officerBubble
+            ]}>
+                <Text style={[
+                    localStyles.messageText,
+                    isUserMessage ? localStyles.userMessageText : localStyles.officerMessageText
+                ]}>
+                    {item.message}
+                </Text>
+                <Text style={[
+                    localStyles.timeText,
+                    isUserMessage ? localStyles.userTimeText : localStyles.officerTimeText
+                ]}>
+                    {formatTime(item.sent_at)}
+                </Text>
+            </View>
         </View>
     );
 });
@@ -76,7 +104,7 @@ const ChatScreen = () => {
                 );
                 // Only update if messages actually changed to prevent unnecessary re-renders
                 setMessages(prev => {
-                    if (JSON.stringify(prev.map(m => m.id)) === JSON.stringify(sortedMessages.map((m: any) => m.id))) {
+                    if (JSON.stringify(prev.map(m => m.message_id)) === JSON.stringify(sortedMessages.map((m: any) => m.message_id))) {
                         return prev;
                     }
                     return sortedMessages;
@@ -270,8 +298,11 @@ const ChatScreen = () => {
 
     if (loading) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#1D3557" />
+            <View style={localStyles.loadingContainer}>
+                <View style={localStyles.loadingSpinner}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+                <Text style={localStyles.loadingText}>Loading messages...</Text>
             </View>
         );
     }
@@ -282,42 +313,44 @@ const ChatScreen = () => {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-            <View style={styles.container}>
-                {/* Header with Back Button and Title */}
-                <View style={[styles.headerHistory, {
-                    borderBottomWidth: 1,
-                    borderBottomColor: '#e5e7eb',
-                    paddingBottom: 12
-                }]}>
-                    <TouchableOpacity onPress={() => router.push('/chatlist')}>
-                        <Ionicons name="chevron-back" size={24} color="#000" />
+            <View style={localStyles.container}>
+                {/* Header */}
+                <View style={localStyles.header}>
+                    <TouchableOpacity 
+                        onPress={() => router.push('/chatlist')}
+                        style={localStyles.backButton}
+                    >
+                        <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
                     </TouchableOpacity>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                        <Text style={styles.textTitle}>
-                            <Text style={styles.alertWelcome}>Alert</Text>
-                            <Text style={styles.davao}>Davao</Text>
+                    <View style={localStyles.headerCenter}>
+                        <Text style={localStyles.headerTitle}>
+                            <Text style={{ color: COLORS.primary }}>Alert</Text>
+                            <Text style={{ color: '#000' }}>Davao</Text>
                         </Text>
                         <TouchableOpacity
                             onPress={fetchEnforcerDetails}
                             disabled={loadingEnforcerDetails}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                            style={localStyles.officerNameButton}
                         >
-                            <Text style={[styles.subheadingCenter, { color: '#1D3557', textDecorationLine: 'underline' }]}>
+                            <Text style={localStyles.officerName}>
                                 {otherUserName || 'Chat'}
                             </Text>
-                            <Ionicons name="information-circle" size={20} color="#1D3557" />
+                            <Ionicons name="information-circle" size={18} color={COLORS.primary} />
                         </TouchableOpacity>
                     </View>
-                    <View style={{ width: 24 }} />
+                    <View style={{ width: 40 }} />
                 </View>
+
+                {/* Divider */}
+                <View style={localStyles.divider} />
 
                 {/* Chat Messages */}
                 <FlatList
                     data={messages}
                     keyExtractor={(item) => item.message_id.toString()}
                     renderItem={renderMessage}
-                    style={styles.chatArea}
-                    contentContainerStyle={{ paddingBottom: 10, flexGrow: 1, justifyContent: 'flex-end' }}
+                    style={localStyles.chatArea}
+                    contentContainerStyle={localStyles.chatContent}
                     initialNumToRender={15}
                     maxToRenderPerBatch={10}
                     windowSize={10}
@@ -327,57 +360,35 @@ const ChatScreen = () => {
 
                 {/* Typing Indicator */}
                 {isOtherUserTyping && (
-                    <View style={{ paddingHorizontal: 10, paddingVertical: 5 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <View style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: '#999',
-                                opacity: 0.3
-                            }} />
-                            <View style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: '#999',
-                                opacity: 0.6
-                            }} />
-                            <View style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: '#999'
-                            }} />
-                            <Text style={{ fontSize: 12, color: '#999', marginLeft: 4, fontStyle: 'italic' }}>typing...</Text>
+                    <View style={localStyles.typingContainer}>
+                        <View style={localStyles.typingIndicator}>
+                            <View style={[localStyles.typingDot, { opacity: 0.4 }]} />
+                            <View style={[localStyles.typingDot, { opacity: 0.6 }]} />
+                            <View style={[localStyles.typingDot, { opacity: 1 }]} />
+                            <Text style={localStyles.typingText}>typing...</Text>
                         </View>
                     </View>
                 )}
 
                 {/* Input Area */}
-                <View>
+                <View style={localStyles.inputWrapper}>
                     {newMessage.length > MAX_MESSAGE_LENGTH * 0.8 && (
-                        <View style={{ paddingHorizontal: 10, paddingVertical: 4 }}>
-                            <Text style={{
-                                fontSize: 12,
-                                color: newMessage.length > MAX_MESSAGE_LENGTH ? '#ef4444' : '#f59e0b',
-                                fontWeight: '500'
-                            }}>
+                        <View style={localStyles.charLimitWarning}>
+                            <Text style={[
+                                localStyles.charLimitText,
+                                newMessage.length > MAX_MESSAGE_LENGTH && { color: COLORS.accent }
+                            ]}>
                                 {newMessage.length > MAX_MESSAGE_LENGTH
                                     ? `⚠️ Message too long! (${newMessage.length - MAX_MESSAGE_LENGTH} over limit)`
                                     : `${MAX_MESSAGE_LENGTH - newMessage.length} characters remaining`}
                             </Text>
                         </View>
                     )}
-                    <View style={[styles.inputContainer, {
-                        marginBottom: Platform.OS === 'android' ? 90 : 30,
-                        borderTopWidth: 1,
-                        borderTopColor: '#e5e7eb',
-                        paddingTop: 12
-                    }]}>
+                    <View style={localStyles.inputContainer}>
                         <TextInput
-                            style={styles.chatInput}
-                            placeholder="Write a message"
+                            style={localStyles.chatInput}
+                            placeholder="Write a message..."
+                            placeholderTextColor={COLORS.textMuted}
                             value={newMessage}
                             onChangeText={(text) => {
                                 setNewMessage(text);
@@ -399,14 +410,17 @@ const ChatScreen = () => {
                             editable={!sending}
                         />
                         <TouchableOpacity
-                            style={[styles.sendButton, sending && { opacity: 0.5 }]}
+                            style={[
+                                localStyles.sendButton,
+                                (sending || newMessage.trim() === '') && localStyles.sendButtonDisabled
+                            ]}
                             onPress={sendMessage}
                             disabled={sending || newMessage.trim() === ''}
                         >
                             {sending ? (
                                 <ActivityIndicator size="small" color="#fff" />
                             ) : (
-                                <Ionicons name="send" size={20} color="#fff" />
+                                <Ionicons name="send" size={18} color="#fff" />
                             )}
                         </TouchableOpacity>
                     </View>
@@ -519,5 +533,228 @@ const ChatScreen = () => {
         </KeyboardAvoidingView>
     );
 };
+
+const localStyles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    loadingContainer: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingSpinner: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: COLORS.white,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        fontWeight: '500',
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 12,
+        backgroundColor: COLORS.white,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerCenter: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+    },
+    officerNameButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        backgroundColor: '#E3F2FD',
+        borderRadius: 16,
+    },
+    officerName: {
+        fontSize: 14,
+        color: COLORS.primary,
+        fontWeight: '600',
+        marginRight: 6,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: COLORS.border,
+    },
+    chatArea: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    chatContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 10,
+        flexGrow: 1,
+        justifyContent: 'flex-end',
+    },
+    // Message Styles
+    messageWrapper: {
+        marginVertical: 4,
+    },
+    userMessageWrapper: {
+        alignItems: 'flex-end',
+    },
+    officerMessageWrapper: {
+        alignItems: 'flex-start',
+    },
+    messageBubble: {
+        maxWidth: '80%',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    userBubble: {
+        backgroundColor: COLORS.primary,
+        borderBottomRightRadius: 6,
+    },
+    officerBubble: {
+        backgroundColor: COLORS.white,
+        borderBottomLeftRadius: 6,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    messageText: {
+        fontSize: 15,
+        lineHeight: 20,
+    },
+    userMessageText: {
+        color: COLORS.white,
+    },
+    officerMessageText: {
+        color: COLORS.textPrimary,
+    },
+    timeText: {
+        fontSize: 11,
+        marginTop: 6,
+    },
+    userTimeText: {
+        color: 'rgba(255,255,255,0.7)',
+        textAlign: 'right',
+    },
+    officerTimeText: {
+        color: COLORS.textMuted,
+    },
+    // Typing Indicator
+    typingContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: COLORS.background,
+    },
+    typingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 18,
+        alignSelf: 'flex-start',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    typingDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: COLORS.textMuted,
+        marginRight: 3,
+    },
+    typingText: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        marginLeft: 4,
+        fontStyle: 'italic',
+    },
+    // Input Area
+    inputWrapper: {
+        backgroundColor: COLORS.white,
+        paddingBottom: Platform.OS === 'android' ? 90 : 30,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    charLimitWarning: {
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        backgroundColor: '#fff7ed',
+    },
+    charLimitText: {
+        fontSize: 12,
+        color: COLORS.warning,
+        fontWeight: '500',
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    chatInput: {
+        flex: 1,
+        minHeight: 44,
+        maxHeight: 120,
+        backgroundColor: COLORS.background,
+        borderRadius: 22,
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        paddingRight: 16,
+        fontSize: 15,
+        color: COLORS.textPrimary,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    sendButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 10,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    sendButtonDisabled: {
+        backgroundColor: COLORS.textMuted,
+        shadowOpacity: 0,
+        elevation: 0,
+    },
+});
 
 export default ChatScreen;

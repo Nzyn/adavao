@@ -7,6 +7,23 @@ import { Link } from 'expo-router';
 import { useUser } from '../../contexts/UserContext';
 import { messageService, ChatConversation } from '../../services/messageService';
 
+// Color palette matching dashboard
+const COLORS = {
+    primary: '#1D3557',
+    primaryDark: '#152741',
+    primaryLight: '#2a4a7a',
+    accent: '#E63946',
+    white: '#ffffff',
+    background: '#f5f7fa',
+    cardBg: '#ffffff',
+    textPrimary: '#1D3557',
+    textSecondary: '#6b7280',
+    textMuted: '#9ca3af',
+    border: '#e5e7eb',
+    success: '#10b981',
+    warning: '#f59e0b',
+};
+
 const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -27,62 +44,28 @@ const formatDate = (dateString: string) => {
 
 const FAQProfileItem = React.memo(() => (
     <Link href="/FAQScreen" asChild>
-        <Pressable
-            style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: 14,
-                paddingHorizontal: 10,
-                borderBottomWidth: 1,
-                borderBottomColor: '#f0f0f0',
-                backgroundColor: '#F5F5F5',
-            }}
-        >
+        <Pressable style={localStyles.faqItem}>
             {/* Avatar */}
-            <View style={{ marginRight: 12 }}>
-                <View
-                    style={{
-                        width: 50,
-                        height: 50,
-                        borderRadius: 25,
-                        backgroundColor: '#FF6B6B',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                    }}
-                >
-                    <Ionicons name="help-circle" size={24} color="#fff" />
+            <View style={localStyles.faqAvatarContainer}>
+                <View style={localStyles.faqAvatar}>
+                    <Ionicons name="help-circle" size={26} color="#fff" />
                 </View>
             </View>
 
             {/* Chat Info */}
             <View style={{ flex: 1 }}>
-                <View
-                    style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 8,
-                    }}
-                >
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#1D3557' }}>FAQ</Text>
-                    <View
-                        style={{
-                            backgroundColor: '#FF6B6B',
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: 12,
-                        }}
-                    >
-                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>PINNED</Text>
+                <View style={localStyles.faqHeader}>
+                    <Text style={localStyles.faqTitle}>FAQ</Text>
+                    <View style={localStyles.pinnedBadge}>
+                        <Ionicons name="pin" size={10} color="#fff" style={{ marginRight: 3 }} />
+                        <Text style={localStyles.pinnedText}>PINNED</Text>
                     </View>
                 </View>
-                <Text
-                    style={{ fontSize: 14, color: '#666' }}
-                    numberOfLines={1}
-                >
+                <Text style={localStyles.faqSubtitle} numberOfLines={1}>
                     Get instant answers to common questions
                 </Text>
             </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
         </Pressable>
     </Link>
 ));
@@ -98,29 +81,39 @@ const ChatListItem = React.memo(({ item }: { item: ChatConversation }) => (
         }}
         asChild
     >
-        <Pressable style={styles.chatItem}>
+        <Pressable style={localStyles.chatItem}>
             {/* Avatar */}
-            <View style={styles.avatarContainer}>
-                <View style={[styles.avatar, { backgroundColor: '#1D3557' }]}>
-                    <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>
+            <View style={localStyles.avatarWrapper}>
+                <View style={localStyles.chatAvatar}>
+                    <Text style={localStyles.avatarText}>
                         {item.user_firstname.charAt(0)}{item.user_lastname.charAt(0)}
                     </Text>
                 </View>
+                {/* Online indicator could go here */}
             </View>
 
             {/* Chat Info */}
-            <View style={styles.chatInfo}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.name}>{item.user_name}</Text>
-                    <Text style={styles.date}>{formatDate(item.last_message_time)}</Text>
+            <View style={localStyles.chatContent}>
+                <View style={localStyles.chatHeader}>
+                    <Text style={[localStyles.chatName, item.unread_count > 0 && { fontWeight: '700' }]}>
+                        {item.user_name}
+                    </Text>
+                    <Text style={[localStyles.chatDate, item.unread_count > 0 && { color: COLORS.primary }]}>
+                        {formatDate(item.last_message_time)}
+                    </Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={[styles.message, item.unread_count > 0 && { fontWeight: '600' }]} numberOfLines={1}>
+                <View style={localStyles.chatPreview}>
+                    <Text 
+                        style={[localStyles.chatMessage, item.unread_count > 0 && { color: COLORS.textPrimary, fontWeight: '500' }]} 
+                        numberOfLines={1}
+                    >
                         {item.last_message}
                     </Text>
                     {item.unread_count > 0 && (
-                        <View style={styles.unreadBadge}>
-                            <Text style={styles.unreadText}>{item.unread_count}</Text>
+                        <View style={localStyles.unreadBadge}>
+                            <Text style={localStyles.unreadText}>
+                                {item.unread_count > 9 ? '9+' : item.unread_count}
+                            </Text>
                         </View>
                     )}
                 </View>
@@ -190,109 +183,356 @@ export default function ChatList({ navigation }: any) {
         fetchConversations();
     };
 
-
-
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#1D3557" />
-                <Text style={{ marginTop: 12, color: '#666' }}>Loading conversations...</Text>
+            <View style={localStyles.loadingContainer}>
+                <View style={localStyles.loadingSpinner}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+                <Text style={localStyles.loadingText}>Loading conversations...</Text>
             </View>
         );
     }
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
-            {/* Header with Back Button and Title */}
-            <View style={styles.headerHistory}>
-                <TouchableOpacity onPress={() => router.push('/')}>
-                    <Ionicons name="chevron-back" size={24} color="#000" />
+        <View style={localStyles.container}>
+            {/* Header */}
+            <View style={localStyles.header}>
+                <TouchableOpacity onPress={() => router.push('/')} style={localStyles.backButton}>
+                    <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
                 </TouchableOpacity>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={styles.textTitle}>
-                        <Text style={styles.alertWelcome}>Alert</Text>
-                        <Text style={styles.davao}>Davao</Text>
+                <View style={localStyles.headerCenter}>
+                    <Text style={localStyles.headerTitle}>
+                        <Text style={{ color: COLORS.primary }}>Alert</Text>
+                        <Text style={{ color: '#000' }}>Davao</Text>
                     </Text>
-                    <Text style={styles.subheadingCenter}>Messages</Text>
+                    <Text style={localStyles.headerSubtitle}>Messages</Text>
                 </View>
-                <View style={{ width: 24 }} />
+                <View style={{ width: 40 }} />
             </View>
+
+            {/* Divider */}
+            <View style={localStyles.divider} />
 
             {/* Error Message */}
             {error && (
-                <View style={{ padding: 15, backgroundColor: '#ffebee', marginHorizontal: 15, marginTop: 10, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#c62828' }}>
-                    <Text style={{ color: '#c62828', textAlign: 'left', fontWeight: '500' }}>{error}</Text>
+                <View style={localStyles.errorContainer}>
+                    <Ionicons name="alert-circle" size={18} color="#c62828" style={{ marginRight: 8 }} />
+                    <Text style={localStyles.errorText}>{error}</Text>
                 </View>
             )}
 
             {/* Chat List */}
-            {conversations.length > 0 && (
-                <FlatList
-                    data={conversations}
-                    keyExtractor={(item) => item.user_id.toString()}
-                    renderItem={({ item }) => <ChatListItem item={item} />}
-                    contentContainerStyle={{ paddingVertical: 15, paddingHorizontal: 10, paddingBottom: 50 }}
-                    showsVerticalScrollIndicator={true}
-                    scrollEnabled={true}
-                    nestedScrollEnabled={true}
-                    bounces={true}
-                    ListHeaderComponent={<FAQProfileItem />}
-                    initialNumToRender={10}
-                    maxToRenderPerBatch={10}
-                    windowSize={5}
-                    removeClippedSubviews={true}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1D3557']} />
-                    }
-                />
-            )}
-
-            {/* FAQ Profile when no conversations */}
-            {!loading && !error && conversations.length === 0 && (
-                <View style={{ flex: 1 }}>
-                    <FAQProfileItem />
-                </View>
-            )}
-
-            {/* Empty State with Helpful Message */}
-            {!loading && !error && conversations.length === 0 && (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 }}>
-                    <View style={{
-                        width: 100,
-                        height: 100,
-                        borderRadius: 50,
-                        backgroundColor: '#E3F2FD',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        marginBottom: 20
-                    }}>
-                        <Ionicons name="chatbubble-ellipses-outline" size={50} color="#1D3557" />
-                    </View>
-
-                    <Text style={{ marginBottom: 12, fontSize: 22, fontWeight: '700', color: '#1D3557', textAlign: 'center' }}>
-                        No Active Conversations
-                    </Text>
-
-                    <Text style={{ marginBottom: 8, fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 20 }}>
-                        Police officers will contact you here regarding your reports or concerns.
-                    </Text>
-
-                    <View style={{ marginTop: 24, padding: 16, backgroundColor: '#F5F5F5', borderRadius: 12, width: '100%', borderLeftWidth: 4, borderLeftColor: '#1D3557' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                            <Ionicons name="shield-checkmark" size={18} color="#1D3557" style={{ marginRight: 10, marginTop: 2 }} />
-                            <Text style={{ fontSize: 12, color: '#555', flex: 1, lineHeight: 18, fontWeight: '500' }}>
+            <FlatList
+                data={conversations}
+                keyExtractor={(item) => item.user_id.toString()}
+                renderItem={({ item }) => <ChatListItem item={item} />}
+                contentContainerStyle={localStyles.listContent}
+                showsVerticalScrollIndicator={false}
+                ListHeaderComponent={<FAQProfileItem />}
+                ListEmptyComponent={
+                    <View style={localStyles.emptyContainer}>
+                        <View style={localStyles.emptyIconContainer}>
+                            <Ionicons name="chatbubbles-outline" size={56} color={COLORS.primary} />
+                        </View>
+                        <Text style={localStyles.emptyTitle}>No Conversations Yet</Text>
+                        <Text style={localStyles.emptySubtitle}>
+                            Police officers will contact you here regarding your reports or concerns.
+                        </Text>
+                        <View style={localStyles.emptyTip}>
+                            <Ionicons name="shield-checkmark" size={18} color={COLORS.primary} />
+                            <Text style={localStyles.emptyTipText}>
                                 Only verified officers can contact you. Keep your reports updated for faster response.
                             </Text>
                         </View>
                     </View>
-
-                    <View style={{ marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#e0e0e0', width: '100%' }}>
-                        <Text style={{ fontSize: 12, color: '#999', textAlign: 'center', lineHeight: 18 }}>
-                            🔄 Messages sync automatically. Check back for updates from officers about your reports.
-                        </Text>
-                    </View>
-                </View>
-            )}
+                }
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={true}
+                refreshControl={
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={onRefresh} 
+                        colors={[COLORS.primary]}
+                        tintColor={COLORS.primary}
+                    />
+                }
+            />
         </View>
     );
 }
+
+const localStyles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    loadingContainer: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingSpinner: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: COLORS.white,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        fontWeight: '500',
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 12,
+        backgroundColor: COLORS.white,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerCenter: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+    },
+    headerSubtitle: {
+        fontSize: 15,
+        color: COLORS.textSecondary,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: COLORS.border,
+    },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        backgroundColor: '#ffebee',
+        marginHorizontal: 16,
+        marginTop: 12,
+        borderRadius: 10,
+        borderLeftWidth: 4,
+        borderLeftColor: '#c62828',
+    },
+    errorText: {
+        flex: 1,
+        color: '#c62828',
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    listContent: {
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 100,
+    },
+    // FAQ Item Styles
+    faqItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#f0f0f0',
+    },
+    faqAvatarContainer: {
+        marginRight: 14,
+    },
+    faqAvatar: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: COLORS.accent,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: COLORS.accent,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    faqHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    faqTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.textPrimary,
+    },
+    pinnedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.accent,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+    },
+    pinnedText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    faqSubtitle: {
+        fontSize: 13,
+        color: COLORS.textSecondary,
+    },
+    // Chat Item Styles
+    chatItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#f0f0f0',
+    },
+    avatarWrapper: {
+        marginRight: 14,
+    },
+    chatAvatar: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    chatContent: {
+        flex: 1,
+    },
+    chatHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    chatName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
+        flex: 1,
+    },
+    chatDate: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        marginLeft: 8,
+    },
+    chatPreview: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    chatMessage: {
+        fontSize: 13,
+        color: COLORS.textSecondary,
+        flex: 1,
+        marginRight: 8,
+    },
+    unreadBadge: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 12,
+        minWidth: 22,
+        height: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+    },
+    unreadText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    // Empty State
+    emptyContainer: {
+        alignItems: 'center',
+        paddingHorizontal: 30,
+        paddingTop: 40,
+    },
+    emptyIconContainer: {
+        width: 110,
+        height: 110,
+        borderRadius: 55,
+        backgroundColor: '#E3F2FD',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: COLORS.textPrimary,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 24,
+    },
+    emptyTip: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: COLORS.white,
+        padding: 16,
+        borderRadius: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: COLORS.primary,
+        width: '100%',
+    },
+    emptyTipText: {
+        flex: 1,
+        marginLeft: 10,
+        fontSize: 13,
+        color: COLORS.textSecondary,
+        lineHeight: 18,
+    },
+});
