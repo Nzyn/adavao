@@ -25,11 +25,12 @@ class StatisticsController extends Controller
 
     /**
      * Check if SARIMA API is running
+     * Increased timeout to 60s to handle Render cold starts
      */
     private function isSarimaApiRunning()
     {
         try {
-            $response = Http::timeout(2)->get("{$this->sarimaApiUrl}/");
+            $response = Http::timeout(60)->get("{$this->sarimaApiUrl}/");
             return $response->successful();
         } catch (\Exception $e) {
             return false;
@@ -174,7 +175,8 @@ class StatisticsController extends Controller
                 $params['crime_type'] = $crimeType;
             }
 
-            $response = Http::get("{$this->sarimaApiUrl}/forecast", $params);
+            // 60s timeout to handle Render cold starts
+            $response = Http::timeout(60)->get("{$this->sarimaApiUrl}/forecast", $params);
             
             if ($response->successful()) {
                 // Return EVERYTHING the API sends, not just ['data']
