@@ -599,11 +599,13 @@ async function submitReport(req, res) {
       return isFocus;
     });
 
-    // Check information sufficiency
-    const hasSufficientInfo = description &&
+    // Check information sufficiency (must return boolean, not the last truthy value)
+    const hasSufficientInfo = Boolean(
+      description &&
       description.length >= 20 &&
       latitude &&
-      longitude;
+      longitude
+    );
 
     console.log(`🚨 Priority Flags:`, {
       isFocusCrime,
