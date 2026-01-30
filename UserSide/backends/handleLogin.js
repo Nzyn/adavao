@@ -2,6 +2,7 @@
 const bcrypt = require("bcryptjs");
 const db = require("./db");
 const { checkUserRestrictions } = require("./handleUserRestrictions");
+const { decrypt } = require("./encryptionService");
 
 // Sanitize email input
 const sanitizeEmail = (email) => {
@@ -310,6 +311,10 @@ const handleLogin = async (req, res) => {
     // Role normalization: DB uses `user_role` but older clients may read `role`.
     const effectiveRole = user.user_role || user.role || 'user';
 
+    // 🔓 Decrypt sensitive fields for display
+    const decryptedAddress = user.address ? decrypt(user.address) : '';
+    const decryptedContact = user.contact ? decrypt(user.contact) : '';
+
     // Return complete user data
     res.json({
       success: true,
@@ -319,9 +324,9 @@ const handleLogin = async (req, res) => {
         firstname: user.firstname,
         lastName: user.lastname,
         email: user.email,
-        contact: user.contact,
-        phone: user.contact,
-        address: user.address || '',
+        contact: decryptedContact,
+        phone: decryptedContact,
+        address: decryptedAddress,
         is_verified: user.is_verified,
         profile_image: user.profile_image,
         user_role: effectiveRole,

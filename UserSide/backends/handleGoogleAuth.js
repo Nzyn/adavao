@@ -1,5 +1,6 @@
 const db = require("./db");
 const { OAuth2Client } = require('google-auth-library');
+const { decrypt } = require('./encryptionService');
 
 // Initialize Google OAuth client
 const CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID; // Support both naming conventions
@@ -230,6 +231,10 @@ const handleGoogleOtpVerify = async (req, res) => {
 
     // Success - Log them in
     await db.query('UPDATE users_public SET last_login = NOW() WHERE id = $1', [user.id]);
+
+    // 🔓 Decrypt sensitive fields for display
+    if (user.address) user.address = decrypt(user.address);
+    if (user.contact) user.contact = decrypt(user.contact);
 
     res.json({
       message: 'Login successful',
