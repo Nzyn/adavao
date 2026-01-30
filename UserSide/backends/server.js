@@ -844,20 +844,14 @@ const { runMigrations } = require('./runMigrations');
         const url = new URL(targetUrl);
         const client = url.protocol === 'https:' ? https : http;
         
-        const req = client.get(url.href, { timeout: 10000 }, (res) => {
-          console.log(`🏓 ${label}: ${res.statusCode} at ${new Date().toLocaleTimeString()}`);
+        const req = client.get(url.href, { timeout: 30000 }, (res) => {
+          console.log(`🏓 ${label}: ${res.statusCode}`);
         });
         
-        req.on('error', (err) => {
-          console.warn(`⚠️ ${label} failed: ${err.message}`);
-        });
-        
-        req.on('timeout', () => {
-          req.destroy();
-          console.warn(`⚠️ ${label} timed out`);
-        });
+        req.on('error', () => {}); // Silently ignore - ping attempt still keeps server alive
+        req.on('timeout', () => req.destroy());
       } catch (err) {
-        console.warn(`⚠️ ${label} error: ${err.message}`);
+        // Silently ignore - ping attempt still keeps server alive
       }
     };
     
