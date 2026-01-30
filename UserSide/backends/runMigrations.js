@@ -51,6 +51,12 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP
     `);
 
+    console.log('📝 Adding validated_at column (for patrol verification timer)...');
+    await safeQuery('reports.validated_at', `
+      ALTER TABLE reports
+      ADD COLUMN IF NOT EXISTS validated_at TIMESTAMP
+    `);
+
     // Add priority flags columns (new system)
     console.log('📝 Adding is_focus_crime column...');
     await safeQuery('reports.is_focus_crime', `
@@ -221,6 +227,32 @@ async function runMigrations() {
     await safeQuery('idx_patrol_dispatches_station_id', `CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_station_id ON patrol_dispatches(station_id)`);
     await safeQuery('idx_patrol_dispatches_dispatched_at', `CREATE INDEX IF NOT EXISTS idx_patrol_dispatches_dispatched_at ON patrol_dispatches(dispatched_at DESC)`);
 
+    // Patrol locations table for real-time tracking
+    console.log('📝 Ensuring patrol_locations table exists...');
+    await safeQuery('create patrol_locations', `
+      CREATE TABLE IF NOT EXISTS patrol_locations (
+        location_id BIGSERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL UNIQUE,
+        latitude DOUBLE PRECISION NOT NULL,
+        longitude DOUBLE PRECISION NOT NULL,
+        heading DOUBLE PRECISION NULL,
+        speed DOUBLE PRECISION NULL,
+        accuracy DOUBLE PRECISION NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await safeQuery('idx_patrol_locations_user_id', `CREATE INDEX IF NOT EXISTS idx_patrol_locations_user_id ON patrol_locations(user_id)`);
+    await safeQuery('idx_patrol_locations_updated_at', `CREATE INDEX IF NOT EXISTS idx_patrol_locations_updated_at ON patrol_locations(updated_at DESC)`);
+
+    // Add dispatched status to reports if not exists
+    console.log('📝 Adding dispatched status support to reports...');
+    await safeQuery('reports.is_valid', `
+      ALTER TABLE reports
+      ADD COLUMN IF NOT EXISTS is_valid VARCHAR(20)
+    `);
+
     // Update existing reports to set priority flags
     console.log('🔄 Updating existing reports with priority flags...');
     await safeQuery('backfill reports.is_focus_crime', `
@@ -250,6 +282,88 @@ async function runMigrations() {
         ELSE false 
       END
       WHERE has_sufficient_info IS NULL
+    `);
+
+    // Announcements table for admin announcements
+    console.log('📝 Ensuring announcements table exists...');
+    await safeQuery('create announcements', `
+      CREATE TABLE IF NOT EXISTS announcements (
+        id BIGSERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        attachments JSONB NULL,
+        user_id BIGINT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await safeQuery('idx_announcements_created_at', `CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON announcements(created_at DESC)`);
+
+    // === PERFORMANCE INDEXES FOR SCALABILITY ===
+    console.log('📊 Creating performance indexes for scalability...');
+
+    // Messages table indexes for chat performance
+    await safeQuery('idx_messages_sender_receiver', `
+      CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver 
+      ON messages(sender_id, receiver_id, created_at DESC)
+    `);
+    await safeQuery('idx_messages_receiver_unread', `
+      CREATE INDEX IF NOT EXISTS idx_messages_receiver_unread 
+      ON messages(receiver_id, status) WHERE status = false
+    `);
+    await safeQuery('idx_messages_conversation', `
+      CREATE INDEX IF NOT EXISTS idx_messages_conversation 
+      ON messages(LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id), created_at DESC)
+    `);
+
+    // Reports table indexes for faster queries
+    await safeQuery('idx_reports_user_id', `
+      CREATE INDEX IF NOT EXISTS idx_reports_user_id ON reports(user_id, created_at DESC)
+    `);
+    await safeQuery('idx_reports_station_status', `
+      CREATE INDEX IF NOT EXISTS idx_reports_station_status ON reports(closest_station_id, status, created_at DESC)
+    `);
+    await safeQuery('idx_reports_barangay', `
+      CREATE INDEX IF NOT EXISTS idx_reports_barangay ON reports(barangay_id, created_at DESC)
+    `);
+    await safeQuery('idx_reports_created_at', `
+      CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC)
+    `);
+    await safeQuery('idx_reports_status', `
+      CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)
+    `);
+
+    // Notifications table indexes
+    await safeQuery('idx_notifications_user', `
+      CREATE INDEX IF NOT EXISTS idx_notifications_user 
+      ON notifications(user_id, created_at DESC)
+    `);
+    await safeQuery('idx_notifications_unread', `
+      CREATE INDEX IF NOT EXISTS idx_notifications_unread 
+      ON notifications(user_id, read) WHERE read = false
+    `);
+
+    // User flags table indexes
+    await safeQuery('idx_user_flags_user', `
+      CREATE INDEX IF NOT EXISTS idx_user_flags_user 
+      ON user_flags(user_id, created_at DESC)
+    `);
+    await safeQuery('idx_user_flags_active', `
+      CREATE INDEX IF NOT EXISTS idx_user_flags_active 
+      ON user_flags(user_id, status) WHERE status = 'active'
+    `);
+
+    // Police stations location index for nearest station queries
+    await safeQuery('idx_police_stations_location', `
+      CREATE INDEX IF NOT EXISTS idx_police_stations_location 
+      ON police_stations(latitude, longitude)
+    `);
+
+    // User login optimization
+    await safeQuery('idx_users_public_email', `
+      CREATE INDEX IF NOT EXISTS idx_users_public_email 
+      ON users_public(LOWER(email))
     `);
 
     console.log('✅ All migrations completed successfully!');

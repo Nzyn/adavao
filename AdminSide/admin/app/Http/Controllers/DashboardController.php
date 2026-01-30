@@ -178,4 +178,61 @@ class DashboardController extends Controller
             'dateTo'
         ));
     }
+
+    /**
+     * Get crime data for charts and analytics
+     */
+    public function getCrimeData(Request $request)
+    {
+        $user = auth()->user();
+        $stationId = $user->station_id ?? null;
+        $isSuperAdmin = $user && $user->email === 'alertdavao.ph@gmail.com';
+
+        $cacheKey = 'crime_data_' . ($isSuperAdmin ? 'all' : ($stationId ?? 'none'));
+        
+        $data = Cache::remember($cacheKey, 300, function() use ($stationId, $isSuperAdmin) {
+            // Crime types breakdown
+            $crimeTypes = DB::table('reports')
+                ->select('crime_type', DB::raw('COUNT(*) as count'))
+                ->when(!$isSuperAdmin && $stationId, function($q) use ($stationId) {
+                    return $q->where('assigned_station_id', $stationId);
+                })
+                ->whereNotNull('crime_type')
+                ->groupBy('crime_type')
+                ->orderByDesc('count')
+                ->limit(10)
+                ->get();
+
+            // Monthly trend (last 12 months)
+            $monthlyTrend = DB::table('reports')
+                ->select(
+                    DB::raw("TO_CHAR(created_at, 'YYYY-MM') as month"),
+                    DB::raw('COUNT(*) as count')
+                )
+                ->when(!$isSuperAdmin && $stationId, function($q) use ($stationId) {
+                    return $q->where('assigned_station_id', $stationId);
+                })
+                ->where('created_at', '>=', now()->subMonths(12))
+                ->groupBy(DB::raw("TO_CHAR(created_at, 'YYYY-MM')"))
+                ->orderBy('month')
+                ->get();
+
+            // Status distribution
+            $statusDistribution = DB::table('reports')
+                ->select('status', DB::raw('COUNT(*) as count'))
+                ->when(!$isSuperAdmin && $stationId, function($q) use ($stationId) {
+                    return $q->where('assigned_station_id', $stationId);
+                })
+                ->groupBy('status')
+                ->get();
+
+            return [
+                'crimeTypes' => $crimeTypes,
+                'monthlyTrend' => $monthlyTrend,
+                'statusDistribution' => $statusDistribution
+            ];
+        });
+
+        return response()->json($data);
+    }
 }

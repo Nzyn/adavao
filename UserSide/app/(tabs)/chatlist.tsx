@@ -136,42 +136,44 @@ export default function ChatList({ navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchConversations = async () => {
+    const fetchConversations = async (isInitialLoad = false) => {
         if (!user || !user.id) {
             setError('Please log in to view messages');
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
             return;
         }
 
         try {
-            setError(null);
-            console.log('Fetching conversations for user:', user.id);
+            if (isInitialLoad) setError(null);
             const response = await messageService.getUserConversations(parseInt(user.id));
 
             if (response.success) {
-                setConversations(response.data);
-                console.log('Fetched', response.data.length, 'conversations');
-            } else {
+                // Only update if data actually changed to prevent flickering
+                setConversations(prev => {
+                    const newIds = response.data.map((c: any) => `${c.other_user_id}-${c.last_message_time}-${c.unread_count}`);
+                    const oldIds = prev.map(c => `${c.other_user_id}-${c.last_message_time}-${c.unread_count}`);
+                    if (JSON.stringify(newIds) === JSON.stringify(oldIds)) return prev;
+                    return response.data;
+                });
+            } else if (isInitialLoad) {
                 setError('Failed to load conversations');
             }
         } catch (err) {
-            console.error('Error fetching conversations:', err);
-            setError('Failed to load conversations. Please try again.');
+            if (isInitialLoad) setError('Failed to load conversations. Please try again.');
         } finally {
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
             setRefreshing(false);
         }
     };
 
     useEffect(() => {
-        // Fetch immediately when component mounts
-        fetchConversations();
+        // Fetch immediately when component mounts (initial load)
+        fetchConversations(true);
 
-        // Set up auto-refresh every 3 seconds
+        // Set up auto-refresh every 2 seconds (silent background refresh)
         const interval = setInterval(() => {
-            console.log('🔄 Auto-refreshing conversations...');
-            fetchConversations();
-        }, 3000); // Refresh every 3 seconds
+            fetchConversations(false);
+        }, 2000);
 
         return () => clearInterval(interval);
     }, [user]);
@@ -179,8 +181,7 @@ export default function ChatList({ navigation }: any) {
     // Refresh when screen comes into focus
     useFocusEffect(
         React.useCallback(() => {
-            console.log('Chat list screen focused, refreshing conversations...');
-            fetchConversations();
+            fetchConversations(false);
         }, [user])
     );
 

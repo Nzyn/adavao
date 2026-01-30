@@ -63,15 +63,30 @@ export const useGoogleAuth = () => {
 
 export const getGoogleUserInfo = async (accessToken: string) => {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
     const response = await fetch(
       'https://www.googleapis.com/userinfo/v2/me',
       {
         headers: { Authorization: `Bearer ${accessToken}` },
+        signal: controller.signal,
       }
     );
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`Google API responded with ${response.status}`);
+    }
+    
     return await response.json();
-  } catch (error) {
-    console.error('Error getting Google user info:', error);
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error('Google user info request timed out');
+    } else {
+      console.error('Error getting Google user info:', error);
+    }
     return null;
   }
 };

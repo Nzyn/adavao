@@ -1,41 +1,29 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { getBackendUrlSync, findWorkingBackendUrl } from '../utils/networkUtils';
+import { findWorkingBackendUrl } from '../utils/networkUtils';
 
 /**
  * Backend API Configuration
  * 
  * PRODUCTION MODE: Uses API_BASE_URL from app.json extra config
- * DEVELOPMENT MODE: Auto-detects your network
- * 
- * The system will:
- * 1. Check if API_BASE_URL is configured (production)
- * 2. Detect if you're on emulator/simulator (uses localhost)
- * 3. For physical devices, auto-discovers the backend server
- * 4. Tests multiple common network configurations
- * 5. Falls back to safe defaults if needed
+ * APK BUILD: Defaults to Render URL for production builds
  */
-
-const BACKEND_PORT = 3001;
 
 // Check if we have a production API URL configured
 const PRODUCTION_API_URL = Constants.expoConfig?.extra?.apiBaseUrl;
 
 /**
  * Get the backend URL synchronously
- * Uses production URL if available, otherwise auto-detects
+ * Uses production URL if available, otherwise defaults to Render URL
  */
 function getBackendUrl(): string {
-  // Use production URL if configured or defaulting to Render
+  // Use production URL if configured
   if (PRODUCTION_API_URL && PRODUCTION_API_URL !== 'https://YOUR_NGROK_BACKEND_URL_HERE') {
     return PRODUCTION_API_URL;
   }
 
-  // Default to Render URL for APK builds if no other config found
+  // Default to Render URL for APK builds
   return 'https://node-server-gk1u.onrender.com';
-
-  // Otherwise use auto-detection for development
-  return getBackendUrlSync();
 }
 
 export const BACKEND_URL = getBackendUrl();
@@ -80,6 +68,5 @@ export async function getOptimalBackendUrl(): Promise<string> {
 export default {
   BACKEND_URL,
   API_URL,
-  BACKEND_PORT,
   getOptimalBackendUrl,
 };

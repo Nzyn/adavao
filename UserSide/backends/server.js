@@ -3,6 +3,7 @@ const cors = require("cors");
 const path = require('path');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 require("dotenv").config();
 
 const app = express();
@@ -11,8 +12,45 @@ const PORT = process.env.PORT || 8081;
 // Needed for correct req.ip behind proxies (e.g., Render)
 app.set('trust proxy', 1);
 
+// Performance: Enable gzip compression for responses
+app.use(compression({
+  filter: (req, res) => {
+    // Don't compress small responses or already compressed
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  },
+  level: 6, // Balanced compression level
+}));
+
 app.use(cors());
-app.use(express.json());
+
+// Performance: Limit JSON body size to prevent abuse
+app.use(express.json({ limit: '10mb' }));
+
+// Performance: Import server-side cache middleware
+const { cacheMiddleware, getCacheStats, clearCache } = require('./cacheMiddleware');
+app.use(cacheMiddleware);
+
+// API rate limiting for general endpoints (prevents abuse)
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  limit: 300, // 300 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    if (typeof rateLimit.ipKeyGenerator === 'function') return rateLimit.ipKeyGenerator(req);
+    return req.ip;
+  },
+  skip: (req) => {
+    // Skip rate limiting for health checks
+    return req.path === '/health' || req.path === '/api/health';
+  },
+  message: {
+    success: false,
+    message: 'Too many requests. Please slow down.'
+  }
+});
+app.use('/api', generalLimiter);
 
 // Global rate limit for report submissions (extra safety; DB checks apply inside handler too)
 const reportLimiter = rateLimit({
@@ -21,7 +59,6 @@ const reportLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    // express-rate-limit v8 requires ipKeyGenerator to correctly normalize IPv6 addresses
     if (typeof rateLimit.ipKeyGenerator === 'function') return rateLimit.ipKeyGenerator(req);
     return req.ip;
   },
@@ -34,7 +71,10 @@ const reportLimiter = rateLimit({
 // Serve static files from 'evidence' directory
 // DO NOT serve evidence as public static files.
 // Evidence is encrypted at rest and must be decrypted only for authorized roles.
-app.use('/verifications', express.static(path.join(__dirname, '../verifications')));
+app.use('/verifications', express.static(path.join(__dirname, '../verifications'), {
+  maxAge: '1d', // Cache static files for 1 day
+  etag: true,
+}));
 
 const requestLogger = (req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} from ${req.ip}`);
@@ -97,6 +137,7 @@ const verificationUpload = multer({
 const handleRegister = require("./handleRegister");
 const { handleGoogleLogin, handleGoogleLoginWithToken, handleGoogleOtpVerify, handleGoogleCompleteRegistration } = require("./handleGoogleAuth");
 const handleLogin = require("./handleLogin");
+const { handleLogout, handlePatrolLogout } = require("./handleLogout");
 const { handleVerifyEmail, handleResendVerification } = require("./handleEmailVerification");
 const { handleForgotPassword, handleVerifyResetToken, handleResetPassword } = require("./handlePasswordReset");
 const { handleChangePassword } = require("./handleChangePassword");
@@ -201,6 +242,9 @@ const { decryptFile } = require('./encryptionService');
 const { getVerifiedUserRole } = require('./authMiddleware');
 const { verifyUserRole, requireAuthorizedRole } = require('./authMiddleware');
 
+// Announcements handlers
+const { getAnnouncements, getAnnouncementById } = require('./handleAnnouncements');
+
 // Patrol dispatch handlers
 const {
   getMyDispatches,
@@ -209,9 +253,39 @@ const {
   declineDispatch,
 } = require('./handlePatrolDispatches');
 
+// Dispatch management handlers (location tracking, send to dispatch, verification)
+const {
+  updatePatrolLocation,
+  getAllPatrolLocations,
+  getPatrolOfficersByStation,
+  sendToDispatch,
+  getPendingDispatchesForStation,
+  respondToDispatch,
+  markEnRoute,
+  markArrived,
+  verifyReport,
+} = require('./handleDispatch');
+
 // User routes (push notifications, duty status)
 const userRoutes = require('./routes/user');
 app.use('/api/user', userRoutes);
+
+// Announcements API (public, no auth required)
+app.get('/api/announcements', getAnnouncements);
+app.get('/api/announcements/:id', getAnnouncementById);
+
+// Patrol location tracking API
+app.post('/api/patrol/location', updatePatrolLocation);
+app.get('/api/patrol/locations', verifyUserRole, requireAuthorizedRole, getAllPatrolLocations);
+app.get('/api/patrol/officers/:stationId', verifyUserRole, requireAuthorizedRole, getPatrolOfficersByStation);
+
+// Dispatch management API (for police station to send reports to patrol)
+app.post('/api/dispatch/send', verifyUserRole, requireAuthorizedRole, sendToDispatch);
+app.get('/api/dispatch/station/:stationId/pending', verifyUserRole, requireAuthorizedRole, getPendingDispatchesForStation);
+app.post('/api/dispatch/:dispatchId/respond', verifyUserRole, requireAuthorizedRole, respondToDispatch);
+app.post('/api/dispatch/:dispatchId/en-route', verifyUserRole, requireAuthorizedRole, markEnRoute);
+app.post('/api/dispatch/:dispatchId/arrived', verifyUserRole, requireAuthorizedRole, markArrived);
+app.post('/api/dispatch/:dispatchId/verify', verifyUserRole, requireAuthorizedRole, verifyReport);
 
 // Patrol dispatch API (mobile patrol UI)
 app.get('/api/patrol/dispatches', verifyUserRole, requireAuthorizedRole, getMyDispatches);
@@ -345,6 +419,8 @@ const handleGoogleRegister = require("./handleGoogleRegister"); // Import
 app.post("/register", handleRegister); // Registration with email verification
 app.post("/google-register", handleGoogleRegister); // Google Registration with Phone
 app.post("/login", handleLogin);
+app.post("/logout", handleLogout); // Clear server-side session on logout
+app.post("/patrol-logout", handlePatrolLogout); // Clear patrol officer session and location
 
 // Email Verification Routes
 app.get("/verify-email/:token", handleVerifyEmail); // Verify email with token
@@ -670,9 +746,64 @@ if (String(process.env.ENABLE_DEBUG_ENDPOINTS || '').toLowerCase() === 'true') {
   });
 }
 
+// === HEALTH CHECK & MONITORING ENDPOINTS ===
+const db = require('./db');
+
+// Basic health check (for load balancers, uptime monitors)
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+// Detailed health check with database connectivity
+app.get('/api/health', async (req, res) => {
+  try {
+    const start = Date.now();
+    await db.query('SELECT 1');
+    const dbLatency = Date.now() - start;
+    
+    res.status(200).json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: {
+        status: 'connected',
+        latency: `${dbLatency}ms`,
+        pool: db.getPoolStats ? db.getPoolStats() : 'N/A',
+      },
+      cache: getCacheStats ? getCacheStats() : 'N/A',
+      memory: {
+        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + 'MB',
+      },
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      database: { status: 'disconnected' },
+    });
+  }
+});
+
+// Cache management endpoint (for admin/debugging)
+app.post('/api/admin/cache/clear', (req, res) => {
+  const authKey = req.headers['x-admin-key'];
+  if (authKey !== process.env.ADMIN_API_KEY && authKey !== process.env.DEBUG_API_KEY) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (clearCache) clearCache();
+  res.json({ success: true, message: 'Cache cleared' });
+});
+
 // Catch-all for undefined routes
 app.use('*', (req, res) => {
-  console.log(`❌ 404 Hit: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ error: 'Not found', path: req.originalUrl, method: req.method });
 });
 

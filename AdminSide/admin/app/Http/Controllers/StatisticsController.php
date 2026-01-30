@@ -19,7 +19,8 @@ class StatisticsController extends Controller
     private const REPORT_CHECKING = 'checking_for_report_validity';
 
     public function __construct() {
-        $this->sarimaApiUrl = env('SARIMA_API_URL', 'http://sarima-api:8080');
+        // Default to localhost:8001 for local development, Docker override via env
+        $this->sarimaApiUrl = env('SARIMA_API_URL', 'http://localhost:8001');
     }
 
     /**
@@ -1170,6 +1171,89 @@ class StatisticsController extends Controller
         return response($csv)
             ->header('Content-Type', 'text/csv')
             ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+    }
+
+    /**
+     * Get barangay risk assessment from SARIMA API
+     * Proxies to /barangay-risk endpoint
+     */
+    public function getBarangayRisk(Request $request)
+    {
+        $months = $request->input('months', 6);
+        
+        try {
+            $this->autoStartSarimaApi();
+            
+            $cacheKey = "sarima_barangay_risk_{$months}";
+            
+            $data = Cache::remember($cacheKey, 1800, function () use ($months) {
+                $response = Http::timeout(30)->get("{$this->sarimaApiUrl}/barangay-risk", [
+                    'months' => $months
+                ]);
+                
+                if ($response->successful()) {
+                    return $response->json();
+                }
+                
+                throw new \Exception('Failed to fetch barangay risk: ' . $response->status());
+            });
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $data,
+                'months' => $months,
+                'source' => 'SARIMA API'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch barangay risk assessment',
+                'details' => $e->getMessage()
+            ], 503);
+        }
+    }
+
+    /**
+     * Get monthly crime warning from SARIMA API
+     * Proxies to /monthly-crime-warning endpoint
+     */
+    public function getMonthlyCrimeWarning(Request $request)
+    {
+        $date = $request->input('date'); // YYYY-MM format
+        
+        try {
+            $this->autoStartSarimaApi();
+            
+            $cacheKey = "sarima_monthly_warning_" . ($date ?? 'current');
+            
+            $data = Cache::remember($cacheKey, 1800, function () use ($date) {
+                $params = [];
+                if ($date) {
+                    $params['date'] = $date;
+                }
+                
+                $response = Http::timeout(30)->get("{$this->sarimaApiUrl}/monthly-crime-warning", $params);
+                
+                if ($response->successful()) {
+                    return $response->json();
+                }
+                
+                throw new \Exception('Failed to fetch monthly warning: ' . $response->status());
+            });
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $data,
+                'date' => $date,
+                'source' => 'SARIMA API'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch monthly crime warning',
+                'details' => $e->getMessage()
+            ], 503);
+        }
     }
 }
 

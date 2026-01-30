@@ -695,4 +695,12 @@ class MapController extends Controller
         
         return false; // Default: on land
     }
+
+    /**
+     * Display the crime hotspot map view
+     */
+    public function hotspotIndex()
+    {
+        return view('hotspot-map');
+    }
 }

@@ -2,6 +2,8 @@
 import { Platform } from 'react-native';
 import { BACKEND_URL as CONFIG_BACKEND_URL, getOptimalBackendUrl } from '../config/backend';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiCache, CacheTTL } from '../utils/apiCache';
+import { deduplicateRequest } from '../utils/requestOptimization';
 
 // Use the backend URL from config
 let BACKEND_URL = CONFIG_BACKEND_URL;
@@ -197,12 +199,12 @@ export const reportService = {
       }
 
       const data = await response.json();
-      console.log('Report submitted successfully:', data);
+      
+      // Invalidate user reports cache after successful submission
+      apiCache.invalidate(`user_reports_${reportData.userId}`);
 
       return data;
     } catch (error) {
-      console.error('Error submitting report:', error);
-
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Request timeout - Server took too long to respond. Please check your connection and try again.');
       }
@@ -215,39 +217,34 @@ export const reportService = {
     }
   },
 
-  // Get user's report history
+  // Get user's report history (with caching and deduplication)
   async getUserReports(userId: string) {
-    try {
-      console.log('Fetching reports for user:', userId);
-      console.log('Using backend URL:', BACKEND_URL);
+    const cacheKey = `user_reports_${userId}`;
+    
+    return deduplicateRequest(cacheKey, async () => {
+      // Check cache first (short TTL for reports - 2 seconds)
+      const cached = apiCache.get(cacheKey);
+      if (cached) return cached;
 
-      const response = await fetch(`${BACKEND_URL}/api/reports/user/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/reports/user/${userId}`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+        });
 
-      console.log('Response status:', response.status);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch reports: HTTP ${response.status}`);
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server error response:', errorText);
-        throw new Error(`Failed to fetch reports: HTTP ${response.status}`);
+        const data = await response.json();
+        apiCache.set(cacheKey, data, CacheTTL.VERY_SHORT);
+        return data;
+      } catch (error) {
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          throw new Error('Unable to connect to server. Please check your internet connection and try again.');
+        }
+        throw error;
       }
-
-      const data = await response.json();
-      console.log('Reports fetched successfully:', data);
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching reports:', error);
-
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Unable to connect to server. Please check your internet connection and try again.');
-      }
-
-      throw error;
-    }
+    });
   },
 };

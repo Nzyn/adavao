@@ -98,17 +98,22 @@ const Register = () => {
   const handleGoogleSignIn = async (accessToken: string) => {
     setIsLoading(true);
     try {
-      const userInfo = await getGoogleUserInfo(accessToken);
-      if (!userInfo) {
+      // Fetch Google user info with timeout
+      const userInfoPromise = getGoogleUserInfo(accessToken);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Google user info timeout')), 8000)
+      );
+      
+      const userInfo = await Promise.race([userInfoPromise, timeoutPromise]) as any;
+      if (!userInfo || !userInfo.email) {
         Alert.alert('Error', 'Failed to get user information from Google');
         setIsLoading(false);
         return;
       }
 
-      console.log('🌐 Google User Info (Register Page):', userInfo.email);
-
+      // Use shorter timeout for backend
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const response = await fetch(`${BACKEND_URL}/google-login`, {
         method: 'POST',

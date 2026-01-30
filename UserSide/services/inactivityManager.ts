@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { BACKEND_URL } from '../config/backend';
 
 const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
@@ -94,9 +95,33 @@ class InactivityManager {
       // Import Alert dynamically
       const { Alert } = await import('react-native');
 
+      // Get user data before clearing
+      const userData = await AsyncStorage.getItem('userData');
+      const parsedUser = userData ? JSON.parse(userData) : null;
+
+      // Call backend to clear server-side session (non-blocking)
+      if (parsedUser?.id || parsedUser?.email) {
+        fetch(`${BACKEND_URL}/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          },
+          body: JSON.stringify({
+            userId: parsedUser?.id,
+            email: parsedUser?.email
+          })
+        }).catch(err => console.warn('Server logout failed:', err));
+      }
+
       // Clear user data
-      await AsyncStorage.removeItem('userData');
-      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.multiRemove([
+        'userData',
+        'userToken',
+        'pushToken',
+        'lastNotificationCheck',
+        'cachedNotifications'
+      ]);
 
       // Set flag to show logout notification (backup for app reopen)
       await AsyncStorage.setItem('inactivityLogout', 'true');

@@ -6,7 +6,7 @@ const CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GO
 const client = new OAuth2Client(CLIENT_ID);
 const { sendOtpInternal, verifyOtpInternal } = require('./handleOtp');
 
-// Handle Google Sign-In - Simplified flow
+// Handle Google Sign-In - Simplified flow (OPTIMIZED for speed)
 const handleGoogleLogin = async (req, res) => {
   const { googleId, email, firstName, lastName, profilePicture } = req.body;
 
@@ -15,27 +15,19 @@ const handleGoogleLogin = async (req, res) => {
   }
 
   try {
-    // Check if user already exists
+    // OPTIMIZED: Single query to check user AND update google_id + last_login in one go
     const [existingUsers] = await db.query(
-      "SELECT * FROM users_public WHERE email = $1",
-      [email]
+      `UPDATE users_public 
+       SET google_id = COALESCE(google_id, $1), 
+           last_login = NOW() 
+       WHERE email = $2 
+       RETURNING *`,
+      [googleId, email]
     );
 
     if (existingUsers.length > 0) {
-      // User exists - log them in directly (no OTP for Google Sign-In)
+      // User exists - login successful
       const user = existingUsers[0];
-
-      // Update google_id if not set
-      if (!user.google_id) {
-        await db.query(
-          "UPDATE users_public SET google_id = $1 WHERE id = $2",
-          [googleId, user.id]
-        );
-      }
-
-      // Update last login
-      await db.query("UPDATE users_public SET last_login = NOW() WHERE id = $1", [user.id]);
-
       const { password, ...userWithoutPassword } = user;
 
       return res.status(200).json({

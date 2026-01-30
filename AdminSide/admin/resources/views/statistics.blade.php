@@ -493,6 +493,41 @@
         </div>
     </div>
 
+    <!-- Barangay Risk Assessment (from SARIMA API) -->
+    <div class="chart-section">
+        <div class="chart-header">
+            <h2 class="chart-title">🚨 Barangay Risk Assessment</h2>
+            <div class="chart-controls">
+                <select class="forecast-select" id="riskMonthsFilter">
+                    <option value="1">Last 1 Month</option>
+                    <option value="3" selected>Last 3 Months</option>
+                    <option value="6">Last 6 Months</option>
+                </select>
+                <button class="chart-btn" id="refreshRiskBtn">🔄 Refresh</button>
+            </div>
+        </div>
+        <p style="color: #6b7280; font-size: 0.875rem; margin-bottom: 1rem;">
+            Risk levels based on recent crime activity compared to city average (SARIMA API)
+        </p>
+        <div id="barangayRiskContainer" style="overflow-x: auto; color: #374151;">
+            Loading risk assessment...
+        </div>
+    </div>
+
+    <!-- Monthly Crime Warning (from SARIMA API) -->
+    <div class="chart-section">
+        <div class="chart-header">
+            <h2 class="chart-title">⚠️ Monthly Crime Warning & Patrol Recommendation</h2>
+            <div class="chart-controls">
+                <input type="month" class="forecast-select" id="warningMonthFilter" style="width: 160px;">
+                <button class="chart-btn" id="refreshWarningBtn">🔄 Get Warning</button>
+            </div>
+        </div>
+        <div id="monthlyCrimeWarningContainer" style="color: #374151;">
+            Loading monthly warning...
+        </div>
+    </div>
+
     <!-- Crime Trend Chart -->
     <div class="chart-section">
         <div class="chart-header">
@@ -624,12 +659,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // Immediate: Only populate filter dropdown (lightweight)
     populateYearFilter();
     
+    // Set default month for warning filter to current month
+    const warningMonthFilter = document.getElementById('warningMonthFilter');
+    if (warningMonthFilter) {
+        const now = new Date();
+        warningMonthFilter.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+    
     // Immediate: Attach event listeners (lightweight)
     document.getElementById('forecastHorizon').addEventListener('change', loadForecast);
     document.getElementById('crimeTypeFilter').addEventListener('change', loadForecast);
     document.getElementById('refreshForecast').addEventListener('click', loadForecast);
     document.getElementById('applyFilter').addEventListener('click', applyFilter);
     document.getElementById('clearFilter').addEventListener('click', clearFilter);
+    
+    // SARIMA Risk & Warning event listeners
+    document.getElementById('riskMonthsFilter').addEventListener('change', loadBarangayRisk);
+    document.getElementById('refreshRiskBtn').addEventListener('click', loadBarangayRisk);
+    document.getElementById('refreshWarningBtn').addEventListener('click', loadMonthlyCrimeWarning);
     
     // DEFERRED: Heavy operations after first paint
     // Priority 1: Load crime stats (most important data)
@@ -643,6 +690,17 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('⏳ Loading forecast (deferred)');
         loadForecast();
     }, { timeout: 200 });
+    
+    // Priority 3: Load SARIMA Risk & Warning data
+    requestIdleCallback(() => {
+        console.log('⏳ Loading barangay risk assessment (deferred)');
+        loadBarangayRisk();
+    }, { timeout: 300 });
+    
+    requestIdleCallback(() => {
+        console.log('⏳ Loading monthly crime warning (deferred)');
+        loadMonthlyCrimeWarning();
+    }, { timeout: 400 });
 });
 
 // Populate year filter dropdown with years from 2020 to current year
@@ -1104,6 +1162,191 @@ async function loadInsights() {
                 el.textContent = 'Failed to load insights.';
             }
         });
+    }
+}
+
+// =========================================================
+// SARIMA API: Load Barangay Risk Assessment
+// =========================================================
+async function loadBarangayRisk() {
+    const container = document.getElementById('barangayRiskContainer');
+    const months = document.getElementById('riskMonthsFilter')?.value || 3;
+    
+    if (!container) return;
+    
+    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><span>🔄 Loading risk assessment...</span></div>';
+    
+    try {
+        // Call Laravel API proxy (which calls SARIMA API)
+        const response = await fetch(`/api/statistics/barangay-risk?months=${months}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Unwrap Laravel proxy response
+        const data = result.data || result;
+        
+        if (!Array.isArray(data) || data.length === 0) {
+            container.innerHTML = '<div style="padding: 1rem; background: #f9fafb; border-radius: 8px; color: #6b7280;">No risk data available from SARIMA API.</div>';
+            return;
+        }
+        
+        // Group by risk level
+        const highRisk = data.filter(d => d.risk_level === 'HIGH');
+        const mediumRisk = data.filter(d => d.risk_level === 'MEDIUM');
+        const lowRisk = data.filter(d => d.risk_level === 'LOW');
+        
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="padding: 1rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: 700; color: #dc2626;">${highRisk.length}</div>
+                    <div style="font-size: 0.875rem; color: #991b1b;">🔴 HIGH Risk</div>
+                </div>
+                <div style="padding: 1rem; background: #fffbeb; border: 1px solid #fed7aa; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: 700; color: #d97706;">${mediumRisk.length}</div>
+                    <div style="font-size: 0.875rem; color: #92400e;">🟡 MEDIUM Risk</div>
+                </div>
+                <div style="padding: 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: 700; color: #16a34a;">${lowRisk.length}</div>
+                    <div style="font-size: 0.875rem; color: #166534;">🟢 LOW Risk</div>
+                </div>
+            </div>
+            
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+                <thead>
+                    <tr style="background: #f9fafb;">
+                        <th style="text-align: left; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Barangay</th>
+                        <th style="text-align: center; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Recent Crimes</th>
+                        <th style="text-align: center; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Risk Level</th>
+                        <th style="text-align: left; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Warning</th>
+                        <th style="text-align: left; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Recommended Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.slice(0, 20).map(item => {
+                        const riskColors = {
+                            'HIGH': { bg: '#fef2f2', text: '#dc2626', badge: '#dc2626' },
+                            'MEDIUM': { bg: '#fffbeb', text: '#d97706', badge: '#d97706' },
+                            'LOW': { bg: '#f0fdf4', text: '#16a34a', badge: '#16a34a' }
+                        };
+                        const color = riskColors[item.risk_level] || riskColors['LOW'];
+                        return `
+                            <tr style="background: ${color.bg};">
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb; font-weight: 600;">${escapeHtml(item.barangay)}</td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb; text-align: center; font-weight: 700;">${item.recent_crimes}</td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb; text-align: center;">
+                                    <span style="display: inline-block; padding: 0.25rem 0.75rem; background: ${color.badge}; color: white; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">
+                                        ${item.risk_level}
+                                    </span>
+                                </td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb; color: ${color.text};">${escapeHtml(item.warning)}</td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.recommended_action)}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+            ${data.length > 20 ? `<p style="margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">Showing top 20 of ${data.length} barangays</p>` : ''}
+        `;
+        
+        console.log('✅ Barangay risk assessment loaded:', data.length, 'barangays');
+        
+    } catch (error) {
+        console.error('❌ Error loading barangay risk:', error);
+        container.innerHTML = `
+            <div style="padding: 1.5rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚠️</div>
+                <div style="color: #991b1b; font-weight: 600;">Failed to load risk assessment</div>
+                <div style="color: #b91c1c; font-size: 0.875rem; margin-top: 0.5rem;">
+                    SARIMA API may not be running. Please check the server.
+                </div>
+            </div>
+        `;
+    }
+}
+
+// =========================================================
+// SARIMA API: Load Monthly Crime Warning
+// =========================================================
+async function loadMonthlyCrimeWarning() {
+    const container = document.getElementById('monthlyCrimeWarningContainer');
+    const monthInput = document.getElementById('warningMonthFilter');
+    
+    if (!container) return;
+    
+    // Get selected date or use current month
+    let dateParam;
+    if (monthInput && monthInput.value) {
+        dateParam = monthInput.value + '-01';
+    } else {
+        const now = new Date();
+        dateParam = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    }
+    
+    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><span>🔄 Loading monthly warning...</span></div>';
+    
+    try {
+        // Call Laravel API proxy (which calls SARIMA API)
+        const response = await fetch(`/api/statistics/monthly-warning?date=${dateParam}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Unwrap Laravel proxy response
+        const data = result.data || result;
+        
+        container.innerHTML = `
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                    <span style="font-size: 2rem;">⚠️</span>
+                    <div>
+                        <div style="font-size: 1.25rem; font-weight: 700; color: #92400e;">Crime Alert: ${escapeHtml(data.month)}</div>
+                        <div style="color: #a16207; font-size: 0.875rem;">${escapeHtml(data.warning)}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem;">
+                    <div style="font-weight: 600; color: #111827; margin-bottom: 0.75rem;">📊 Likely Crimes This Month</div>
+                    ${data.likely_crimes && data.likely_crimes.length > 0 ? `
+                        <ul style="margin: 0; padding-left: 1.25rem; color: #374151;">
+                            ${data.likely_crimes.map(crime => `
+                                <li style="margin-bottom: 0.5rem;">
+                                    <strong>${escapeHtml(crime.crime_type)}</strong>
+                                    <span style="color: #6b7280; font-size: 0.875rem;"> (${crime.historical_total} cases historically)</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    ` : '<p style="color: #6b7280;">No crime patterns detected for this month.</p>'}
+                </div>
+                
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 1rem;">
+                    <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.75rem;">👮 Patrol Recommendation</div>
+                    <p style="color: #1e3a8a; margin: 0; line-height: 1.5;">${escapeHtml(data.recommended_action)}</p>
+                </div>
+            </div>
+        `;
+        
+        console.log('✅ Monthly crime warning loaded for:', data.month);
+        
+    } catch (error) {
+        console.error('❌ Error loading monthly crime warning:', error);
+        container.innerHTML = `
+            <div style="padding: 1.5rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚠️</div>
+                <div style="color: #991b1b; font-weight: 600;">Failed to load monthly warning</div>
+                <div style="color: #b91c1c; font-size: 0.875rem; margin-top: 0.5rem;">
+                    SARIMA API may not be running. Please check the server.
+                </div>
+            </div>
+        `;
     }
 }
 

@@ -16,6 +16,7 @@ import GradientBackground from '../components/GradientBackground';
 import { UserProvider } from '../contexts/UserContext';
 import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
 import { inactivityManager } from '../services/inactivityManager';
+import { startServerWarmup, stopServerWarmup, pingServer } from '../utils/serverWarmup';
 
 // Prevent auto-hiding splash screen
 SplashScreen.preventAutoHideAsync();
@@ -31,6 +32,9 @@ export default function RootLayout() {
         // IMPORTANT: Hide native splash IMMEDIATELY so LoadingScreen can show
         // This ensures the custom animation is visible
         await SplashScreen.hideAsync();
+
+        // Start warming up the server immediately (non-blocking)
+        pingServer();
 
         // Preload fonts to prevent FontFaceObserver timeout
         await Font.loadAsync({
@@ -80,9 +84,13 @@ function AppContent() {
   // Start inactivity manager when app loads
   useEffect(() => {
     inactivityManager.start();
+    
+    // Start server warmup to prevent cold start delays
+    startServerWarmup();
 
     return () => {
       inactivityManager.stop();
+      stopServerWarmup();
     };
   }, []);
 

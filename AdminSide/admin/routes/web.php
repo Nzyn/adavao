@@ -287,6 +287,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/statistics/export', [StatisticsController::class, 'exportCrimeData'])->name('statistics.export');
     Route::get('/api/statistics/barangay-stats', [StatisticsController::class, 'getBarangayCrimeStats'])->name('statistics.barangay');
     Route::post('/api/statistics/clear-cache', [StatisticsController::class, 'clearCache'])->name('statistics.clearCache');
+    
+    // SARIMA API proxy routes (barangay risk & monthly warning)
+    Route::get('/api/statistics/barangay-risk', [StatisticsController::class, 'getBarangayRisk'])->name('statistics.barangayRisk');
+    Route::get('/api/statistics/monthly-warning', [StatisticsController::class, 'getMonthlyCrimeWarning'])->name('statistics.monthlyWarning');
 
     Route::get('/view-map', [MapController::class, 'index'])->name('view-map');
     Route::get('/api/reports', [MapController::class, 'getReports'])->middleware('api.cache')->name('api.reports');

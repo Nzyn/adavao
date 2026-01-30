@@ -133,6 +133,9 @@ const Login = () => {
     syncPoliceStations().catch(err => {
       console.warn('Background sync of police stations failed:', err);
     });
+
+    // Warm up the server to prevent cold start delays on login
+    fetch(`${BACKEND_URL}/health`, { method: 'GET' }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -161,17 +164,22 @@ const Login = () => {
   const handleGoogleSignIn = async (accessToken: string) => {
     setIsLoading(true);
     try {
-      const userInfo = await getGoogleUserInfo(accessToken);
-      if (!userInfo) {
+      // Fetch Google user info with shorter timeout
+      const userInfoPromise = getGoogleUserInfo(accessToken);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Google user info timeout')), 8000)
+      );
+      
+      const userInfo = await Promise.race([userInfoPromise, timeoutPromise]) as any;
+      if (!userInfo || !userInfo.email) {
         Alert.alert('Error', 'Failed to get user information from Google');
         setIsLoading(false);
         return;
       }
 
-      console.log('🌐 Google User Info:', userInfo.email);
-
+      // Use shorter timeout for backend (server should be warm now)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
       const response = await fetch(`${BACKEND_URL}/google-login`, {
         method: 'POST',

@@ -15,9 +15,13 @@ def root():
 # FastAPI app
 # =========================================================
 app = FastAPI(
-    title="SARIMA Crime Forecast API",
-    description="Forecast monthly crimes + show top crimes and high-risk barangays using SARIMA(0,1,1)(0,1,1)[12].",
-    version="1.2.0",
+    title="AlertDavao Crime Forecast & Risk Analysis API",
+    description=(
+        "Provides crime trends, SARIMA-based crime forecasting, "
+        "high-risk barangay detection, patrol recommendations, "
+        "and monthly crime warnings based on historical patterns."
+    ),
+    version="2.0.0",
 )
 
 # =========================================================
@@ -64,6 +68,21 @@ class PossibleCrimesResponse(BaseModel):
     month: int
     month_name: str
     data: List[PossibleCrimeItem]
+
+
+class BarangayRiskItem(BaseModel):
+    barangay: str
+    recent_crimes: int
+    risk_level: str
+    warning: str
+    recommended_action: str
+
+
+class MonthlyCrimeWarningResponse(BaseModel):
+    month: str
+    warning: str
+    likely_crimes: List[dict]
+    recommended_action: str
 
 
 # =========================================================
@@ -465,6 +484,109 @@ def get_possible_crimes_for_month(date: str):
         month_name=month_name_from_int(m),
         data=data
     )
+
+
+# ---------- 5) BARANGAY RISK ASSESSMENT ----------------
+@app.get("/barangay-risk", response_model=List[BarangayRiskItem], tags=["insights"])
+def barangay_risk(months: int = 3):
+    """
+    Analyze recent crimes per barangay and return risk levels with patrol recommendations.
+    Uses the last N months of data (default: 3 months).
+    
+    Risk Levels:
+    - HIGH: >= 1.5x city average (Deploy additional patrol)
+    - MEDIUM: >= city average (Increase patrol frequency)
+    - LOW: < city average (Maintain regular patrol)
+    """
+    global df_global
+    
+    if df_global is None:
+        raise HTTPException(status_code=500, detail="Data not loaded.")
+    
+    cutoff = df_global["date"].max() - pd.DateOffset(months=months)
+    recent_df = df_global[df_global["date"] >= cutoff]
+    
+    if recent_df.empty:
+        return []
+    
+    totals = recent_df.groupby("barangay")["crime_count"].sum()
+    city_avg = totals.mean()
+    
+    results = []
+    
+    for barangay, total in totals.items():
+        if total >= city_avg * 1.5:
+            risk = "HIGH"
+            warning = "This barangay has a high number of recent crimes."
+            action = "Deploy additional police personnel and patrol vehicles."
+        elif total >= city_avg:
+            risk = "MEDIUM"
+            warning = "Crime level is above normal."
+            action = "Increase patrol frequency."
+        else:
+            risk = "LOW"
+            warning = "Crime level is within normal range."
+            action = "Maintain regular patrol."
+        
+        results.append(
+            BarangayRiskItem(
+                barangay=str(barangay),
+                recent_crimes=int(total),
+                risk_level=risk,
+                warning=warning,
+                recommended_action=action
+            )
+        )
+    
+    # Sort by risk level (HIGH first) and crime count
+    risk_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+    results.sort(key=lambda x: (risk_order.get(x.risk_level, 3), -x.recent_crimes))
+    
+    return results
+
+
+# ---------- 6) MONTHLY CRIME WARNING -------------------
+@app.get("/monthly-crime-warning", response_model=MonthlyCrimeWarningResponse, tags=["insights"])
+def monthly_crime_warning(date: str):
+    """
+    Get crime warning and patrol recommendations for a specific month.
+    Based on historical crime patterns for that calendar month.
+    
+    Example: /monthly-crime-warning?date=2025-03-15
+    """
+    global top_crimes_by_month
+    
+    if top_crimes_by_month is None:
+        raise HTTPException(status_code=500, detail="Historical data not available.")
+    
+    try:
+        d = pd.to_datetime(date)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    
+    m = d.month
+    month_name = month_name_from_int(m)
+    
+    sub = top_crimes_by_month[top_crimes_by_month["month"] == m]
+    
+    likely_crimes = [
+        {"crime_type": row["crime_type"], "historical_total": int(row["total"])}
+        for _, row in sub.iterrows()
+    ]
+    
+    return MonthlyCrimeWarningResponse(
+        month=month_name,
+        warning=(
+            f"Based on historical records, certain crimes are more likely "
+            f"to occur during {month_name}."
+        ),
+        likely_crimes=likely_crimes,
+        recommended_action=(
+            "Increase police visibility and deploy patrol units during this month."
+        )
+    )
+
+
 # RUN SERVER (for local dev)
 # =========================================================
 if __name__ == '__main__':

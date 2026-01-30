@@ -62,7 +62,7 @@ const ChatScreen = () => {
     let typingTimeout: ReturnType<typeof setTimeout> | null = null;
     let typingCheckInterval: ReturnType<typeof setInterval> | null = null;
 
-    const fetchMessages = async () => {
+    const fetchMessages = async (isInitialLoad = false) => {
         if (!user || !user.id || !otherUserId) return;
 
         try {
@@ -74,28 +74,30 @@ const ChatScreen = () => {
                 const sortedMessages = response.data.sort((a: any, b: any) =>
                     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
                 );
-                setMessages(sortedMessages);
+                // Only update if messages actually changed to prevent unnecessary re-renders
+                setMessages(prev => {
+                    if (JSON.stringify(prev.map(m => m.id)) === JSON.stringify(sortedMessages.map((m: any) => m.id))) {
+                        return prev;
+                    }
+                    return sortedMessages;
+                });
                 // Mark conversation as read
                 await messageService.markConversationAsRead(parseInt(user.id), parseInt(otherUserId));
-            } else {
-                console.error('Failed to fetch messages:', response);
             }
         } catch (error) {
-            console.error('Error fetching messages:', error);
-            // Don't alert on background fetch errors, just log
+            // Silent fail for background polling
         } finally {
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
         }
     };
 
     useEffect(() => {
-        // Fetch immediately
-        fetchMessages();
+        // Fetch immediately (initial load)
+        fetchMessages(true);
 
         // Poll for new messages every 2 seconds for better real-time feel
         const interval = setInterval(() => {
-            console.log('🔄 Auto-refreshing messages from', otherUserName);
-            fetchMessages();
+            fetchMessages(false); // Silent background refresh
         }, 2000);
 
         // Check typing status every 800ms

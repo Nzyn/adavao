@@ -163,53 +163,51 @@ const history = () => {
   const [showReportDetail, setShowReportDetail] = useState(false);
   const [decodedAddress, setDecodedAddress] = useState<string>('Loading address...');
 
-  const fetchReports = async () => {
+  const fetchReports = async (isInitialLoad = false) => {
     if (!user || !user.id) {
       setError('Please log in to view your reports');
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
       return;
     }
 
     try {
-      setError(null);
-      console.log('Fetching reports for user:', user.id);
+      if (isInitialLoad) setError(null);
       const response = await reportService.getUserReports(user.id);
 
       if (response.success) {
-        setReports(response.data);
-        console.log('Fetched', response.data.length, 'reports');
-      } else {
+        // Only update if data actually changed to prevent flickering
+        setReports(prev => {
+          const newIds = response.data.map((r: any) => `${r.id}-${r.status}`);
+          const oldIds = prev.map(r => `${r.id}-${r.status}`);
+          if (JSON.stringify(newIds) === JSON.stringify(oldIds)) return prev;
+          return response.data;
+        });
+      } else if (isInitialLoad) {
         setError('Failed to load reports');
       }
     } catch (err) {
-      console.error('Error fetching reports:', err);
-      setError('Failed to load reports. Please try again.');
+      if (isInitialLoad) setError('Failed to load reports. Please try again.');
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
       setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchReports();
+    fetchReports(true);
   }, [user]);
 
   // Refresh when screen comes into focus AND start polling for real-time updates
   useFocusEffect(
     React.useCallback(() => {
-      console.log('History screen focused, refreshing reports...');
-      fetchReports();
+      fetchReports(false);
       
-      // Poll for updates every 2 seconds for real-time status changes
+      // Poll for updates every 2 seconds for real-time status changes (silent)
       const pollInterval = setInterval(() => {
-        console.log('Polling for report updates...');
-        fetchReports();
+        fetchReports(false);
       }, 2000);
       
-      return () => {
-        console.log('History screen unfocused, stopping polling...');
-        clearInterval(pollInterval);
-      };
+      return () => clearInterval(pollInterval);
     }, [user])
   );
 

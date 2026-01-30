@@ -108,12 +108,10 @@ export default function ProfileScreen() {
 
     const pollVerificationStatus = async () => {
       try {
-        console.log('🔄 Auto-refreshing verification status...');
         const result = await verificationService.getVerificationStatus(user.id);
         if (result.success && result.data) {
-          // Check if status changed
+          // Only update if status changed to prevent flickering
           if (verificationStatus?.status !== result.data.status) {
-            console.log('✅ Verification status changed:', verificationStatus?.status, '→', result.data.status);
             setVerificationStatus(result.data);
 
             // Update form state based on new status
@@ -125,11 +123,11 @@ export default function ProfileScreen() {
           }
         }
       } catch (error) {
-        console.error('Error polling verification status:', error);
+        // Silent fail for background polling
       }
     };
 
-    const intervalId = setInterval(pollVerificationStatus, 10000);
+    const intervalId = setInterval(pollVerificationStatus, 2000); // Poll every 2 seconds
     return () => clearInterval(intervalId);
   }, [user?.id, verificationStatus?.status]);
 
@@ -347,7 +345,7 @@ export default function ProfileScreen() {
         {flagStatus && (
           <View style={styles.flagBadgeContainer}>
             <FlagStatusBadge
-              flagStatus={flagStatus}
+              flagData={flagStatus}
               size="medium"
               showLabel={false}
             />

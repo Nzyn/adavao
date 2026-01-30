@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,11 +7,18 @@ import {
     ScrollView,
     RefreshControl,
     Dimensions,
+    Alert,
+    Switch,
+    Modal,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize, containerPadding, borderRadius, isTablet } from '../../utils/responsive';
+import { startLocationTracking, stopLocationTracking, isLocationTrackingActive } from '../../services/patrolLocationService';
+import { API_URL, BACKEND_URL } from '../../config/backend';
+import { stopServerWarmup } from '../../utils/serverWarmup';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -35,12 +42,51 @@ const COLORS = {
 export default function PatrolDashboard() {
     const router = useRouter();
     const [userName, setUserName] = useState('Officer');
+    const [userId, setUserId] = useState<string | null>(null);
+    const [stationId, setStationId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
-    const [unreadNotifications, setUnreadNotifications] = useState(3); // Mock data for UI
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const [isOnDuty, setIsOnDuty] = useState(false);
+    const [isLocationTracking, setIsLocationTracking] = useState(false);
+    const [pendingDispatchCount, setPendingDispatchCount] = useState(0);
+    const [activeDispatchCount, setActiveDispatchCount] = useState(0);
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
     useEffect(() => {
         loadUserData();
     }, []);
+
+    // Refresh data when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            if (userId && stationId) {
+                loadDispatchCounts();
+            }
+        }, [userId, stationId])
+    );
+
+    // Auto-refresh dispatch counts every 2 seconds (silent)
+    useEffect(() => {
+        if (!userId || !stationId) return;
+        
+        const interval = setInterval(() => {
+            loadDispatchCounts();
+        }, 2000);
+        
+        return () => clearInterval(interval);
+    }, [userId, stationId]);
+
+    // Start location tracking when on duty
+    useEffect(() => {
+        if (isOnDuty) {
+            startLocationTracking(2000); // Poll every 2 seconds for real-time tracking
+            setIsLocationTracking(true);
+        } else {
+            stopLocationTracking();
+            setIsLocationTracking(false);
+        }
+        return () => stopLocationTracking();
+    }, [isOnDuty]);
 
     const loadUserData = async () => {
         try {
@@ -54,14 +100,71 @@ export default function PatrolDashboard() {
             const last = user?.lastname || user?.lastName || '';
             const full = `${first} ${last}`.trim();
             setUserName(full || user?.email || 'Officer');
+            setUserId(user?.id?.toString() || user?.userId?.toString());
+            setStationId(user?.assigned_station_id || user?.stationId || null);
+            setIsOnDuty(user?.is_on_duty || false);
         } catch {
             setUserName('Officer');
         }
     };
 
+    const loadDispatchCounts = async () => {
+        if (!userId || !stationId) return;
+        try {
+            // Load pending dispatches count
+            const pendingRes = await fetch(
+                `${API_URL}/dispatch/station/${stationId}/pending?userId=${userId}`,
+                { headers: { 'X-User-Id': userId } }
+            );
+            const pendingData = await pendingRes.json();
+            if (pendingData.success) {
+                setPendingDispatchCount(pendingData.data?.length || 0);
+            }
+
+            // Load my active dispatches count
+            const myRes = await fetch(
+                `${API_URL}/patrol/dispatches?userId=${userId}`,
+                { headers: { 'X-User-Id': userId } }
+            );
+            const myData = await myRes.json();
+            if (myData.success) {
+                setActiveDispatchCount(myData.data?.length || 0);
+            }
+        } catch (error) {
+            console.error('Error loading dispatch counts:', error);
+        }
+    };
+
+    const toggleDutyStatus = async () => {
+        const newStatus = !isOnDuty;
+        try {
+            const response = await fetch(`${API_URL}/user/duty-status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: parseInt(userId || '0'), is_on_duty: newStatus }),
+            });
+            const data = await response.json();
+            if (data.success) {
+                setIsOnDuty(newStatus);
+                // Update stored user data
+                const stored = await AsyncStorage.getItem('userData');
+                if (stored) {
+                    const user = JSON.parse(stored);
+                    user.is_on_duty = newStatus;
+                    await AsyncStorage.setItem('userData', JSON.stringify(user));
+                }
+                Alert.alert('Status Updated', `You are now ${newStatus ? 'ON DUTY' : 'OFF DUTY'}`);
+            } else {
+                Alert.alert('Error', data.message || 'Failed to update duty status');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to update duty status');
+        }
+    };
+
     const onRefresh = () => {
         setLoading(true);
-        // Simulate refresh - will connect to backend later
+        loadDispatchCounts();
         setTimeout(() => setLoading(false), 1000);
     };
 
@@ -71,6 +174,51 @@ export default function PatrolDashboard() {
             return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
         }
         return name.substring(0, 2).toUpperCase();
+    };
+
+    const handleLogout = async () => {
+        setShowLogoutDialog(false);
+        try {
+            // Stop location tracking
+            stopLocationTracking();
+            
+            // Stop server warmup pings
+            stopServerWarmup();
+
+            // Get user data before clearing
+            const userData = await AsyncStorage.getItem('userData');
+            const parsedUser = userData ? JSON.parse(userData) : null;
+
+            // Call backend to clear patrol officer session (non-blocking)
+            if (parsedUser?.id || parsedUser?.email) {
+                fetch(`${BACKEND_URL}/patrol-logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        odId: parsedUser?.id,
+                        odEmail: parsedUser?.email
+                    })
+                }).catch(err => console.warn('Server patrol logout failed:', err));
+            }
+
+            // Clear local storage
+            await AsyncStorage.multiRemove([
+                'userData',
+                'userToken',
+                'pushToken',
+                'lastNotificationCheck',
+                'cachedNotifications',
+                'patrolDutyStatus'
+            ]);
+
+            router.replace('/(tabs)/login');
+        } catch (error) {
+            console.error('Error logging out:', error);
+            router.replace('/(tabs)/login');
+        }
     };
 
     // Mock data for recent reports (UI only)
@@ -101,16 +249,24 @@ export default function PatrolDashboard() {
                         <Text style={styles.userName} numberOfLines={1}>{userName}</Text>
                     </View>
                 </View>
-                <TouchableOpacity style={styles.notificationButton}>
-                    <Ionicons name="notifications-outline" size={26} color={COLORS.primary} />
-                    {unreadNotifications > 0 && (
-                        <View style={styles.notificationBadge}>
-                            <Text style={styles.notificationBadgeText}>
-                                {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                            </Text>
-                        </View>
-                    )}
-                </TouchableOpacity>
+                <View style={styles.headerRight}>
+                    <TouchableOpacity style={styles.notificationButton}>
+                        <Ionicons name="notifications-outline" size={26} color={COLORS.primary} />
+                        {unreadNotifications > 0 && (
+                            <View style={styles.notificationBadge}>
+                                <Text style={styles.notificationBadgeText}>
+                                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={styles.logoutButton}
+                        onPress={() => setShowLogoutDialog(true)}
+                    >
+                        <Ionicons name="log-out-outline" size={24} color={COLORS.accent} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView
@@ -125,6 +281,35 @@ export default function PatrolDashboard() {
                     />
                 }
             >
+                {/* Duty Status Toggle */}
+                <View style={styles.dutyStatusContainer}>
+                    <View style={styles.dutyStatusCard}>
+                        <View style={styles.dutyStatusLeft}>
+                            <View style={[
+                                styles.dutyIndicator,
+                                { backgroundColor: isOnDuty ? COLORS.success : COLORS.textMuted }
+                            ]} />
+                            <View>
+                                <Text style={styles.dutyStatusTitle}>
+                                    {isOnDuty ? 'On Duty' : 'Off Duty'}
+                                </Text>
+                                <Text style={styles.dutyStatusSubtitle}>
+                                    {isOnDuty 
+                                        ? (isLocationTracking ? '📍 Location tracking active' : '⏳ Starting tracking...')
+                                        : 'Toggle to start your shift'
+                                    }
+                                </Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={isOnDuty}
+                            onValueChange={toggleDutyStatus}
+                            trackColor={{ false: '#E5E7EB', true: '#86EFAC' }}
+                            thumbColor={isOnDuty ? COLORS.success : '#9CA3AF'}
+                        />
+                    </View>
+                </View>
+
                 {/* Banner */}
                 <View style={styles.bannerContainer}>
                     <View style={styles.banner}>
@@ -141,13 +326,13 @@ export default function PatrolDashboard() {
                         </View>
                         <View style={styles.bannerStats}>
                             <View style={styles.bannerStatItem}>
-                                <Text style={styles.bannerStatValue}>12</Text>
-                                <Text style={styles.bannerStatLabel}>Dispatches Today</Text>
+                                <Text style={styles.bannerStatValue}>{pendingDispatchCount}</Text>
+                                <Text style={styles.bannerStatLabel}>Pending</Text>
                             </View>
                             <View style={styles.bannerStatDivider} />
                             <View style={styles.bannerStatItem}>
-                                <Text style={styles.bannerStatValue}>8h</Text>
-                                <Text style={styles.bannerStatLabel}>On Duty</Text>
+                                <Text style={styles.bannerStatValue}>{activeDispatchCount}</Text>
+                                <Text style={styles.bannerStatLabel}>Active</Text>
                             </View>
                         </View>
                     </View>
@@ -155,11 +340,21 @@ export default function PatrolDashboard() {
 
                 {/* Quick Action Buttons */}
                 <View style={styles.quickActionsContainer}>
-                    <TouchableOpacity style={styles.quickActionButton}>
-                        <View style={[styles.quickActionIconBg, { backgroundColor: '#EEF2FF' }]}>
-                            <Ionicons name="chatbubbles-outline" size={24} color="#4F46E5" />
+                    <TouchableOpacity 
+                        style={styles.quickActionButton}
+                        onPress={() => router.push('/(patrol)/dispatches')}
+                    >
+                        <View style={[styles.quickActionIconBg, { backgroundColor: '#FEE2E2' }]}>
+                            <Ionicons name="alert-circle-outline" size={24} color="#DC2626" />
+                            {pendingDispatchCount > 0 && (
+                                <View style={styles.quickActionBadge}>
+                                    <Text style={styles.quickActionBadgeText}>
+                                        {pendingDispatchCount > 9 ? '9+' : pendingDispatchCount}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
-                        <Text style={styles.quickActionText}>Messages</Text>
+                        <Text style={styles.quickActionText}>Dispatches</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.quickActionButtonCenter}>
@@ -288,6 +483,16 @@ export default function PatrolDashboard() {
                     <Text style={styles.navText}>Profile</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Logout Confirmation Dialog */}
+            <ConfirmDialog
+                visible={showLogoutDialog}
+                title="Confirm Logout"
+                message="Are you sure you want to logout? Your location tracking will stop."
+                confirmText="Logout"
+                onCancel={() => setShowLogoutDialog(false)}
+                onConfirm={handleLogout}
+            />
         </View>
     );
 }
@@ -355,6 +560,11 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: COLORS.textPrimary,
     },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
     notificationButton: {
         width: 48,
         height: 48,
@@ -363,6 +573,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
+    },
+    logoutButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#FEE2E2',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     notificationBadge: {
         position: 'absolute',
@@ -385,6 +603,48 @@ const styles = StyleSheet.create({
     // Content
     content: {
         flex: 1,
+    },
+
+    // Duty Status Styles
+    dutyStatusContainer: {
+        paddingHorizontal: containerPadding.horizontal,
+        paddingTop: spacing.lg,
+    },
+    dutyStatusCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    dutyStatusLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    dutyIndicator: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        marginRight: spacing.md,
+    },
+    dutyStatusTitle: {
+        fontSize: fontSize.md,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
+    },
+    dutyStatusSubtitle: {
+        fontSize: fontSize.xs,
+        color: COLORS.textSecondary,
+        marginTop: 2,
     },
 
     // Banner Styles
@@ -492,6 +752,24 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
         marginTop: spacing.sm,
         fontWeight: '600',
+    },
+    quickActionBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: COLORS.accent,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: COLORS.white,
+    },
+    quickActionBadgeText: {
+        color: COLORS.white,
+        fontSize: 10,
+        fontWeight: 'bold',
     },
 
     // Section Styles

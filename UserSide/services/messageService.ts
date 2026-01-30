@@ -1,5 +1,7 @@
 // Message service for handling chat functionality
 import { BACKEND_URL } from '../config/backend';
+import { apiCache, CacheTTL } from '../utils/apiCache';
+import { deduplicateRequest } from '../utils/requestOptimization';
 
 export interface Message {
   message_id: number;
@@ -21,6 +23,7 @@ export interface Message {
 
 export interface ChatConversation {
   user_id: number;
+  other_user_id: number;
   user_name: string;
   user_firstname: string;
   user_lastname: string;
@@ -33,57 +36,67 @@ export interface ChatConversation {
 class MessageService {
   private apiUrl = `${BACKEND_URL}/api`;
 
-  // Get all conversations for a user (only show if officer/admin initiated)
+  // Get all conversations for a user (with caching and deduplication)
   async getUserConversations(userId: number): Promise<{ success: boolean; data: ChatConversation[] }> {
-    try {
-      const response = await fetch(`${this.apiUrl}/messages/conversations/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+    const cacheKey = `conversations_${userId}`;
+    
+    return deduplicateRequest(cacheKey, async () => {
+      // Check cache first (very short TTL for conversations - 2 seconds)
+      const cached = apiCache.get<{ success: boolean; data: ChatConversation[] }>(cacheKey);
+      if (cached) return cached;
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch conversations: ${response.status}`);
+      try {
+        const response = await fetch(`${this.apiUrl}/messages/conversations/${userId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch conversations: ${response.status}`);
+        }
+
+        const result = await response.json();
+        apiCache.set(cacheKey, result, CacheTTL.VERY_SHORT);
+        return result;
+      } catch (error) {
+        return { success: false, data: [] };
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
-      return { success: false, data: [] };
-    }
+    });
   }
 
-  // Get messages between two users
+  // Get messages between two users (with caching and deduplication)
   async getMessages(userId: number, otherUserId: number): Promise<{ success: boolean; data: Message[] }> {
-    try {
-      const response = await fetch(`${this.apiUrl}/messages/${userId}/${otherUserId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+    const cacheKey = `messages_${userId}_${otherUserId}`;
+    
+    return deduplicateRequest(cacheKey, async () => {
+      const cached = apiCache.get<{ success: boolean; data: Message[] }>(cacheKey);
+      if (cached) return cached;
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch messages: ${response.status}`);
+      try {
+        const response = await fetch(`${this.apiUrl}/messages/${userId}/${otherUserId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch messages: ${response.status}`);
+        }
+
+        const result = await response.json();
+        apiCache.set(cacheKey, result, CacheTTL.VERY_SHORT);
+        return result;
+      } catch (error) {
+        return { success: false, data: [] };
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      return { success: false, data: [] };
-    }
+    });
   }
 
-  // Send a new message
+  // Send a new message (invalidates cache after sending)
   async sendMessage(senderId: number, receiverId: number, message: string, reportId?: number): Promise<{ success: boolean; messageId?: number }> {
     try {
-      console.log('📨 Sending message:', { senderId, receiverId, message, reportId });
       const response = await fetch(`${this.apiUrl}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           senderId,
           receiverId,
@@ -93,16 +106,19 @@ class MessageService {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Send message error response:', errorText);
-        throw new Error(`Failed to send message: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to send message: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('✅ Message sent successfully:', result);
+      
+      // Invalidate caches for both users to ensure fresh data on next fetch
+      apiCache.invalidate(`messages_${senderId}_${receiverId}`);
+      apiCache.invalidate(`messages_${receiverId}_${senderId}`);
+      apiCache.invalidate(`conversations_${senderId}`);
+      apiCache.invalidate(`conversations_${receiverId}`);
+      
       return result;
     } catch (error) {
-      console.error('❌ Error sending message:', error);
       return { success: false };
     }
   }

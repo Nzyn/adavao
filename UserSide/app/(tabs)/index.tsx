@@ -24,6 +24,8 @@ import { useUser } from '../../contexts/UserContext';
 import { messageService } from '../../services/messageService';
 import { inactivityManager } from '../../services/inactivityManager';
 import { debugService } from '../../services/debugService';
+import { API_URL, BACKEND_URL } from '../../config/backend';
+import { stopServerWarmup } from '../../utils/serverWarmup';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -62,6 +64,7 @@ export default function UserDashboard() {
     const [flagStatus, setFlagStatus] = useState<{ totalFlags: number; restrictionLevel: string | null } | null>(null);
     const [flagToastShownThisSession, setFlagToastShownThisSession] = useState(false);
     const [showSideMenu, setShowSideMenu] = useState(false);
+    const [announcements, setAnnouncements] = useState<{ id: number; title: string; content: string; message?: string; date: string }[]>([]);
 
     // Ref to track flagStatus for polling callback
     const flagStatusRef = useRef(flagStatus);
@@ -259,8 +262,43 @@ export default function UserDashboard() {
             loadUnreadChatCount(userId);
             fetchFlagStatusFromBackend();
         }
+        fetchAnnouncements();
         setTimeout(() => setLoading(false), 1000);
     };
+
+    // Fetch announcements from backend
+    const fetchAnnouncements = async () => {
+        try {
+            const response = await fetch(`${API_URL}/announcements?limit=5`);
+            const data = await response.json();
+            if (data.success && data.data) {
+                setAnnouncements(data.data.map((a: any) => ({
+                    id: a.id,
+                    title: a.title,
+                    content: a.content,
+                    message: a.content, // Alias for display
+                    date: a.date
+                })));
+            }
+        } catch (error) {
+            console.error('Error fetching announcements:', error);
+            // Keep any existing announcements or show empty
+        }
+    };
+
+    // Load announcements on mount and auto-refresh every 2 seconds
+    useEffect(() => {
+        if (isLoggedIn) {
+            fetchAnnouncements();
+            
+            // Auto-refresh announcements every 2 seconds (silent)
+            const interval = setInterval(() => {
+                fetchAnnouncements();
+            }, 2000);
+            
+            return () => clearInterval(interval);
+        }
+    }, [isLoggedIn]);
 
     const getInitials = (name: string) => {
         const parts = name.split(' ');
@@ -274,19 +312,52 @@ export default function UserDashboard() {
         setShowLogoutDialog(false);
         setShowSideMenu(false);
         try {
+            // Stop inactivity manager
             inactivityManager.stop();
+            
+            // Stop server warmup pings
+            stopServerWarmup();
+
+            // Get user data before clearing
+            const userData = await AsyncStorage.getItem('userData');
+            const parsedUser = userData ? JSON.parse(userData) : null;
+
+            // Call backend to clear server-side session (non-blocking)
+            if (parsedUser?.id || parsedUser?.email) {
+                fetch(`${BACKEND_URL}/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        userId: parsedUser?.id,
+                        email: parsedUser?.email
+                    })
+                }).catch(err => console.warn('Server logout failed:', err));
+            }
+
+            // Clear local storage
             const savedEmail = await AsyncStorage.getItem('rememberedEmail');
-            await AsyncStorage.removeItem('userData');
-            await AsyncStorage.removeItem('userToken');
+            await AsyncStorage.multiRemove([
+                'userData',
+                'userToken',
+                'pushToken',
+                'lastNotificationCheck',
+                'cachedNotifications'
+            ]);
             if (!savedEmail) {
                 await AsyncStorage.removeItem('rememberedEmail');
             }
+
+            // Clear context state
             clearUser();
             setIsLoggedIn(false);
             setUserId('');
             setFlagStatus(null);
             setFlagNotification(null);
             setNotifications([]);
+            
             router.replace('/(tabs)/login');
         } catch (error) {
             console.error('Error logging out:', error);
@@ -302,12 +373,6 @@ export default function UserDashboard() {
         setShowNotifications(true);
         setBadgeHidden(true);
     };
-
-    // Mock announcements data
-    const announcements = [
-        { id: 1, title: 'Community Safety Alert', message: 'Be vigilant in your area. Report any suspicious activities immediately.', date: 'Today' },
-        { id: 2, title: 'App Update Available', message: 'New features and improvements are now available. Update your app.', date: 'Yesterday' },
-    ];
 
     // Guidelines preview
     const guidelinesPreview = [
@@ -466,7 +531,7 @@ export default function UserDashboard() {
                                         <Text style={styles.announcementDate}>{announcement.date}</Text>
                                     </View>
                                     <Text style={styles.announcementMessage} numberOfLines={2}>
-                                        {announcement.message}
+                                        {announcement.content || announcement.message}
                                     </Text>
                                 </View>
                             </TouchableOpacity>
