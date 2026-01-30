@@ -7,6 +7,7 @@ use App\Models\Report;
 use App\Models\Location;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use App\Services\EncryptionService;
 
 class MapController extends Controller
 {
@@ -203,14 +204,18 @@ class MapController extends Controller
                 $dateFormatted = date('Y-m-d H:i:s');
             }
             
+            // 🔓 Decrypt sensitive fields for display (police/admin only page)
+            $decryptedDescription = EncryptionService::decrypt($report->description);
+            $decryptedBarangay = EncryptionService::decrypt($report->location->barangay);
+            
             return [
                 'id' => $report->report_id,
                 'title' => $report->report_type,
-                'description' => $report->description,
+                'description' => $decryptedDescription,
                 'crime_type' => $report->report_type, // Using report_type as crime_type
                 'latitude' => $report->location->latitude + $latOffset,
                 'longitude' => $report->location->longitude + $lngOffset,
-                'location_name' => $report->location->barangay,
+                'location_name' => $decryptedBarangay,
                 'status' => $report->status,
                 'date_reported' => $dateFormatted,
                 'reporter' => $reporterName,

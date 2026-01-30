@@ -302,8 +302,8 @@ class ReportController extends Controller
         }
         if (\App\Services\EncryptionService::canDecrypt($userRole)) {
             foreach ($reports as $report) {
-                // Decrypt report fields
-                $fieldsToDecrypt = ['title', 'description'];
+                // Decrypt report fields (only description is encrypted, not title)
+                $fieldsToDecrypt = ['description'];
                 $report = \App\Services\EncryptionService::decryptModelFields($report, $fieldsToDecrypt);
                 
                 // Decrypt location data if it exists
@@ -791,8 +791,8 @@ class ReportController extends Controller
                     'user_role' => $userRole
                 ]);
                 
-                // Decrypt sensitive fields in the report
-                $fieldsToDecrypt = ['title', 'description'];
+                // Decrypt sensitive fields in the report (only description is encrypted, not title)
+                $fieldsToDecrypt = ['description'];
                 $report = \App\Services\EncryptionService::decryptModelFields($report, $fieldsToDecrypt);
                 
                 // Decrypt location data if it exists

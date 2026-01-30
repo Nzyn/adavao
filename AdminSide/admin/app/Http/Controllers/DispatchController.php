@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use App\Services\EncryptionService;
 
 class DispatchController extends Controller
 {
@@ -67,6 +68,18 @@ class DispatchController extends Controller
         }
 
         $dispatches = $query->paginate(20)->withQueryString();
+
+        // 🔓 Decrypt sensitive fields in reports for display
+        // Note: Only description, barangay, and reporters_address are encrypted (not title)
+        foreach ($dispatches as $dispatch) {
+            if ($dispatch->report) {
+                $dispatch->report->description = EncryptionService::decrypt($dispatch->report->description);
+                if ($dispatch->report->location) {
+                    $dispatch->report->location->barangay = EncryptionService::decrypt($dispatch->report->location->barangay);
+                    $dispatch->report->location->reporters_address = EncryptionService::decrypt($dispatch->report->location->reporters_address);
+                }
+            }
+        }
 
         // Get statistics
         $stats = [
@@ -134,10 +147,14 @@ class DispatchController extends Controller
                 'officer_id' => $dispatch->patrol_officer_id,
             ]);
 
+            // Load relationships and decrypt for response
+            $dispatch->load(['report.location', 'patrolOfficer']);
+            $this->decryptDispatchReport($dispatch);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Dispatch created successfully',
-                'dispatch' => $dispatch->load(['report', 'patrolOfficer']),
+                'dispatch' => $dispatch,
             ]);
 
         } catch (\Exception $e) {
@@ -217,10 +234,14 @@ class DispatchController extends Controller
                 'new_status' => $request->status,
             ]);
 
+            // Load relationships and decrypt for response
+            $dispatch = $dispatch->fresh()->load(['report.location', 'patrolOfficer']);
+            $this->decryptDispatchReport($dispatch);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Dispatch status updated successfully',
-                'dispatch' => $dispatch->fresh()->load(['report', 'patrolOfficer']),
+                'dispatch' => $dispatch,
             ]);
 
         } catch (\Exception $e) {
@@ -447,5 +468,22 @@ class DispatchController extends Controller
                 'count' => $group->count(),
             ];
         })->values();
+    }
+
+    /**
+     * Decrypt sensitive fields in a dispatch's report for display
+     * Note: Only description, barangay, and reporters_address are encrypted (not title)
+     */
+    private function decryptDispatchReport($dispatch)
+    {
+        if ($dispatch->report) {
+            // Only description is encrypted, not title
+            $dispatch->report->description = EncryptionService::decrypt($dispatch->report->description);
+            if ($dispatch->report->location) {
+                $dispatch->report->location->barangay = EncryptionService::decrypt($dispatch->report->location->barangay);
+                $dispatch->report->location->reporters_address = EncryptionService::decrypt($dispatch->report->location->reporters_address);
+            }
+        }
+        return $dispatch;
     }
 }
