@@ -600,8 +600,8 @@ async function submitReport(req, res) {
     });
 
     // Check information sufficiency
-    const hasSufficientInfo = reportDescription &&
-      reportDescription.length >= 20 &&
+    const hasSufficientInfo = description &&
+      description.length >= 20 &&
       latitude &&
       longitude;
 

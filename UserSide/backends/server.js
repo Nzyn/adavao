@@ -829,5 +829,58 @@ const { runMigrations } = require('./runMigrations');
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
     // console.log(`   Local Network: http://${require('ip').address()}:${PORT}`);
+    
+    // 🔄 KEEP-ALIVE: Prevent Render free tier cold starts
+    // Pings both UserSide and AdminSide every 30 seconds to keep them warm
+    const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || process.env.RENDER_EXTERNAL_URL;
+    const ADMIN_KEEP_ALIVE_URL = process.env.ADMIN_KEEP_ALIVE_URL; // AdminSide URL
+    const SARIMA_KEEP_ALIVE_URL = process.env.SARIMA_KEEP_ALIVE_URL; // SARIMA API URL
+    const KEEP_ALIVE_INTERVAL = parseInt(process.env.KEEP_ALIVE_INTERVAL_MS || '30000', 10); // 30 seconds default
+    
+    const pingUrl = async (targetUrl, label) => {
+      try {
+        const https = require('https');
+        const http = require('http');
+        const url = new URL(targetUrl);
+        const client = url.protocol === 'https:' ? https : http;
+        
+        const req = client.get(url.href, { timeout: 10000 }, (res) => {
+          console.log(`🏓 ${label}: ${res.statusCode} at ${new Date().toLocaleTimeString()}`);
+        });
+        
+        req.on('error', (err) => {
+          console.warn(`⚠️ ${label} failed: ${err.message}`);
+        });
+        
+        req.on('timeout', () => {
+          req.destroy();
+          console.warn(`⚠️ ${label} timed out`);
+        });
+      } catch (err) {
+        console.warn(`⚠️ ${label} error: ${err.message}`);
+      }
+    };
+    
+    const urls = [];
+    if (KEEP_ALIVE_URL) urls.push({ url: KEEP_ALIVE_URL + '/health', label: 'UserSide' });
+    if (ADMIN_KEEP_ALIVE_URL) urls.push({ url: ADMIN_KEEP_ALIVE_URL, label: 'AdminSide' });
+    if (SARIMA_KEEP_ALIVE_URL) urls.push({ url: SARIMA_KEEP_ALIVE_URL, label: 'SARIMA API' });
+    
+    if (urls.length > 0) {
+      console.log(`🏓 Keep-alive enabled: pinging every ${KEEP_ALIVE_INTERVAL / 1000}s`);
+      urls.forEach(u => console.log(`   → ${u.label}: ${u.url}`));
+      
+      const keepAlive = () => {
+        urls.forEach(u => pingUrl(u.url, u.label));
+      };
+      
+      // Start pinging after 30 seconds, then every KEEP_ALIVE_INTERVAL
+      setTimeout(() => {
+        keepAlive(); // First ping
+        setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
+      }, 30000);
+    } else {
+      console.log('ℹ️ Keep-alive disabled (set KEEP_ALIVE_URL or RENDER_EXTERNAL_URL to enable)');
+    }
   });
 })();

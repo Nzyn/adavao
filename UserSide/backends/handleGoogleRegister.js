@@ -54,8 +54,8 @@ const handleGoogleRegister = async (req, res) => {
 
         const sql = `
             INSERT INTO users_public(
-                firstname, lastname, email, google_id, profile_picture, password, contact, created_at, email_verified_at, is_verified
-            ) VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), 1) RETURNING id
+                firstname, lastname, email, google_id, profile_image, password, contact, created_at, email_verified_at, email_verified, is_verified
+            ) VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), true, true) RETURNING id
         `;
 
         const [result] = await db.query(sql, [

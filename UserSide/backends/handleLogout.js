@@ -3,6 +3,7 @@ const db = require("./db");
 
 /**
  * Handle user logout - clears server-side session data
+ * Note: Only push_token column exists in users_public schema
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -17,22 +18,18 @@ const handleLogout = async (req, res) => {
   }
 
   try {
-    // Update last_logout timestamp and clear any active session tokens
+    // Clear push_token on logout (only column that exists in schema)
     if (userId) {
       await db.query(
         `UPDATE users_public 
-         SET last_logout = NOW(), 
-             session_token = NULL,
-             push_token = NULL
+         SET push_token = NULL
          WHERE id = $1`,
         [userId]
       );
     } else if (email) {
       await db.query(
         `UPDATE users_public 
-         SET last_logout = NOW(), 
-             session_token = NULL,
-             push_token = NULL
+         SET push_token = NULL
          WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
         [email]
       );
@@ -55,6 +52,7 @@ const handleLogout = async (req, res) => {
 
 /**
  * Handle patrol officer logout - also clears patrol location tracking
+ * Note: Uses try-catch for individual queries to handle missing columns gracefully
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -69,50 +67,46 @@ const handlePatrolLogout = async (req, res) => {
   }
 
   try {
-    // Clear patrol location and set officer as offline
-    if (odId) {
-      // Update user_admin to mark as logged out
-      await db.query(
-        `UPDATE user_admin 
-         SET last_logout = NOW(),
-             is_online = false
-         WHERE id = $1`,
-        [odId]
-      );
+    let officerId = odId;
 
-      // Clear active patrol location
-      await db.query(
-        `UPDATE patrol_locations 
-         SET is_active = false, 
-             last_updated = NOW() 
-         WHERE officer_id = $1`,
-        [odId]
-      );
-    } else if (odEmail) {
-      // Get officer ID first
+    // If email provided, get officer ID first
+    if (!officerId && odEmail) {
       const [officer] = await db.query(
         `SELECT id FROM user_admin WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
         [odEmail]
       );
-
       if (officer.length > 0) {
-        const odIdFromEmail = officer[0].id;
-        
+        officerId = officer[0].id;
+      }
+    }
+
+    if (officerId) {
+      // Try to update user_admin - gracefully handle missing columns
+      try {
+        // First try with is_online only (more likely to exist)
         await db.query(
           `UPDATE user_admin 
-           SET last_logout = NOW(),
-               is_online = false
+           SET is_online = false
            WHERE id = $1`,
-          [odIdFromEmail]
+          [officerId]
         );
+      } catch (adminUpdateError) {
+        // If is_online doesn't exist, just log and continue
+        console.warn("⚠️ Could not update user_admin is_online:", adminUpdateError.message);
+      }
 
+      // Clear active patrol location
+      try {
         await db.query(
           `UPDATE patrol_locations 
            SET is_active = false, 
                last_updated = NOW() 
            WHERE officer_id = $1`,
-          [odIdFromEmail]
+          [officerId]
         );
+      } catch (patrolError) {
+        // patrol_locations table might not exist
+        console.warn("⚠️ Could not update patrol_locations:", patrolError.message);
       }
     }
 
