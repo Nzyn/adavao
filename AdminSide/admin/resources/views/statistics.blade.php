@@ -1,1416 +1,1148 @@
 @extends('layouts.app')
 
-@section('title', 'Statistics & Crime Forecast')
+@section('title', 'Crime Statistics & Analytics')
 
 @section('styles')
-<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-    .statistics-container {
-        padding: 2rem;
-        max-width: 1400px;
-        margin: 0 auto;
+    :root {
+        --primary: #1D3557;
+        --primary-light: #457B9D;
+        --accent: #E63946;
+        --success: #10B981;
+        --warning: #F59E0B;
+        --danger: #EF4444;
+        --gray-50: #F9FAFB;
+        --gray-100: #F3F4F6;
+        --gray-200: #E5E7EB;
+        --gray-300: #D1D5DB;
+        --gray-500: #6B7280;
+        --gray-700: #374151;
+        --gray-900: #111827;
     }
 
-    .stats-header {
-        margin-bottom: 2rem;
-    }
+    * { box-sizing: border-box; }
 
-    .stats-title {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #1D3557;
-        margin-bottom: 0.5rem;
-    }
-
-    .stats-subtitle {
-        color: #6b7280;
-        font-size: 1rem;
-    }
-
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .stat-card {
-        background: white;
-        border-radius: 12px;
+    .stats-page {
         padding: 1.5rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        border: 1px solid #e5e7eb;
-        transition: transform 0.2s, box-shadow 0.2s;
+        max-width: 1600px;
+        margin: 0 auto;
+        background: var(--gray-50);
+        min-height: 100vh;
     }
 
-    .stat-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
-    .stat-card-header {
+    /* Header */
+    .page-header {
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        margin-bottom: 1rem;
-    }
-
-    .stat-label {
-        font-size: 0.875rem;
-        color: #6b7280;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-
-    .stat-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-    }
-
-    .stat-icon.blue { background: #dbeafe; color: #1e40af; }
-    .stat-icon.green { background: #d1fae5; color: #065f46; }
-    .stat-icon.orange { background: #fed7aa; color: #c2410c; }
-    .stat-icon.purple { background: #e9d5ff; color: #6b21a8; }
-
-    .stat-value {
-        font-size: 2.25rem;
-        font-weight: 700;
-        color: #1f2937;
-        margin-bottom: 0.25rem;
-    }
-
-    .stat-change {
-        font-size: 0.875rem;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-    }
-
-    .stat-change.positive { color: #059669; }
-    .stat-change.negative { color: #dc2626; }
-
-    .chart-section {
-        background: white;
-        border-radius: 12px;
-        padding: 2rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        border: 1px solid #e5e7eb;
-        margin-bottom: 2rem;
-    }
-
-    .chart-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        align-items: flex-start;
         margin-bottom: 1.5rem;
         flex-wrap: wrap;
         gap: 1rem;
     }
 
-    .chart-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #1f2937;
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--gray-900);
+        margin: 0;
     }
 
-    .chart-controls {
+    .page-subtitle {
+        color: var(--gray-500);
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .header-actions {
         display: flex;
         gap: 0.75rem;
-        align-items: center;
+        flex-wrap: wrap;
     }
 
-    .chart-btn {
+    /* Filters */
+    .filter-bar {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        flex-wrap: wrap;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .filter-label {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--gray-500);
+    }
+
+    .filter-select {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: var(--gray-700);
+        background: white;
+        min-width: 120px;
+        cursor: pointer;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(29, 53, 87, 0.1);
+    }
+
+    .btn {
         padding: 0.5rem 1rem;
         border-radius: 8px;
-        border: 1px solid #d1d5db;
-        background: white;
-        color: #374151;
         font-size: 0.875rem;
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
     }
 
-    .chart-btn:hover {
-        background: #f3f4f6;
-        border-color: #9ca3af;
-    }
-
-    .chart-btn.active {
-        background: #1D3557;
+    .btn-primary {
+        background: var(--primary);
         color: white;
-        border-color: #1D3557;
     }
 
-    .chart-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
+    .btn-primary:hover {
+        background: #162a44;
     }
 
-    .forecast-select {
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        border: 1px solid #d1d5db;
+    .btn-secondary {
+        background: var(--gray-100);
+        color: var(--gray-700);
+        border: 1px solid var(--gray-200);
+    }
+
+    .btn-secondary:hover {
+        background: var(--gray-200);
+    }
+
+    .btn-success {
+        background: var(--success);
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #059669;
+    }
+
+    /* Quick Stats Grid */
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
         background: white;
-        color: #374151;
-        font-size: 0.875rem;
-        cursor: pointer;
-    }
-
-    .chart-canvas {
-        width: 100%;
-        height: 400px;
+        border-radius: 12px;
+        padding: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         position: relative;
+        overflow: hidden;
     }
 
-    .loading-overlay {
+    .stat-card::before {
+        content: '';
         position: absolute;
         top: 0;
         left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(255, 255, 255, 0.9);
+        width: 4px;
+        height: 100%;
+    }
+
+    .stat-card.blue::before { background: var(--primary); }
+    .stat-card.green::before { background: var(--success); }
+    .stat-card.orange::before { background: var(--warning); }
+    .stat-card.red::before { background: var(--danger); }
+    .stat-card.purple::before { background: #8B5CF6; }
+
+    .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--gray-500);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--gray-900);
+    }
+
+    .stat-meta {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        margin-top: 0.25rem;
+    }
+
+    .stat-change {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.125rem 0.5rem;
+        border-radius: 999px;
+        margin-top: 0.5rem;
+    }
+
+    .stat-change.up { background: #D1FAE5; color: #065F46; }
+    .stat-change.down { background: #FEE2E2; color: #991B1B; }
+
+    /* Cards */
+    .card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--gray-100);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-900);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .card-body {
+        padding: 1.25rem;
+    }
+
+    .card-controls {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    /* Charts */
+    .chart-container {
+        position: relative;
+        height: 350px;
+    }
+
+    .chart-container.tall {
+        height: 400px;
+    }
+
+    /* Operational Metrics */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .metric-box {
+        padding: 1rem;
+        border-radius: 10px;
+        text-align: center;
+    }
+
+    .metric-box.critical { background: #FEF2F2; border: 1px solid #FECACA; }
+    .metric-box.warning { background: #FFFBEB; border: 1px solid #FED7AA; }
+    .metric-box.success { background: #F0FDF4; border: 1px solid #BBF7D0; }
+    .metric-box.info { background: #EFF6FF; border: 1px solid #BFDBFE; }
+
+    .metric-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .metric-box.critical .metric-value { color: #DC2626; }
+    .metric-box.warning .metric-value { color: #D97706; }
+    .metric-box.success .metric-value { color: #16A34A; }
+    .metric-box.info .metric-value { color: #2563EB; }
+
+    .metric-label {
+        font-size: 0.6875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--gray-500);
+        margin-top: 0.25rem;
+    }
+
+    /* Tables */
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+
+    .data-table th {
+        text-align: left;
+        padding: 0.75rem;
+        font-weight: 600;
+        color: var(--gray-500);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 2px solid var(--gray-200);
+        background: var(--gray-50);
+    }
+
+    .data-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--gray-100);
+        color: var(--gray-700);
+    }
+
+    .data-table tr:hover {
+        background: var(--gray-50);
+    }
+
+    /* Risk Badges */
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.625rem;
+        border-radius: 999px;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-high { background: #FEE2E2; color: #991B1B; }
+    .badge-medium { background: #FEF3C7; color: #92400E; }
+    .badge-low { background: #D1FAE5; color: #065F46; }
+
+    /* Recommendations */
+    .recommendation-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .recommendation-list li {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--gray-100);
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        font-size: 0.875rem;
+        color: var(--gray-700);
+    }
+
+    .recommendation-list li:last-child {
+        border-bottom: none;
+    }
+
+    .recommendation-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 12px;
-        z-index: 10;
+        flex-shrink: 0;
+        font-size: 0.75rem;
     }
 
-    .spinner {
-        width: 40px;
-        height: 40px;
-        border: 4px solid #e5e7eb;
-        border-top-color: #1D3557;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
+    .recommendation-icon.alert { background: #FEF3C7; color: #D97706; }
+    .recommendation-icon.info { background: #DBEAFE; color: #2563EB; }
+    .recommendation-icon.success { background: #D1FAE5; color: #059669; }
 
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
-    .error-message {
-        background: #fef2f2;
-        color: #991b1b;
-        padding: 1rem;
-        border-radius: 8px;
-        border: 1px solid #fecaca;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .info-message {
-        background: #eff6ff;
-        color: #1e40af;
-        padding: 1rem;
-        border-radius: 8px;
-        border: 1px solid #bfdbfe;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
+    /* Forecast Legend */
     .forecast-legend {
         display: flex;
         gap: 1.5rem;
         margin-top: 1rem;
         flex-wrap: wrap;
+        justify-content: center;
     }
 
     .legend-item {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-size: 0.875rem;
-        color: #6b7280;
+        font-size: 0.8125rem;
+        color: var(--gray-500);
     }
 
     .legend-color {
-        width: 16px;
-        height: 16px;
+        width: 14px;
+        height: 14px;
         border-radius: 3px;
     }
 
+    /* Loading */
+    .loading-spinner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+    }
+
+    .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid var(--gray-200);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: var(--gray-500);
+    }
+
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Forecast Info */
+    .forecast-info {
+        background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+        border: 1px solid #BFDBFE;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+    }
+
+    .forecast-info strong {
+        color: var(--primary);
+    }
+
+    /* Export Section */
     .export-section {
         display: flex;
-        gap: 1rem;
-        margin-top: 1rem;
+        gap: 0.75rem;
         flex-wrap: wrap;
     }
 
-    /* Loading Skeleton Styles */
-    .skeleton {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: loading 1.5s ease-in-out infinite;
-        border-radius: 8px;
+    /* Two Column Layout */
+    .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
     }
 
-    @keyframes loading {
-        0% {
-            background-position: 200% 0;
-        }
-        100% {
-            background-position: -200% 0;
+    @media (max-width: 900px) {
+        .two-col {
+            grid-template-columns: 1fr;
         }
     }
 
-    .skeleton-text {
-        height: 20px;
-        margin-bottom: 10px;
-        border-radius: 4px;
-    }
-
-    .skeleton-chart {
-        height: 400px;
-        border-radius: 12px;
-    }
-
-    .skeleton-card {
-        height: 120px;
-        border-radius: 12px;
-    }
-
+    /* Responsive */
     @media (max-width: 768px) {
-        .statistics-container {
+        .stats-page {
             padding: 1rem;
         }
 
-        .stats-grid {
-            grid-template-columns: 1fr;
+        .quick-stats {
+            grid-template-columns: repeat(2, 1fr);
         }
 
-        .chart-header {
-            flex-direction: column;
-            align-items: flex-start;
+        .stat-value {
+            font-size: 1.5rem;
         }
+
+        .filter-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .filter-group {
+            justify-content: space-between;
+        }
+    }
+
+    /* Status Indicator */
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+
+    .status-dot.online { background: var(--success); }
+    .status-dot.offline { background: var(--danger); }
+
+    /* Compact Card */
+    .compact-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .compact-stat {
+        text-align: center;
+        padding: 0.75rem;
+        background: var(--gray-50);
+        border-radius: 8px;
+    }
+
+    .compact-stat-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--gray-900);
+    }
+
+    .compact-stat-label {
+        font-size: 0.6875rem;
+        color: var(--gray-500);
+        text-transform: uppercase;
     }
 </style>
 @endsection
 
 @section('content')
-<div class="statistics-container">
-    <div class="stats-header">
-        <h1 class="stats-title">📊 Crime Statistics & SARIMA Forecast</h1>
-        <p class="stats-subtitle">Advanced predictive analytics using Seasonal AutoRegressive Integrated Moving Average modeling</p>
-    </div>
-
-    <!-- Date Filter Section -->
-    <div class="chart-section" style="margin-bottom: 2rem;">
-        <div class="chart-header">
-            <h2 class="chart-title">🔍 Filter Data</h2>
-            <div class="chart-controls">
-                <select class="forecast-select" id="yearFilter" style="margin-right: 0.5rem;">
-                    <option value="">All Years</option>
-                </select>
-                <select class="forecast-select" id="monthFilter">
-                    <option value="">All Months</option>
-                    <option value="01">January</option>
-                    <option value="02">February</option>
-                    <option value="03">March</option>
-                    <option value="04">April</option>
-                    <option value="05">May</option>
-                    <option value="06">June</option>
-                    <option value="07">July</option>
-                    <option value="08">August</option>
-                    <option value="09">September</option>
-                    <option value="10">October</option>
-                    <option value="11">November</option>
-                    <option value="12">December</option>
-                </select>
-                <button class="chart-btn active" id="applyFilter">📅 Apply Filter</button>
-                <button class="chart-btn" id="clearFilter">🔄 Clear Filter</button>
-            </div>
+<div class="stats-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Crime Statistics & Analytics</h1>
+            <p class="page-subtitle">Real-time crime data analysis and SARIMA-based forecasting</p>
         </div>
-        <p style="color: #6b7280; font-size: 0.875rem; margin-top: 0.5rem;" id="filterStatus">
-            Showing: <strong>All historical data</strong>
-        </p>
+        <div class="header-actions">
+            <span id="apiStatus" style="display: flex; align-items: center; font-size: 0.875rem; color: var(--gray-500);">
+                <span class="status-dot offline" id="apiStatusDot"></span>
+                <span id="apiStatusText">Checking API...</span>
+            </span>
+        </div>
     </div>
 
-    <!-- SARIMA API Status (removed) -->
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <span class="filter-label">Year:</span>
+            <select class="filter-select" id="yearFilter">
+                <option value="">All Years</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <span class="filter-label">Month:</span>
+            <select class="filter-select" id="monthFilter">
+                <option value="">All Months</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" id="applyFilter">Apply Filter</button>
+        <button class="btn btn-secondary" id="clearFilter">Clear</button>
+        <div style="flex: 1;"></div>
+        <span id="filterStatus" style="font-size: 0.8125rem; color: var(--gray-500);">Showing: All data</span>
+    </div>
 
-    <!-- Overview Cards -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Total Reports</span>
-                <div class="stat-icon blue">📊</div>
-            </div>
+    <!-- Quick Stats -->
+    <div class="quick-stats">
+        <div class="stat-card blue">
+            <div class="stat-label">Total Reports</div>
             <div class="stat-value" id="totalReports">-</div>
-            <div class="stat-change">All time</div>
+            <div class="stat-meta">All time records</div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">This Month</span>
-                <div class="stat-icon green">📈</div>
-            </div>
-            <div class="stat-value" id="thisMonthReports">-</div>
-            <div class="stat-change" id="monthChange">-</div>
+        <div class="stat-card green">
+            <div class="stat-label">Validated Complaints</div>
+            <div class="stat-value" id="validComplaints">-</div>
+            <div class="stat-meta">Verified incidents</div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Last Month</span>
-                <div class="stat-icon orange">📉</div>
-            </div>
-            <div class="stat-value" id="lastMonthReports">-</div>
-            <div class="stat-change">Previous period</div>
+        <div class="stat-card orange">
+            <div class="stat-label">Resolved Cases</div>
+            <div class="stat-value" id="resolvedCases">-</div>
+            <div class="stat-meta">Successfully closed</div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">SARIMA API Status</span>
-                <div class="stat-icon purple">🔮</div>
-            </div>
-            <div class="stat-value" style="font-size: 1.25rem;" id="forecastStatus">Checking...</div>
-            <div class="stat-change">Port 8001</div>
+        <div class="stat-card red">
+            <div class="stat-label">Pending Review</div>
+            <div class="stat-value" id="pendingReview">-</div>
+            <div class="stat-meta">Awaiting validation</div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Total Complaints (DB)</span>
-                <div class="stat-icon blue">🗃️</div>
-            </div>
-            <div class="stat-value" id="dbTotalReports">-</div>
-            <div class="stat-change" id="dbScopeText">System reports</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Resolved Cases (DB)</span>
-                <div class="stat-icon green">✅</div>
-            </div>
-            <div class="stat-value" id="dbResolvedReports">-</div>
-            <div class="stat-change">Status: resolved</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Complaints (DB)</span>
-                <div class="stat-icon green">🧾</div>
-            </div>
-            <div class="stat-value" id="dbValidReports">-</div>
-            <div class="stat-change">is_valid: valid</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Hoaxes (DB)</span>
-                <div class="stat-icon orange">🚫</div>
-            </div>
-            <div class="stat-value" id="dbInvalidReports">-</div>
-            <div class="stat-change">is_valid: invalid</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Fake Reports (Validated)</span>
-                <div class="stat-icon orange">🕵️</div>
-            </div>
-            <div class="stat-value" id="dbFakeReports">-</div>
-            <div class="stat-change">patrol_dispatches.is_valid = false</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Checking Validity (DB)</span>
-                <div class="stat-icon purple">🕒</div>
-            </div>
-            <div class="stat-value" id="dbCheckingReports">-</div>
-            <div class="stat-change">is_valid: checking</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Patrol On Duty</span>
-                <div class="stat-icon blue">👮</div>
-            </div>
-            <div class="stat-value" id="patrolOnDuty">-</div>
-            <div class="stat-change" id="patrolDutyHint">users_public.is_on_duty</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-label">Active Dispatches</span>
-                <div class="stat-icon purple">🚓</div>
-            </div>
+        <div class="stat-card purple">
+            <div class="stat-label">Active Dispatches</div>
             <div class="stat-value" id="activeDispatches">-</div>
-            <div class="stat-change">pending/accepted/en_route/arrived</div>
+            <div class="stat-meta">Ongoing responses</div>
         </div>
     </div>
 
-    <!-- Deployment & AI Insights -->
-    <div class="chart-section">
-        <div class="chart-header">
-            <h2 class="chart-title">👮 Deployment & Recommendations</h2>
+    <!-- Operational Status -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title">👮 Operational Status</h3>
+            <span style="font-size: 0.75rem; color: var(--gray-500);">Real-time deployment metrics</span>
         </div>
-        <div id="deploymentSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
-            <div style="padding: 1rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
-                <div style="font-size: 0.875rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">Deployment</div>
-                <div style="font-size: 1.25rem; font-weight: 700; color: #111827; margin-top: 0.25rem;" id="deploymentHeadline">Loading...</div>
-                <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;" id="deploymentDetails"></div>
+        <div class="card-body">
+            <div class="metrics-grid">
+                <div class="metric-box info">
+                    <div class="metric-value" id="patrolOnDuty">-</div>
+                    <div class="metric-label">Patrol On Duty</div>
+                </div>
+                <div class="metric-box success">
+                    <div class="metric-value" id="patrolTotal">-</div>
+                    <div class="metric-label">Total Officers</div>
+                </div>
+                <div class="metric-box warning" id="overdueBox">
+                    <div class="metric-value" id="overdueDispatches">-</div>
+                    <div class="metric-label">Overdue (>3min)</div>
+                </div>
+                <div class="metric-box critical">
+                    <div class="metric-value" id="fakeReports">-</div>
+                    <div class="metric-label">False Reports</div>
+                </div>
+                <div class="metric-box info">
+                    <div class="metric-value" id="hoaxReports">-</div>
+                    <div class="metric-label">Marked Invalid</div>
+                </div>
             </div>
         </div>
-        <div style="margin-top: 0.5rem;">
-            <div style="font-weight: 600; margin-bottom: 0.5rem; color: #111827;">Recommendations</div>
-            <ul id="aiRecommendations" style="margin: 0; padding-left: 1.25rem; color: #374151;"></ul>
-        </div>
-
-        <div style="margin-top: 1rem;">
-            <div style="font-weight: 600; margin-bottom: 0.5rem; color: #111827;">Station Deployment Suggestions</div>
-            <div id="stationDeploymentTable" style="overflow-x: auto; color: #374151;">Loading...</div>
-        </div>
     </div>
 
-    <div class="chart-section">
-        <div class="chart-header">
-            <h2 class="chart-title">🗓️ Seasonal Pattern Analysis</h2>
-        </div>
-        <div id="seasonalitySummary" style="color: #374151;">
-            Loading...
-        </div>
-    </div>
-
-    <div class="chart-section">
-        <div class="chart-header">
-            <h2 class="chart-title">📍 Crime Type vs Barangay Correlation</h2>
-        </div>
-        <div id="correlationSummary" style="overflow-x: auto; color: #374151;">
-            Loading...
-        </div>
-    </div>
-
-    <!-- Barangay Risk Assessment (from SARIMA API) -->
-    <div class="chart-section">
-        <div class="chart-header">
-            <h2 class="chart-title">🚨 Barangay Risk Assessment</h2>
-            <div class="chart-controls">
-                <select class="forecast-select" id="riskMonthsFilter">
-                    <option value="1">Last 1 Month</option>
-                    <option value="3" selected>Last 3 Months</option>
-                    <option value="6">Last 6 Months</option>
-                </select>
-                <button class="chart-btn" id="refreshRiskBtn">🔄 Refresh</button>
-            </div>
-        </div>
-        <p style="color: #6b7280; font-size: 0.875rem; margin-bottom: 1rem;">
-            Risk levels based on recent crime activity compared to city average (SARIMA API)
-        </p>
-        <div id="barangayRiskContainer" style="overflow-x: auto; color: #374151;">
-            Loading risk assessment...
-        </div>
-    </div>
-
-    <!-- Monthly Crime Warning (from SARIMA API) -->
-    <div class="chart-section">
-        <div class="chart-header">
-            <h2 class="chart-title">⚠️ Monthly Crime Warning & Patrol Recommendation</h2>
-            <div class="chart-controls">
-                <input type="month" class="forecast-select" id="warningMonthFilter" style="width: 160px;">
-                <button class="chart-btn" id="refreshWarningBtn">🔄 Get Warning</button>
-            </div>
-        </div>
-        <div id="monthlyCrimeWarningContainer" style="color: #374151;">
-            Loading monthly warning...
-        </div>
-    </div>
-
-    <!-- Crime Trend Chart -->
-    <div class="chart-section">
-        <div class="chart-header">
-            <h2 class="chart-title">📊 Crime Trends & Forecast</h2>
-            <div class="chart-controls">
-                <select class="forecast-select" id="crimeTypeFilter" style="margin-right: 0.5rem;">
-                    <option value="">All Crimes (Overall)</option>
+    <!-- Main Charts Section -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title">📈 Crime Trends & SARIMA Forecast</h3>
+            <div class="card-controls">
+                <select class="filter-select" id="crimeTypeFilter">
+                    <option value="">All Crime Types</option>
                     <option value="ASSAULT">Assault</option>
                     <option value="CARNAPPING">Carnapping</option>
                     <option value="CYBER FRAUD">Cyber Fraud</option>
-                    <option value="CYBERBULLYING">Cyberbullying</option>
-                    <option value="HACKING">Hacking</option>
                     <option value="HOMICIDE">Homicide</option>
-                    <option value="IDENTITY THEFT">Identity Theft</option>
                     <option value="ILLEGAL DRUGS">Illegal Drugs</option>
                     <option value="MURDER">Murder</option>
-                    <option value="ONLINE SCAM">Online Scam</option>
-                    <option value="PHISHING">Phishing</option>
                     <option value="PHYSICAL INJURY">Physical Injury</option>
                     <option value="ROBBERY">Robbery</option>
                     <option value="THEFT">Theft</option>
                     <option value="VANDALISM">Vandalism</option>
                 </select>
-                <select class="forecast-select" id="forecastHorizon">
-                    <option value="6">6 Months Forecast</option>
-                    <option value="12" selected>12 Months Forecast</option>
-                    <option value="18">18 Months Forecast</option>
-                    <option value="24">24 Months Forecast</option>
+                <select class="filter-select" id="forecastHorizon">
+                    <option value="6">6 Month Forecast</option>
+                    <option value="12" selected>12 Month Forecast</option>
+                    <option value="18">18 Month Forecast</option>
+                    <option value="24">24 Month Forecast</option>
                 </select>
-                <button class="chart-btn" id="refreshForecast">🔄 Refresh Forecast</button>
+                <button class="btn btn-secondary" id="refreshForecast">🔄 Refresh</button>
             </div>
         </div>
-        <div id="forecastInfoBox" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; color: #0c4a6e;">
-            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                <span style="font-size: 1.25rem;">ℹ️</span>
-                <strong>Forecast Information</strong>
+        <div class="card-body">
+            <div id="forecastInfo" class="forecast-info" style="display: none;">
+                <strong>Forecast Details:</strong> <span id="forecastInfoText"></span>
             </div>
-            <div id="forecastInfoText" style="font-size: 0.875rem; line-height: 1.5;"></div>
-        </div>
-        <div class="chart-canvas" id="trendChartContainer">
-            <canvas id="trendChart"></canvas>
-        </div>
-        <div class="forecast-legend">
-            <div class="legend-item">
-                <div class="legend-color" style="background: #1D3557;"></div>
-                <span>Historical Data</span>
+            <div class="chart-container tall" id="trendChartContainer">
+                <canvas id="trendChart"></canvas>
             </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: #e63946;"></div>
-                <span>SARIMA Forecast</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: rgba(230, 57, 70, 0.2);"></div>
-                <span>95% Confidence Interval</span>
+            <div class="forecast-legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #1D3557;"></div>
+                    <span>Historical Data</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #E63946;"></div>
+                    <span>SARIMA Forecast</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(230, 57, 70, 0.2);"></div>
+                    <span>95% Confidence Interval</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Crime by Type & Location -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
-        <div class="chart-section">
-            <div class="chart-header">
-                <h2 class="chart-title">Crime by Type</h2>
+    <!-- Two Column Charts -->
+    <div class="two-col" style="margin-bottom: 1.5rem;">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📊 Crime Distribution by Type</h3>
             </div>
-            <div class="chart-canvas" style="height: 400px;">
-                <canvas id="typeChart"></canvas>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="typeChart"></canvas>
+                </div>
             </div>
         </div>
-
-        <div class="chart-section">
-            <div class="chart-header">
-                <h2 class="chart-title">Top Locations</h2>
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📍 Top Crime Locations</h3>
             </div>
-            <div class="chart-canvas" style="height: 400px;">
-                <canvas id="locationChart"></canvas>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="locationChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
 
-
-    <!-- Data Export Section -->
-    <div class="chart-section">
-        <div class="chart-header">
-            <h2 class="chart-title">Data Export</h2>
+    <!-- Risk Assessment & Recommendations -->
+    <div class="two-col" style="margin-bottom: 1.5rem;">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">🚨 Barangay Risk Assessment</h3>
+                <div class="card-controls">
+                    <select class="filter-select" id="riskMonthsFilter">
+                        <option value="1">Last 1 Month</option>
+                        <option value="3" selected>Last 3 Months</option>
+                        <option value="6">Last 6 Months</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <div id="riskSummary" class="compact-stats" style="margin-bottom: 1rem;">
+                    <div class="compact-stat" style="background: #FEF2F2;">
+                        <div class="compact-stat-value" style="color: #DC2626;" id="highRiskCount">-</div>
+                        <div class="compact-stat-label">High Risk</div>
+                    </div>
+                    <div class="compact-stat" style="background: #FFFBEB;">
+                        <div class="compact-stat-value" style="color: #D97706;" id="mediumRiskCount">-</div>
+                        <div class="compact-stat-label">Medium Risk</div>
+                    </div>
+                    <div class="compact-stat" style="background: #F0FDF4;">
+                        <div class="compact-stat-value" style="color: #16A34A;" id="lowRiskCount">-</div>
+                        <div class="compact-stat-label">Low Risk</div>
+                    </div>
+                </div>
+                <table class="data-table" id="riskTable">
+                    <thead>
+                        <tr>
+                            <th>Barangay</th>
+                            <th style="text-align: center;">Crimes</th>
+                            <th style="text-align: center;">Risk</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="riskTableBody">
+                        <tr><td colspan="4" class="loading-spinner"><div class="spinner"></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <p style="color: #6b7280; margin-bottom: 1rem;">Export crime data for external analysis or model training</p>
-        <div class="export-section">
-            <button class="chart-btn" onclick="exportCrimeData()">📥 Export Crime Data (CSV)</button>
-            <button class="chart-btn" onclick="exportForecastData()">📥 Download Forecast Data (JSON)</button>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">💡 AI Recommendations</h3>
+            </div>
+            <div class="card-body">
+                <ul class="recommendation-list" id="recommendationsList">
+                    <li class="loading-spinner"><div class="spinner"></div></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Station Deployment -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title">🏢 Station Deployment Overview</h3>
+        </div>
+        <div class="card-body" style="overflow-x: auto;">
+            <table class="data-table" id="stationTable">
+                <thead>
+                    <tr>
+                        <th>Station</th>
+                        <th style="text-align: center;">On Duty</th>
+                        <th style="text-align: center;">Active</th>
+                        <th style="text-align: center;">Overdue</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="stationTableBody">
+                    <tr><td colspan="5" class="loading-spinner"><div class="spinner"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Monthly Warning -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title">⚠️ Monthly Crime Forecast Warning</h3>
+            <div class="card-controls">
+                <input type="month" class="filter-select" id="warningMonthFilter">
+                <button class="btn btn-secondary" id="refreshWarning">Get Warning</button>
+            </div>
+        </div>
+        <div class="card-body" id="monthlyWarningContainer">
+            <div class="loading-spinner"><div class="spinner"></div></div>
+        </div>
+    </div>
+
+    <!-- Data Export -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📥 Data Export</h3>
+        </div>
+        <div class="card-body">
+            <p style="color: var(--gray-500); margin-bottom: 1rem; font-size: 0.875rem;">
+                Export crime data for external analysis, reporting, or archival purposes.
+            </p>
+            <div class="export-section">
+                <button class="btn btn-success" onclick="exportCrimeDataCSV()">
+                    📄 Export Crime Data (CSV)
+                </button>
+                <button class="btn btn-success" onclick="exportForecastJSON()">
+                    📊 Export Forecast Data (JSON)
+                </button>
+                <button class="btn btn-secondary" onclick="exportFullReport()">
+                    📋 Export Full Report (CSV)
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+// Global state
 let trendChart, typeChart, locationChart;
 let crimeStats = null;
 let forecastData = null;
 let currentFilter = { month: '', year: '' };
+let insightsData = null;
 
+// Utility functions
 function escapeHtml(str) {
     if (str === null || str === undefined) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Polyfill for requestIdleCallback (for older browsers)
-window.requestIdleCallback = window.requestIdleCallback || function(cb) {
-    const start = Date.now();
-    return setTimeout(function() {
-        cb({
-            didTimeout: false,
-            timeRemaining: function() {
-                return Math.max(0, 50 - (Date.now() - start));
-            }
-        });
-    }, 1);
-};
+function formatNumber(num) {
+    return num ? num.toLocaleString() : '0';
+}
 
-// Initialize on page load - FAST FIRST PAINT
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Page loaded - Starting deferred initialization');
-    
-    // Immediate: Only populate filter dropdown (lightweight)
     populateYearFilter();
+    setDefaultWarningMonth();
+    attachEventListeners();
     
-    // Set default month for warning filter to current month
-    const warningMonthFilter = document.getElementById('warningMonthFilter');
-    if (warningMonthFilter) {
-        const now = new Date();
-        warningMonthFilter.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    }
-    
-    // Immediate: Attach event listeners (lightweight)
-    document.getElementById('forecastHorizon').addEventListener('change', loadForecast);
-    document.getElementById('crimeTypeFilter').addEventListener('change', loadForecast);
-    document.getElementById('refreshForecast').addEventListener('click', loadForecast);
-    document.getElementById('applyFilter').addEventListener('click', applyFilter);
-    document.getElementById('clearFilter').addEventListener('click', clearFilter);
-    
-    // SARIMA Risk & Warning event listeners
-    document.getElementById('riskMonthsFilter').addEventListener('change', loadBarangayRisk);
-    document.getElementById('refreshRiskBtn').addEventListener('click', loadBarangayRisk);
-    document.getElementById('refreshWarningBtn').addEventListener('click', loadMonthlyCrimeWarning);
-    
-    // DEFERRED: Heavy operations after first paint
-    // Priority 1: Load crime stats (most important data)
-    requestIdleCallback(() => {
-        console.log('⏳ Loading crime statistics (deferred)');
-        loadCrimeStats();
-    }, { timeout: 100 });
-    
-    // Priority 2: Load forecast (secondary data)
-    requestIdleCallback(() => {
-        console.log('⏳ Loading forecast (deferred)');
-        loadForecast();
-    }, { timeout: 200 });
-    
-    // Priority 3: Load SARIMA Risk & Warning data
-    requestIdleCallback(() => {
-        console.log('⏳ Loading barangay risk assessment (deferred)');
-        loadBarangayRisk();
-    }, { timeout: 300 });
-    
-    requestIdleCallback(() => {
-        console.log('⏳ Loading monthly crime warning (deferred)');
-        loadMonthlyCrimeWarning();
-    }, { timeout: 400 });
+    // Load data in sequence
+    loadCrimeStats();
+    loadForecast();
+    loadInsights();
+    loadBarangayRisk();
+    loadMonthlyWarning();
 });
 
-// Populate year filter dropdown with years from 2020 to current year
 function populateYearFilter() {
     const select = document.getElementById('yearFilter');
-    const startYear = 2020;
     const currentYear = new Date().getFullYear();
-    
-    // Generate year options from 2020 to current year
-    for (let year = startYear; year <= currentYear; year++) {
+    for (let year = 2020; year <= currentYear; year++) {
         const option = document.createElement('option');
-        option.value = year.toString();
-        option.textContent = year.toString();
+        option.value = year;
+        option.textContent = year;
         select.appendChild(option);
     }
 }
 
-// Apply filter
+function setDefaultWarningMonth() {
+    const input = document.getElementById('warningMonthFilter');
+    const now = new Date();
+    input.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function attachEventListeners() {
+    document.getElementById('applyFilter').addEventListener('click', applyFilter);
+    document.getElementById('clearFilter').addEventListener('click', clearFilter);
+    document.getElementById('crimeTypeFilter').addEventListener('change', loadForecast);
+    document.getElementById('forecastHorizon').addEventListener('change', loadForecast);
+    document.getElementById('refreshForecast').addEventListener('click', loadForecast);
+    document.getElementById('riskMonthsFilter').addEventListener('change', loadBarangayRisk);
+    document.getElementById('refreshWarning').addEventListener('click', loadMonthlyWarning);
+}
+
 function applyFilter() {
-    const yearFilter = document.getElementById('yearFilter').value;
-    const monthFilter = document.getElementById('monthFilter').value;
-    const filterStatus = document.getElementById('filterStatus');
-    
+    const year = document.getElementById('yearFilter').value;
+    const month = document.getElementById('monthFilter').value;
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
                         'July', 'August', 'September', 'October', 'November', 'December'];
     
-    if (yearFilter && monthFilter) {
-        // Both year and month selected
-        currentFilter.month = `${yearFilter}-${monthFilter}`;
-        currentFilter.year = '';
-        const monthName = monthNames[parseInt(monthFilter) - 1];
-        filterStatus.innerHTML = `Showing: <strong>${monthName} ${yearFilter}</strong>`;
-    } else if (yearFilter && !monthFilter) {
-        // Only year selected
-        currentFilter.month = '';
-        currentFilter.year = yearFilter;
-        filterStatus.innerHTML = `Showing: <strong>Year ${yearFilter}</strong>`;
-    } else if (!yearFilter && monthFilter) {
-        // Only month selected (all years for this month)
-        currentFilter.month = '';
-        currentFilter.year = '';
-        const monthName = monthNames[parseInt(monthFilter) - 1];
-        filterStatus.innerHTML = `Showing: <strong>${monthName} (All Years)</strong>`;
-        alert('Please select a year to filter by month.');
-        return;
+    if (year && month) {
+        currentFilter = { month: `${year}-${month}`, year: '' };
+        document.getElementById('filterStatus').textContent = `Showing: ${monthNames[parseInt(month) - 1]} ${year}`;
+    } else if (year) {
+        currentFilter = { month: '', year: year };
+        document.getElementById('filterStatus').textContent = `Showing: Year ${year}`;
     } else {
-        // Neither selected
-        currentFilter.month = '';
-        currentFilter.year = '';
-        filterStatus.innerHTML = 'Showing: <strong>All historical data</strong>';
+        currentFilter = { month: '', year: '' };
+        document.getElementById('filterStatus').textContent = 'Showing: All data';
     }
     
-    // Reload data with filter
     loadCrimeStats();
+    loadInsights();
 }
 
-// Clear filter
 function clearFilter() {
     document.getElementById('yearFilter').value = '';
     document.getElementById('monthFilter').value = '';
-    currentFilter.month = '';
-    currentFilter.year = '';
-    document.getElementById('filterStatus').innerHTML = 'Showing: <strong>All historical data</strong>';
-    
-    // Reload data without filter
+    currentFilter = { month: '', year: '' };
+    document.getElementById('filterStatus').textContent = 'Showing: All data';
     loadCrimeStats();
+    loadInsights();
 }
 
-// Load crime statistics
+// Load Crime Statistics
 async function loadCrimeStats() {
-    console.log('Loading crime statistics...');
-    showLoading('Loading crime statistics...');
     try {
-        // Build URL with filter parameters
         let url = '/api/statistics/crime-stats';
         const params = new URLSearchParams();
-        if (currentFilter.month) {
-            params.append('month', currentFilter.month);
-        } else if (currentFilter.year) {
-            params.append('year', currentFilter.year);
-        }
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
+        if (currentFilter.month) params.append('month', currentFilter.month);
+        else if (currentFilter.year) params.append('year', currentFilter.year);
+        if (params.toString()) url += '?' + params;
         
         const response = await fetch(url);
-        console.log('Crime stats response status:', response.status);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
         const data = await response.json();
-        console.log('Crime stats data:', data);
         
         if (data.status === 'success') {
             crimeStats = data.data;
-            updateOverviewCards(data.data.overview);
-            loadDbReportSummary();
-            loadInsights();
+            updateQuickStats(data.data.overview);
             renderTypeChart(data.data.byType);
             renderLocationChart(data.data.byLocation);
-            console.log('Crime statistics loaded successfully');
-        } else {
-            console.error('Crime stats API returned error:', data.message);
         }
     } catch (error) {
         console.error('Error loading crime stats:', error);
-        alert('Failed to load crime statistics. Please ensure you are logged in and try again.');
-    } finally {
-        hideLoading();
+    }
+    
+    // Also load DB summary
+    loadDbSummary();
+}
+
+async function loadDbSummary() {
+    try {
+        let url = '/api/statistics/report-summary';
+        const params = new URLSearchParams();
+        if (currentFilter.month) params.append('month', currentFilter.month);
+        else if (currentFilter.year) params.append('year', currentFilter.year);
+        if (params.toString()) url += '?' + params;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const d = data.data;
+            document.getElementById('totalReports').textContent = formatNumber(d.total);
+            document.getElementById('validComplaints').textContent = formatNumber(d.complaints || d.valid);
+            document.getElementById('resolvedCases').textContent = formatNumber(d.resolved);
+            document.getElementById('pendingReview').textContent = formatNumber(d.checking);
+            document.getElementById('activeDispatches').textContent = formatNumber(d.active_dispatches);
+            document.getElementById('patrolOnDuty').textContent = formatNumber(d.patrol_on_duty);
+            document.getElementById('patrolTotal').textContent = formatNumber(d.patrol_total);
+            document.getElementById('fakeReports').textContent = formatNumber(d.fake_reports);
+            document.getElementById('hoaxReports').textContent = formatNumber(d.invalid);
+        }
+    } catch (error) {
+        console.error('Error loading DB summary:', error);
     }
 }
 
-// Load forecast data
+function updateQuickStats(overview) {
+    // Additional updates if needed
+}
+
+// Load Insights (Recommendations, Stations)
+async function loadInsights() {
+    try {
+        let url = '/api/statistics/insights';
+        const params = new URLSearchParams();
+        if (currentFilter.month) params.append('month', currentFilter.month);
+        else if (currentFilter.year) params.append('year', currentFilter.year);
+        if (params.toString()) url += '?' + params;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            insightsData = data.data;
+            
+            // Update operational metrics
+            const dep = data.data.deployment || {};
+            document.getElementById('overdueDispatches').textContent = formatNumber(dep.overdue_dispatches);
+            
+            // Update overdue box styling
+            const overdueBox = document.getElementById('overdueBox');
+            if (dep.overdue_dispatches > 0) {
+                overdueBox.className = 'metric-box critical';
+            } else {
+                overdueBox.className = 'metric-box success';
+            }
+            
+            // Update recommendations
+            renderRecommendations(data.data.recommendations || []);
+            
+            // Update station table
+            renderStationTable(data.data.stations || []);
+        }
+    } catch (error) {
+        console.error('Error loading insights:', error);
+    }
+}
+
+function renderRecommendations(recommendations) {
+    const list = document.getElementById('recommendationsList');
+    if (!recommendations.length) {
+        list.innerHTML = `<li><span class="recommendation-icon success">✓</span>No critical issues detected. Operations running smoothly.</li>`;
+        return;
+    }
+    
+    list.innerHTML = recommendations.map(rec => {
+        const isAlert = rec.includes('overdue') || rec.includes('High') || rec.includes('No patrol');
+        const iconClass = isAlert ? 'alert' : 'info';
+        const icon = isAlert ? '⚠' : 'ℹ';
+        return `<li><span class="recommendation-icon ${iconClass}">${icon}</span>${escapeHtml(rec)}</li>`;
+    }).join('');
+}
+
+function renderStationTable(stations) {
+    const tbody = document.getElementById('stationTableBody');
+    if (!stations.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--gray-500);">No station data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = stations.map(s => {
+        const statusClass = s.overdue_dispatches > 0 ? 'badge-high' : 
+                           (s.patrol_on_duty === 0 && s.active_dispatches > 0) ? 'badge-medium' : 'badge-low';
+        const statusText = s.overdue_dispatches > 0 ? 'ALERT' : 
+                          (s.patrol_on_duty === 0 && s.active_dispatches > 0) ? 'WARNING' : 'OK';
+        return `
+            <tr>
+                <td style="font-weight: 500;">${escapeHtml(s.station_name)}</td>
+                <td style="text-align: center; font-weight: 600;">${s.patrol_on_duty}</td>
+                <td style="text-align: center;">${s.active_dispatches}</td>
+                <td style="text-align: center;">${s.overdue_dispatches}</td>
+                <td><span class="badge ${statusClass}">${statusText}</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Load SARIMA Forecast
 async function loadForecast() {
     const horizon = document.getElementById('forecastHorizon').value;
     const crimeType = document.getElementById('crimeTypeFilter').value;
-    const forecastStatusEl = document.getElementById('forecastStatus');
-    const forecastInfoBox = document.getElementById('forecastInfoBox');
-    const forecastInfoText = document.getElementById('forecastInfoText');
-    
-    console.log(`🔮 Loading SARIMA forecast: ${crimeType || 'All Crimes'}, ${horizon} months...`);
-    showLoading('Generating forecast...');
+    const container = document.getElementById('trendChartContainer');
+    const infoBox = document.getElementById('forecastInfo');
+    const statusDot = document.getElementById('apiStatusDot');
+    const statusText = document.getElementById('apiStatusText');
     
     // Show loading
     if (trendChart) {
         trendChart.destroy();
         trendChart = null;
     }
-    
-    const container = document.getElementById('trendChartContainer');
-    container.innerHTML = '<div class="loading-overlay"><div class="spinner"></div></div><canvas id="trendChart"></canvas>';
+    container.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div><canvas id="trendChart" style="display:none;"></canvas>';
     
     try {
-        // Update chart title based on selected crime type
-        const chartTitle = document.querySelector('.chart-title');
-        chartTitle.textContent = crimeType 
-            ? `📊 ${crimeType.charAt(0) + crimeType.slice(1).toLowerCase()} - Trends & Forecast`
-            : '📊 Crime Trends & Forecast';
-        
-        console.log('📡 Fetching from SARIMA API endpoint...');
         let url = `/api/statistics/forecast?horizon=${horizon}`;
-        if (crimeType) {
-            url += `&crime_type=${encodeURIComponent(crimeType)}`;
-        }
+        if (crimeType) url += `&crime_type=${encodeURIComponent(crimeType)}`;
+        
         const response = await fetch(url);
-        console.log('✅ Forecast response status:', response.status);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
         const data = await response.json();
-        console.log('📊 Forecast data received:', data);
         
-        if (data.status === 'success' && data.data && Array.isArray(data.data)) {
+        if (data.status === 'success' && data.data) {
             forecastData = data.data;
-            console.log(`✅ Successfully loaded ${forecastData.length} forecast points`);
-            console.log(`📈 Rendering chart with ${crimeStats?.monthly?.length || 0} historical points and ${forecastData.length} forecast points`);
             
-            // Remove loading overlay before rendering chart
-            container.innerHTML = '<canvas id="trendChart"></canvas>';
+            // Update API status
+            statusDot.className = 'status-dot online';
+            statusText.textContent = 'SARIMA API Online';
             
-            // Wait for DOM to update
-            await new Promise(resolve => setTimeout(resolve, 10));
-            
-            // Use crime-specific historical data if available, otherwise use overall stats
-            const historicalData = data.historical && data.historical.length > 0 
-                ? data.historical 
-                : (crimeStats?.monthly || []);
-            
-            console.log(`📈 Rendering chart with ${historicalData.length} historical points and ${forecastData.length} forecast points`);
-            renderTrendChart(historicalData, data.data);
-            
-            // Update forecast status
-            forecastStatusEl.textContent = '✓ Active';
-            forecastStatusEl.style.color = '#059669';
-            
-            // Show forecast information
-            forecastInfoBox.style.display = 'block';
+            // Show forecast info
+            infoBox.style.display = 'block';
             const firstDate = data.data[0]?.date?.substring(0, 7) || 'N/A';
             const lastDate = data.data[data.data.length - 1]?.date?.substring(0, 7) || 'N/A';
             const avgForecast = (data.data.reduce((sum, d) => sum + parseFloat(d.forecast || 0), 0) / data.data.length).toFixed(1);
             
-            forecastInfoText.innerHTML = `
-                <strong>Forecast Period:</strong> ${firstDate} to ${lastDate} (${horizon} months)<br>
-                <strong>Scope:</strong> ${crimeType || 'City-wide (All Crimes)'}<br>
-                <strong>Average Predicted:</strong> ${avgForecast} per month<br>
-                <strong>Model:</strong> SARIMA(0,1,1)(0,1,1)[12] (Auto-optimized)<br>
-                <strong>Last Updated:</strong> ${new Date().toLocaleString()}
-            `;
+            document.getElementById('forecastInfoText').innerHTML = 
+                `Period: ${firstDate} to ${lastDate} | Scope: ${crimeType || 'All Crimes'} | Avg Predicted: ${avgForecast}/month | Model: SARIMA(0,1,1)(0,1,1)[12]`;
             
-            console.log('✅ SARIMA forecast loaded and displayed successfully');
+            // Restore canvas
+            container.innerHTML = '<canvas id="trendChart"></canvas>';
+            
+            const historicalData = data.historical?.length > 0 ? data.historical : (crimeStats?.monthly || []);
+            renderTrendChart(historicalData, data.data);
         } else {
-            throw new Error(data.message || 'Invalid forecast data structure');
+            throw new Error(data.message || 'Invalid forecast data');
         }
     } catch (error) {
-        console.error('❌ Error loading SARIMA forecast:', error);
-        forecastStatusEl.textContent = '✗ Offline';
-        forecastStatusEl.style.color = '#dc2626';
+        console.error('Error loading forecast:', error);
+        statusDot.className = 'status-dot offline';
+        statusText.textContent = 'SARIMA API Offline';
+        infoBox.style.display = 'none';
         
-        // Hide forecast info box
-        forecastInfoBox.style.display = 'none';
-        
-        // Remove loading overlay
         container.innerHTML = '<canvas id="trendChart"></canvas>';
-        
-        // Wait for DOM to update
-        await new Promise(resolve => setTimeout(resolve, 10));
-        
-        // Render historical data only
-        if (crimeStats && crimeStats.monthly && crimeStats.monthly.length > 0) {
-            console.log('⚠️ Rendering historical data only (SARIMA API unavailable)');
+        if (crimeStats?.monthly?.length > 0) {
             renderTrendChart(crimeStats.monthly, []);
         } else {
-            // Show error message in chart area
-            console.warn('❌ No historical data available to display');
-            container.innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 400px; color: #9ca3af; text-align: center; padding: 2rem;">
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
-                    <p style="font-size: 1.125rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem;">No Data Available</p>
-                    <p style="font-size: 0.875rem;">Please ensure crime reports exist in the database and the SARIMA API is running.</p>
-                    <p style="font-size: 0.75rem; margin-top: 1rem; color: #6b7280;">SARIMA API should be running on <code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">localhost:8001</code></p>
-                </div>
-            `;
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><p>No forecast data available</p></div>';
         }
-    } finally {
-        hideLoading();
     }
 }
 
-// Update overview cards
-function updateOverviewCards(overview) {
-    document.getElementById('totalReports').textContent = overview.total.toLocaleString();
-    document.getElementById('thisMonthReports').textContent = overview.thisMonth.toLocaleString();
-    document.getElementById('lastMonthReports').textContent = overview.lastMonth.toLocaleString();
-    
-    const changeEl = document.getElementById('monthChange');
-    const change = overview.percentChange;
-    const arrow = change >= 0 ? '↑' : '↓';
-    changeEl.textContent = `${arrow} ${Math.abs(change)}% from last month`;
-    changeEl.className = `stat-change ${change >= 0 ? 'positive' : 'negative'}`;
-}
-
-// Load DB-backed report summary for analytics cards
-async function loadDbReportSummary() {
-    try {
-        let url = '/api/statistics/report-summary';
-        const params = new URLSearchParams();
-
-        if (currentFilter.month) {
-            // currentFilter.month is expected to be 'YYYY-MM'
-            params.append('month', currentFilter.month);
-        }
-        if (currentFilter.year && !currentFilter.month) {
-            params.append('year', currentFilter.year);
-        }
-
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
-
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data.status !== 'success' || !data.data) {
-            throw new Error(data.message || 'Invalid response');
-        }
-
-        document.getElementById('dbTotalReports').textContent = (data.data.total ?? 0).toLocaleString();
-        document.getElementById('dbResolvedReports').textContent = (data.data.resolved ?? 0).toLocaleString();
-        document.getElementById('dbInvalidReports').textContent = (data.data.invalid ?? 0).toLocaleString();
-        document.getElementById('dbCheckingReports').textContent = (data.data.checking ?? 0).toLocaleString();
-
-        const validEl = document.getElementById('dbValidReports');
-        if (validEl) validEl.textContent = (data.data.complaints ?? data.data.valid ?? 0).toLocaleString();
-
-        const fakeEl = document.getElementById('dbFakeReports');
-        if (fakeEl) fakeEl.textContent = (data.data.fake_reports ?? 0).toLocaleString();
-
-        const patrolOnDutyEl = document.getElementById('patrolOnDuty');
-        const patrolTotal = (data.data.patrol_total ?? 0);
-        const patrolOnDuty = (data.data.patrol_on_duty ?? 0);
-        if (patrolOnDutyEl) patrolOnDutyEl.textContent = patrolOnDuty.toLocaleString();
-
-        const patrolHint = document.getElementById('patrolDutyHint');
-        if (patrolHint) patrolHint.textContent = `On duty: ${patrolOnDuty.toLocaleString()} / ${patrolTotal.toLocaleString()} patrol officers`;
-
-        const activeDispatchesEl = document.getElementById('activeDispatches');
-        if (activeDispatchesEl) activeDispatchesEl.textContent = (data.data.active_dispatches ?? 0).toLocaleString();
-
-        const scopeText = document.getElementById('dbScopeText');
-        if (scopeText) {
-            if (currentFilter.month) {
-                scopeText.textContent = `Filtered: ${currentFilter.month}`;
-            } else if (currentFilter.year) {
-                scopeText.textContent = `Filtered: ${currentFilter.year}`;
-            } else {
-                scopeText.textContent = 'All time';
-            }
-        }
-    } catch (error) {
-        console.error('Error loading DB report summary:', error);
-        // Fail soft: keep UI usable
-        const ids = ['dbTotalReports', 'dbResolvedReports', 'dbInvalidReports', 'dbCheckingReports', 'dbValidReports', 'dbFakeReports', 'patrolOnDuty', 'activeDispatches'];
-        ids.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = '-';
-        });
-    }
-}
-
-// Load recommendations/seasonality/correlation insights
-async function loadInsights() {
-    try {
-        let url = '/api/statistics/insights';
-        const params = new URLSearchParams();
-
-        if (currentFilter.month) {
-            params.append('month', currentFilter.month);
-        }
-        if (currentFilter.year && !currentFilter.month) {
-            params.append('year', currentFilter.year);
-        }
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
-
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const payload = await response.json();
-        if (payload.status !== 'success' || !payload.data) {
-            throw new Error(payload.message || 'Invalid response');
-        }
-
-        const d = payload.data;
-
-        // Deployment summary
-        const headlineEl = document.getElementById('deploymentHeadline');
-        const detailsEl = document.getElementById('deploymentDetails');
-        if (headlineEl) {
-            headlineEl.textContent = `${(d.deployment?.patrol_on_duty ?? 0)} on-duty patrol / ${(d.deployment?.active_dispatches ?? 0)} active dispatches`;
-        }
-        if (detailsEl) {
-            const overdue = (d.deployment?.overdue_dispatches ?? 0);
-            const fake = (d.deployment?.fake_reports ?? 0);
-            detailsEl.textContent = `Overdue (3-min): ${overdue} · Fake validated: ${fake}`;
-        }
-
-        // Recommendations
-        const list = document.getElementById('aiRecommendations');
-        if (list) {
-            const recs = Array.isArray(d.recommendations) ? d.recommendations : [];
-            list.innerHTML = recs.length
-                ? recs.map(r => `<li>${escapeHtml(r)}</li>`).join('')
-                : '<li>No recommendations available.</li>';
-        }
-
-        // Station deployment table
-        const stationEl = document.getElementById('stationDeploymentTable');
-        if (stationEl) {
-            const stations = Array.isArray(d.stations) ? d.stations : [];
-            if (!stations.length) {
-                stationEl.textContent = 'No station deployment data available.';
-            } else {
-                stationEl.innerHTML = `
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr>
-                                <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Station</th>
-                                <th style="text-align: right; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">On Duty</th>
-                                <th style="text-align: right; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Active</th>
-                                <th style="text-align: right; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Overdue</th>
-                                <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Suggestion</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${stations.map(s => `
-                                <tr>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">${escapeHtml(s.station_name)}</td>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 600;">${escapeHtml(s.patrol_on_duty)}</td>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6; text-align: right;">${escapeHtml(s.active_dispatches)}</td>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6; text-align: right;">${escapeHtml(s.overdue_dispatches)}</td>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">${escapeHtml(s.suggestion)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                `;
-            }
-        }
-
-        // Seasonality
-        const seasonEl = document.getElementById('seasonalitySummary');
-        if (seasonEl) {
-            const top = d.seasonality?.topMonths || [];
-            if (!top.length) {
-                seasonEl.textContent = 'No seasonal data available (CSV missing).';
-            } else {
-                seasonEl.innerHTML = `
-                    <div style="margin-bottom: 0.5rem; color: #6b7280;">Top months by average crime count (from CSV)</div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
-                        ${top.map(m => `
-                            <div style="padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 10px; background: #f9fafb;">
-                                <div style="font-weight: 700;">${escapeHtml(m.monthName)}</div>
-                                <div style="color: #6b7280; font-size: 0.875rem;">Avg: ${escapeHtml(m.averageCount)} · Total: ${escapeHtml(m.totalCount)}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-        }
-
-        // Correlation
-        const corrEl = document.getElementById('correlationSummary');
-        if (corrEl) {
-            const pairs = d.correlation?.topPairs || [];
-            if (!pairs.length) {
-                corrEl.textContent = 'No correlation data available for the selected filter.';
-            } else {
-                corrEl.innerHTML = `
-                    <div style="margin-bottom: 0.5rem; color: #6b7280;">Top barangay × crime type pairs (valid reports)</div>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr>
-                                <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Barangay</th>
-                                <th style="text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Crime Type</th>
-                                <th style="text-align: right; padding: 0.5rem; border-bottom: 1px solid #e5e7eb;">Count</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${pairs.map(p => `
-                                <tr>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">${escapeHtml(p.barangay)}</td>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">${escapeHtml(p.crimeType)}</td>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 600;">${escapeHtml(p.count)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                `;
-            }
-        }
-    } catch (error) {
-        console.error('Error loading insights:', error);
-        const ids = ['deploymentHeadline', 'deploymentDetails', 'aiRecommendations', 'stationDeploymentTable', 'seasonalitySummary', 'correlationSummary'];
-        ids.forEach(id => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            if (id === 'aiRecommendations') {
-                el.innerHTML = '<li>Failed to load insights.</li>';
-            } else {
-                el.textContent = 'Failed to load insights.';
-            }
-        });
-    }
-}
-
-// =========================================================
-// SARIMA API: Load Barangay Risk Assessment
-// =========================================================
-async function loadBarangayRisk() {
-    const container = document.getElementById('barangayRiskContainer');
-    const months = document.getElementById('riskMonthsFilter')?.value || 3;
-    
-    if (!container) return;
-    
-    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><span>🔄 Loading risk assessment...</span></div>';
-    
-    try {
-        // Call Laravel API proxy (which calls SARIMA API)
-        const response = await fetch(`/api/statistics/barangay-risk?months=${months}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        // Unwrap Laravel proxy response
-        const data = result.data || result;
-        
-        if (!Array.isArray(data) || data.length === 0) {
-            container.innerHTML = '<div style="padding: 1rem; background: #f9fafb; border-radius: 8px; color: #6b7280;">No risk data available from SARIMA API.</div>';
-            return;
-        }
-        
-        // Group by risk level
-        const highRisk = data.filter(d => d.risk_level === 'HIGH');
-        const mediumRisk = data.filter(d => d.risk_level === 'MEDIUM');
-        const lowRisk = data.filter(d => d.risk_level === 'LOW');
-        
-        container.innerHTML = `
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                <div style="padding: 1rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: 700; color: #dc2626;">${highRisk.length}</div>
-                    <div style="font-size: 0.875rem; color: #991b1b;">🔴 HIGH Risk</div>
-                </div>
-                <div style="padding: 1rem; background: #fffbeb; border: 1px solid #fed7aa; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: 700; color: #d97706;">${mediumRisk.length}</div>
-                    <div style="font-size: 0.875rem; color: #92400e;">🟡 MEDIUM Risk</div>
-                </div>
-                <div style="padding: 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: 700; color: #16a34a;">${lowRisk.length}</div>
-                    <div style="font-size: 0.875rem; color: #166534;">🟢 LOW Risk</div>
-                </div>
-            </div>
-            
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
-                <thead>
-                    <tr style="background: #f9fafb;">
-                        <th style="text-align: left; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Barangay</th>
-                        <th style="text-align: center; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Recent Crimes</th>
-                        <th style="text-align: center; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Risk Level</th>
-                        <th style="text-align: left; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Warning</th>
-                        <th style="text-align: left; padding: 0.75rem; border-bottom: 2px solid #e5e7eb;">Recommended Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${data.slice(0, 20).map(item => {
-                        const riskColors = {
-                            'HIGH': { bg: '#fef2f2', text: '#dc2626', badge: '#dc2626' },
-                            'MEDIUM': { bg: '#fffbeb', text: '#d97706', badge: '#d97706' },
-                            'LOW': { bg: '#f0fdf4', text: '#16a34a', badge: '#16a34a' }
-                        };
-                        const color = riskColors[item.risk_level] || riskColors['LOW'];
-                        return `
-                            <tr style="background: ${color.bg};">
-                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb; font-weight: 600;">${escapeHtml(item.barangay)}</td>
-                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb; text-align: center; font-weight: 700;">${item.recent_crimes}</td>
-                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb; text-align: center;">
-                                    <span style="display: inline-block; padding: 0.25rem 0.75rem; background: ${color.badge}; color: white; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">
-                                        ${item.risk_level}
-                                    </span>
-                                </td>
-                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb; color: ${color.text};">${escapeHtml(item.warning)}</td>
-                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.recommended_action)}</td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
-            ${data.length > 20 ? `<p style="margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">Showing top 20 of ${data.length} barangays</p>` : ''}
-        `;
-        
-        console.log('✅ Barangay risk assessment loaded:', data.length, 'barangays');
-        
-    } catch (error) {
-        console.error('❌ Error loading barangay risk:', error);
-        container.innerHTML = `
-            <div style="padding: 1.5rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; text-align: center;">
-                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚠️</div>
-                <div style="color: #991b1b; font-weight: 600;">Failed to load risk assessment</div>
-                <div style="color: #b91c1c; font-size: 0.875rem; margin-top: 0.5rem;">
-                    SARIMA API may not be running. Please check the server.
-                </div>
-            </div>
-        `;
-    }
-}
-
-// =========================================================
-// SARIMA API: Load Monthly Crime Warning
-// =========================================================
-async function loadMonthlyCrimeWarning() {
-    const container = document.getElementById('monthlyCrimeWarningContainer');
-    const monthInput = document.getElementById('warningMonthFilter');
-    
-    if (!container) return;
-    
-    // Get selected date or use current month
-    let dateParam;
-    if (monthInput && monthInput.value) {
-        dateParam = monthInput.value + '-01';
-    } else {
-        const now = new Date();
-        dateParam = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    }
-    
-    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><span>🔄 Loading monthly warning...</span></div>';
-    
-    try {
-        // Call Laravel API proxy (which calls SARIMA API)
-        const response = await fetch(`/api/statistics/monthly-warning?date=${dateParam}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        // Unwrap Laravel proxy response
-        const data = result.data || result;
-        
-        container.innerHTML = `
-            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem;">
-                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-                    <span style="font-size: 2rem;">⚠️</span>
-                    <div>
-                        <div style="font-size: 1.25rem; font-weight: 700; color: #92400e;">Crime Alert: ${escapeHtml(data.month)}</div>
-                        <div style="color: #a16207; font-size: 0.875rem;">${escapeHtml(data.warning)}</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem;">
-                    <div style="font-weight: 600; color: #111827; margin-bottom: 0.75rem;">📊 Likely Crimes This Month</div>
-                    ${data.likely_crimes && data.likely_crimes.length > 0 ? `
-                        <ul style="margin: 0; padding-left: 1.25rem; color: #374151;">
-                            ${data.likely_crimes.map(crime => `
-                                <li style="margin-bottom: 0.5rem;">
-                                    <strong>${escapeHtml(crime.crime_type)}</strong>
-                                    <span style="color: #6b7280; font-size: 0.875rem;"> (${crime.historical_total} cases historically)</span>
-                                </li>
-                            `).join('')}
-                        </ul>
-                    ` : '<p style="color: #6b7280;">No crime patterns detected for this month.</p>'}
-                </div>
-                
-                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 1rem;">
-                    <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.75rem;">👮 Patrol Recommendation</div>
-                    <p style="color: #1e3a8a; margin: 0; line-height: 1.5;">${escapeHtml(data.recommended_action)}</p>
-                </div>
-            </div>
-        `;
-        
-        console.log('✅ Monthly crime warning loaded for:', data.month);
-        
-    } catch (error) {
-        console.error('❌ Error loading monthly crime warning:', error);
-        container.innerHTML = `
-            <div style="padding: 1.5rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; text-align: center;">
-                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚠️</div>
-                <div style="color: #991b1b; font-weight: 600;">Failed to load monthly warning</div>
-                <div style="color: #b91c1c; font-size: 0.875rem; margin-top: 0.5rem;">
-                    SARIMA API may not be running. Please check the server.
-                </div>
-            </div>
-        `;
-    }
-}
-
-// Render trend chart with forecast
+// Render Trend Chart
 function renderTrendChart(historical, forecast) {
-    console.log(`📊 renderTrendChart: ${historical.length} historical + ${forecast.length} forecast points`);
-    
     const ctx = document.getElementById('trendChart');
+    if (!ctx) return;
     
-    if (!ctx) {
-        console.error('❌ Chart canvas not found');
-        return;
-    }
-    
-    // Prepare historical data
     const historicalLabels = historical.map(d => `${d.year}-${String(d.month).padStart(2, '0')}`);
     const historicalData = historical.map(d => parseInt(d.count) || 0);
     
-    console.log('📊 Historical data sample:', historical.slice(0, 3));
-    console.log('📊 Forecast data sample:', forecast.slice(0, 3));
-    
-    // Prepare forecast data
     const forecastLabels = forecast.map(d => d.date.substring(0, 7));
     const forecastValues = forecast.map(d => parseFloat(d.forecast) || 0);
     const lowerCI = forecast.map(d => parseFloat(d.lower_ci) || 0);
     const upperCI = forecast.map(d => parseFloat(d.upper_ci) || 0);
     
-    console.log('📅 Historical period:', historicalLabels.length > 0 ? `${historicalLabels[0]} to ${historicalLabels[historicalLabels.length - 1]}` : 'None');
-    console.log('🔮 Forecast period:', forecastLabels.length > 0 ? `${forecastLabels[0]} to ${forecastLabels[forecastLabels.length - 1]}` : 'None');
-    console.log('📈 Historical values:', historicalData.slice(0, 5));
-    console.log('🔮 Forecast values:', forecastValues.slice(0, 5));
-    
-    // Combine labels
     const allLabels = [...historicalLabels, ...forecastLabels];
-    
-    // Historical dataset (ends where forecast begins)
     const historicalDataset = [...historicalData, ...Array(forecastLabels.length).fill(null)];
-    
-    // Forecast dataset (starts where historical ends)
     const forecastDataset = [...Array(historicalLabels.length).fill(null), ...forecastValues];
     
-    // Connect the gap between historical and forecast
+    // Connect historical to forecast
     if (historicalData.length > 0 && forecastValues.length > 0) {
-        // Connect last historical point to first forecast point
         forecastDataset[historicalLabels.length - 1] = historicalData[historicalData.length - 1];
     }
     
-    console.log('🔗 Connection point:', historicalData.length > 0 ? historicalData[historicalData.length - 1] : 'No historical data');
-    
-    // Calculate max value for proper Y-axis scaling
-    const allValues = [...historicalData.filter(v => v !== null && !isNaN(v)), ...forecastValues.filter(v => v !== null && !isNaN(v))];
+    const allValues = [...historicalData, ...forecastValues].filter(v => v !== null && !isNaN(v));
     const maxValue = Math.max(...allValues, 0);
-    const suggestedMax = Math.ceil(maxValue * 1.3); // Add 30% padding
+    const suggestedMax = Math.ceil(maxValue * 1.3);
     
-    console.log('📊 Max value in data:', maxValue);
-    console.log('📊 Suggested Y-axis max:', suggestedMax);
-    console.log('📊 All values sample:', allValues.slice(0, 10));
-    
-    // Destroy existing chart
-    if (trendChart) {
-        trendChart.destroy();
-    }
-    
-    console.log('🎨 Creating SARIMA forecast chart...');
+    if (trendChart) trendChart.destroy();
     
     trendChart = new Chart(ctx, {
         type: 'line',
@@ -1418,45 +1150,41 @@ function renderTrendChart(historical, forecast) {
             labels: allLabels,
             datasets: [
                 {
-                    label: 'Historical Crime Data',
+                    label: 'Historical Data',
                     data: historicalDataset,
                     borderColor: '#1D3557',
                     backgroundColor: 'rgba(29, 53, 87, 0.1)',
-                    borderWidth: 3,
+                    borderWidth: 2.5,
                     tension: 0.4,
                     fill: false,
-                    yAxisID: 'y',
-                    pointRadius: 3,
-                    pointHoverRadius: 6
+                    pointRadius: 2,
+                    pointHoverRadius: 5
                 },
                 {
                     label: 'SARIMA Forecast',
                     data: forecastDataset,
-                    borderColor: '#e63946',
-                    backgroundColor: 'rgba(230, 57, 70, 0.1)',
-                    borderWidth: 3,
-                    borderDash: [8, 4],
+                    borderColor: '#E63946',
+                    borderWidth: 2.5,
+                    borderDash: [6, 3],
                     tension: 0.4,
                     fill: false,
-                    pointRadius: 4,
-                    pointHoverRadius: 7,
-                    pointStyle: 'circle'
+                    pointRadius: 3,
+                    pointHoverRadius: 6
                 },
                 {
-                    label: '95% Upper Confidence',
+                    label: 'Upper CI',
                     data: [...Array(historicalLabels.length).fill(null), ...upperCI],
-                    borderColor: 'rgba(230, 57, 70, 0.3)',
-                    backgroundColor: 'rgba(230, 57, 70, 0.15)',
+                    borderColor: 'rgba(230, 57, 70, 0.25)',
+                    backgroundColor: 'rgba(230, 57, 70, 0.1)',
                     borderWidth: 1,
                     fill: '+1',
                     pointRadius: 0,
                     tension: 0.4
                 },
                 {
-                    label: '95% Lower Confidence',
+                    label: 'Lower CI',
                     data: [...Array(historicalLabels.length).fill(null), ...lowerCI],
-                    borderColor: 'rgba(230, 57, 70, 0.3)',
-                    backgroundColor: 'rgba(230, 57, 70, 0.15)',
+                    borderColor: 'rgba(230, 57, 70, 0.25)',
                     borderWidth: 1,
                     fill: false,
                     pointRadius: 0,
@@ -1467,10 +1195,7 @@ function renderTrendChart(historical, forecast) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false
-            },
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: {
                     display: true,
@@ -1478,142 +1203,39 @@ function renderTrendChart(historical, forecast) {
                     labels: {
                         usePointStyle: true,
                         padding: 15,
-                        font: {
-                            size: 12,
-                            weight: '500'
-                        },
-                        filter: function(item) {
-                            // Hide confidence interval labels from legend
-                            return !item.text.includes('Confidence');
-                        }
+                        filter: item => !item.text.includes('CI')
                     }
                 },
                 tooltip: {
                     mode: 'index',
                     intersect: false,
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 12,
-                    titleFont: {
-                        size: 14,
-                        weight: 'bold'
-                    },
-                    bodyFont: {
-                        size: 13
-                    },
                     callbacks: {
-                        title: function(context) {
-                            return 'Period: ' + context[0].label;
-                        },
                         label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += Math.round(context.parsed.y) + ' crimes';
-                            }
-                            return label;
-                        },
-                        afterBody: function(context) {
-                            // Only show breakdown for "All Crimes" forecast points
-                            const crimeTypeFilter = document.getElementById('crimeTypeFilter').value;
-                            if (crimeTypeFilter) return []; // Don't show if already filtered by type
-
-                            const dataPoint = context[0]; // Active point
-                            
-                            // Check if hovering over forecast dataset (Dataset index 1 usually, but let's check label or index)
-                            // Index 0: Historical, 1: Forecast, 2/3: CI
-                            if (dataPoint.datasetIndex !== 1) return [];
-
-                            const totalForecast = dataPoint.parsed.y;
-                            if (!totalForecast || !crimeStats || !crimeStats.byType) return [];
-
-                            // Calculate total historical crimes from the distribution to get ratios
-                            // Note: We use the CURRENTLY LOADED historical distribution as a proxy for future distribution
-                            const totalHistorical = crimeStats.byType.reduce((sum, item) => sum + parseInt(item.count), 0);
-                            
-                            if (totalHistorical === 0) return [];
-
-                            // Calculate estimates
-                            const estimates = crimeStats.byType.map(item => {
-                                const ratio = parseInt(item.count) / totalHistorical;
-                                const estimatedCount = Math.round(totalForecast * ratio);
-                                return {
-                                    type: item.type,
-                                    count: estimatedCount
-                                };
-                            });
-
-                            // Sort by count desc and take top 5
-                            estimates.sort((a, b) => b.count - a.count);
-                            const topEstimates = estimates.slice(0, 5);
-                            
-                            const lines = [' ', 'Estimated Breakdown:']; // Spacer + Header
-                            topEstimates.forEach(est => {
-                                if (est.count > 0) {
-                                    lines.push(`• ${est.type}: ~${est.count}`);
-                                }
-                            });
-                            
-                            if (estimates.length > 5) {
-                                lines.push(`• Others: ~${Math.round(totalForecast - topEstimates.reduce((s, i) => s + i.count, 0))}`);
-                            }
-
-                            return lines;
+                            if (context.dataset.label.includes('CI')) return null;
+                            return `${context.dataset.label}: ${Math.round(context.parsed.y)} crimes`;
                         }
                     }
                 }
             },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    max: suggestedMax,  // Force max instead of suggest
-                    title: {
-                        display: true,
-                        text: '📊 Number of Crimes',
-                        font: {
-                            size: 13,
-                            weight: 'bold'
-                        }
-                    },
-                    ticks: {
-                        precision: 0
-                    }
+                y: { 
+                    beginAtZero: true, 
+                    max: suggestedMax,
+                    title: { display: true, text: 'Number of Crimes', font: { weight: 'bold' } }
                 },
-                x: {
-                    title: {
-                        display: true,
-                        text: '📅 Time Period (Year-Month)',
-                        font: {
-                            size: 13,
-                            weight: 'bold'
-                        }
-                    },
-                    ticks: {
-                        maxRotation: 45,
-                        minRotation: 45
-                    }
+                x: { 
+                    title: { display: true, text: 'Period', font: { weight: 'bold' } },
+                    ticks: { maxRotation: 45, minRotation: 45 }
                 }
             }
         }
     });
-    
-    console.log('✅ SARIMA forecast chart rendered successfully!');
 }
 
-// Render crime by type chart
+// Render Charts
 function renderTypeChart(data) {
     const ctx = document.getElementById('typeChart');
-    
-    if (!ctx) {
-        console.error('Type chart canvas not found');
-        return;
-    }
-    
-    if (!data || !Array.isArray(data) || data.length === 0) {
-        console.warn('No crime type data to display');
-        return;
-    }
+    if (!ctx || !data?.length) return;
     
     if (typeChart) typeChart.destroy();
     
@@ -1623,42 +1245,22 @@ function renderTypeChart(data) {
             labels: data.map(d => d.type || 'Unknown'),
             datasets: [{
                 data: data.map(d => parseInt(d.count) || 0),
-                backgroundColor: [
-                    '#1D3557',
-                    '#457B9D',
-                    '#A8DADC',
-                    '#F77F00',
-                    '#E63946',
-                    '#06D6A0',
-                    '#8338EC'
-                ]
+                backgroundColor: ['#1D3557', '#457B9D', '#A8DADC', '#F77F00', '#E63946', '#06D6A0', '#8338EC', '#3A86FF', '#FB5607', '#FF006E']
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'bottom'
-                }
+                legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true } }
             }
         }
     });
 }
 
-// Render top locations chart
 function renderLocationChart(data) {
     const ctx = document.getElementById('locationChart');
-    
-    if (!ctx) {
-        console.error('Location chart canvas not found');
-        return;
-    }
-    
-    if (!data || !Array.isArray(data) || data.length === 0) {
-        console.warn('No location data to display');
-        return;
-    }
+    if (!ctx || !data?.length) return;
     
     if (locationChart) locationChart.destroy();
     
@@ -1676,229 +1278,135 @@ function renderLocationChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             indexAxis: 'y',
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true
-                }
-            }
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true } }
         }
     });
 }
 
-// Export crime data
-function exportCrimeData() {
-    showLoading('Exporting crime data...');
+// Load Barangay Risk Assessment
+async function loadBarangayRisk() {
+    const months = document.getElementById('riskMonthsFilter').value;
+    const tbody = document.getElementById('riskTableBody');
+    
+    tbody.innerHTML = '<tr><td colspan="4" class="loading-spinner"><div class="spinner"></div></td></tr>';
+    
     try {
-        const yearFilter = document.getElementById('yearFilter')?.value || '';
-        const monthFilter = document.getElementById('monthFilter')?.value || '';
-        const crimeType = document.getElementById('crimeTypeFilter')?.value || '';
+        const response = await fetch(`/api/statistics/barangay-risk?months=${months}`);
+        const result = await response.json();
+        const data = result.data || result;
         
-        let url = '/api/statistics/export';
-        const params = [];
-        
-        if (yearFilter) params.push(`year=${yearFilter}`);
-        if (monthFilter) params.push(`month=${monthFilter}`);
-        if (crimeType) params.push(`crime_type=${encodeURIComponent(crimeType)}`);
-        
-        if (params.length > 0) {
-            url += '?' + params.join('&');
-        }
-        
-        console.log('📥 Exporting crime data:', { year: yearFilter, month: monthFilter, crimeType });
-        window.location.href = url;
-    } finally {
-        hideLoading();
-    }
-}
-
-// Export forecast data
-function exportForecastData() {
-    showLoading('Preparing forecast data for download...');
-    try {
-        if (!forecastData || forecastData.length === 0) {
-            alert('⚠️ No forecast data available. Please load a forecast first by selecting a crime type and clicking "Refresh Forecast".');
+        if (!Array.isArray(data) || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--gray-500);">No risk data available</td></tr>';
             return;
         }
         
-        const horizon = document.getElementById('forecastHorizon')?.value || '12';
-        const crimeType = document.getElementById('crimeTypeFilter')?.value || '';
+        // Update risk counts
+        const highRisk = data.filter(d => d.risk_level === 'HIGH').length;
+        const mediumRisk = data.filter(d => d.risk_level === 'MEDIUM').length;
+        const lowRisk = data.filter(d => d.risk_level === 'LOW').length;
         
-        const exportData = {
-            metadata: {
-                crime_type: crimeType || 'All Crimes',
-                forecast_horizon: `${horizon} months`,
-                model: 'SARIMA(1,1,1)(1,1,1)[12]',
-                forecast_period: `${forecastData[0]?.date} to ${forecastData[forecastData.length - 1]?.date}`,
-                exported_at: new Date().toISOString(),
-                total_forecast_points: forecastData.length
-            },
-            forecast: forecastData
-        };
+        document.getElementById('highRiskCount').textContent = highRisk;
+        document.getElementById('mediumRiskCount').textContent = mediumRisk;
+        document.getElementById('lowRiskCount').textContent = lowRisk;
         
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        
-        const crimeTypeName = crimeType ? crimeType.toLowerCase().replace(/ /g, '_') : 'all_crimes';
-        link.download = `forecast_${crimeTypeName}_${horizon}months_${new Date().toISOString().split('T')[0]}.json`;
-        
-        link.click();
-        URL.revokeObjectURL(url);
-        
-        console.log('📥 Exported forecast data:', link.download);
-    } finally {
-        hideLoading();
-    }
-}
-
-// Load barangay crime statistics
-async function loadBarangayStats() {
-    console.log('Loading barangay statistics...');
-    showLoading('Loading barangay statistics...');
-    try {
-        // Build URL with filter parameters
-        let url = '/api/statistics/barangay-stats';
-        const params = new URLSearchParams();
-        if (currentFilter.month) {
-            params.append('month', currentFilter.month);
-        } else if (currentFilter.year) {
-            params.append('year', currentFilter.year);
-        }
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
-        
-        const response = await fetch(url);
-        console.log('Barangay stats response status:', response.status);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        console.log('Barangay stats data:', result);
-        
-        if (result.status === 'success') {
-            displayTopBarangays(result.data.slice(0, 15));
-            console.log('Barangay statistics loaded successfully');
-        } else {
-            console.error('Barangay stats API returned error:', result.message);
-        }
+        // Render table
+        tbody.innerHTML = data.slice(0, 15).map(item => {
+            const badgeClass = item.risk_level === 'HIGH' ? 'badge-high' : 
+                              item.risk_level === 'MEDIUM' ? 'badge-medium' : 'badge-low';
+            return `
+                <tr>
+                    <td style="font-weight: 500;">${escapeHtml(item.barangay)}</td>
+                    <td style="text-align: center; font-weight: 600;">${item.recent_crimes}</td>
+                    <td style="text-align: center;"><span class="badge ${badgeClass}">${item.risk_level}</span></td>
+                    <td style="font-size: 0.8125rem;">${escapeHtml(item.recommended_action)}</td>
+                </tr>
+            `;
+        }).join('');
     } catch (error) {
-        console.error('Error loading barangay statistics:', error);
-    } finally {
-        hideLoading();
+        console.error('Error loading risk data:', error);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--danger);">Failed to load risk data</td></tr>';
     }
 }
 
-// Display top barangays with hover tooltip showing crime breakdown
-function displayTopBarangays(topBarangays) {
-    const container = document.getElementById('topBarangays');
-    container.innerHTML = '';
+// Load Monthly Warning
+async function loadMonthlyWarning() {
+    const container = document.getElementById('monthlyWarningContainer');
+    const monthInput = document.getElementById('warningMonthFilter');
     
-    topBarangays.forEach((item, index) => {
-        const div = document.createElement('div');
-        div.style.cssText = 'padding: 1rem; background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 8px; border-left: 4px solid ' + getRankColor(index) + '; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; position: relative; cursor: pointer;';
-        div.onmouseenter = function() { 
-            this.style.transform = 'translateY(-2px)'; 
-            this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-            const tooltip = this.querySelector('.crime-tooltip');
-            if (tooltip) tooltip.style.display = 'block';
-        };
-        div.onmouseleave = function() { 
-            this.style.transform = 'translateY(0)'; 
-            this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-            const tooltip = this.querySelector('.crime-tooltip');
-            if (tooltip) tooltip.style.display = 'none';
-        };
+    let dateParam = monthInput.value ? monthInput.value + '-01' : 
+        `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
+    
+    container.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+    
+    try {
+        const response = await fetch(`/api/statistics/monthly-warning?date=${dateParam}`);
+        const result = await response.json();
+        const data = result.data || result;
         
-        // Build crime breakdown tooltip content
-        let tooltipContent = '';
-        if (item.crime_breakdown && item.crime_breakdown.length > 0) {
-            tooltipContent = item.crime_breakdown.map(crime => 
-                `<div style="display: flex; justify-content: space-between; gap: 1rem; padding: 0.25rem 0;">
-                    <span style="color: #374151;">${crime.type}</span>
-                    <span style="font-weight: 600; color: ${getRankColor(index)};">${crime.count}</span>
-                </div>`
-            ).join('');
-        } else {
-            tooltipContent = '<span style="color: #6b7280; font-style: italic;">No breakdown available</span>';
-        }
-        
-        div.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="flex: 1;">
-                    <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600; margin-bottom: 0.25rem;">#${index + 1}</div>
-                    <div style="font-weight: 600; font-size: 0.875rem; color: #1f2937; line-height: 1.2;">${item.barangay}</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 1.5rem; font-weight: 700; color: ${getRankColor(index)};">${item.total_crimes}</div>
-                    <div style="font-size: 0.65rem; color: #6b7280; text-transform: uppercase;">crimes</div>
+        container.innerHTML = `
+            <div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border: 1px solid #FCD34D; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                    <span style="font-size: 1.5rem;">⚠️</span>
+                    <div>
+                        <div style="font-size: 1.125rem; font-weight: 700; color: #92400E;">Crime Alert: ${escapeHtml(data.month)}</div>
+                        <div style="color: #A16207; font-size: 0.875rem;">${escapeHtml(data.warning)}</div>
+                    </div>
                 </div>
             </div>
-            <div class="crime-tooltip" style="display: none; position: absolute; bottom: 100%; left: 0; right: 0; background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; margin-bottom: 0.5rem;">
-                <div style="font-weight: 600; font-size: 0.75rem; color: #1D3557; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">Top Crime Types</div>
-                ${tooltipContent}
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div style="background: var(--gray-50); border-radius: 10px; padding: 1rem;">
+                    <div style="font-weight: 600; color: var(--gray-900); margin-bottom: 0.5rem;">📊 Likely Crime Types</div>
+                    ${data.likely_crimes?.length > 0 ? `
+                        <ul style="margin: 0; padding-left: 1.25rem; color: var(--gray-700); font-size: 0.875rem;">
+                            ${data.likely_crimes.map(c => `<li style="margin-bottom: 0.25rem;"><strong>${escapeHtml(c.crime_type)}</strong> (${c.historical_total} historical)</li>`).join('')}
+                        </ul>
+                    ` : '<p style="color: var(--gray-500); font-size: 0.875rem;">No patterns detected</p>'}
+                </div>
+                <div style="background: #EFF6FF; border-radius: 10px; padding: 1rem;">
+                    <div style="font-weight: 600; color: #1E40AF; margin-bottom: 0.5rem;">👮 Patrol Recommendation</div>
+                    <p style="color: #1E3A8A; margin: 0; font-size: 0.875rem; line-height: 1.5;">${escapeHtml(data.recommended_action)}</p>
+                </div>
             </div>
         `;
-        container.appendChild(div);
-    });
+    } catch (error) {
+        console.error('Error loading monthly warning:', error);
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Failed to load monthly warning</p></div>';
+    }
 }
 
-// Get color based on rank
-function getRankColor(index) {
-    if (index === 0) return '#dc2626'; // Red for #1
-    if (index === 1) return '#ea580c'; // Orange-red for #2
-    if (index === 2) return '#f59e0b'; // Orange for #3
-    if (index < 5) return '#3b82f6'; // Blue for top 5
-    return '#6b7280'; // Gray for others
-}
-
-// Export crime data (CSV) - respects current filters
-function exportCrimeData() {
-    const yearFilter = document.getElementById('yearFilter')?.value || '';
-    const monthFilter = document.getElementById('monthFilter')?.value || '';
-    const crimeType = document.getElementById('crimeTypeFilter')?.value || '';
+// Export Functions
+function exportCrimeDataCSV() {
+    const year = document.getElementById('yearFilter').value;
+    const month = document.getElementById('monthFilter').value;
+    const crimeType = document.getElementById('crimeTypeFilter').value;
     
     let url = '/api/statistics/export-crime-data';
     const params = [];
-    
-    if (yearFilter) params.push(`year=${yearFilter}`);
-    if (monthFilter) params.push(`month=${monthFilter}`);
+    if (year) params.push(`year=${year}`);
+    if (month) params.push(`month=${month}`);
     if (crimeType) params.push(`crime_type=${encodeURIComponent(crimeType)}`);
+    if (params.length > 0) url += '?' + params.join('&');
     
-    if (params.length > 0) {
-        url += '?' + params.join('&');
-    }
-    
-    console.log('📥 Exporting crime data:', { year: yearFilter, month: monthFilter, crimeType });
     window.location.href = url;
 }
 
-// Export forecast data (JSON) - includes current forecast
-function exportForecastData() {
+function exportForecastJSON() {
     if (!forecastData || forecastData.length === 0) {
-        alert('⚠️ No forecast data available. Please load a forecast first by selecting a crime type and clicking "Refresh Forecast".');
+        alert('No forecast data available. Please load a forecast first.');
         return;
     }
     
-    const horizon = document.getElementById('forecastHorizon')?.value || '12';
-    const crimeType = document.getElementById('crimeTypeFilter')?.value || '';
+    const horizon = document.getElementById('forecastHorizon').value;
+    const crimeType = document.getElementById('crimeTypeFilter').value;
     
     const exportData = {
         metadata: {
+            exported_at: new Date().toISOString(),
             crime_type: crimeType || 'All Crimes',
             forecast_horizon: `${horizon} months`,
-            model: 'SARIMA(1,1,1)(1,1,1)[12]',
-            forecast_period: `${forecastData[0]?.date} to ${forecastData[forecastData.length - 1]?.date}`,
-            exported_at: new Date().toISOString(),
-            total_forecast_points: forecastData.length
+            model: 'SARIMA(0,1,1)(0,1,1)[12]',
+            total_points: forecastData.length
         },
         forecast: forecastData
     };
@@ -1907,15 +1415,62 @@ function exportForecastData() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    
-    const crimeTypeName = crimeType ? crimeType.toLowerCase().replace(/ /g, '_') : 'all_crimes';
-    link.download = `forecast_${crimeTypeName}_${horizon}months_${new Date().toISOString().split('T')[0]}.json`;
-    
+    link.download = `forecast_${(crimeType || 'all_crimes').toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    
-    console.log('📥 Exported forecast data:', link.download);
 }
 
+function exportFullReport() {
+    // Generate comprehensive CSV report
+    let csv = 'Alert Davao - Crime Statistics Report\n';
+    csv += `Generated: ${new Date().toLocaleString()}\n\n`;
+    
+    // Summary section
+    csv += 'SUMMARY\n';
+    csv += 'Metric,Value\n';
+    csv += `Total Reports,${document.getElementById('totalReports').textContent}\n`;
+    csv += `Validated Complaints,${document.getElementById('validComplaints').textContent}\n`;
+    csv += `Resolved Cases,${document.getElementById('resolvedCases').textContent}\n`;
+    csv += `Pending Review,${document.getElementById('pendingReview').textContent}\n`;
+    csv += `Active Dispatches,${document.getElementById('activeDispatches').textContent}\n`;
+    csv += `Patrol On Duty,${document.getElementById('patrolOnDuty').textContent}\n\n`;
+    
+    // Crime by type
+    if (crimeStats?.byType?.length > 0) {
+        csv += 'CRIME BY TYPE\n';
+        csv += 'Crime Type,Count\n';
+        crimeStats.byType.forEach(d => {
+            csv += `"${d.type}",${d.count}\n`;
+        });
+        csv += '\n';
+    }
+    
+    // Crime by location
+    if (crimeStats?.byLocation?.length > 0) {
+        csv += 'TOP LOCATIONS\n';
+        csv += 'Location,Count\n';
+        crimeStats.byLocation.forEach(d => {
+            csv += `"${d.location}",${d.count}\n`;
+        });
+        csv += '\n';
+    }
+    
+    // Forecast data
+    if (forecastData?.length > 0) {
+        csv += 'SARIMA FORECAST\n';
+        csv += 'Date,Forecast,Lower CI,Upper CI\n';
+        forecastData.forEach(d => {
+            csv += `${d.date},${d.forecast},${d.lower_ci},${d.upper_ci}\n`;
+        });
+    }
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `alert_davao_full_report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
 </script>
 @endsection
