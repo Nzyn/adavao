@@ -20,3 +20,10 @@ cd "$ADMIN_DIR"
 php artisan migrate --force
 
 echo "✅ Migrations complete."
+
+# Run essential seeders (safe to re-run - uses insertOrIgnore)
+echo "🌱 Running essential seeders..."
+php artisan db:seed --class=RolesTableSeeder --force
+php artisan db:seed --class=PoliceStationsSeeder --force 2>/dev/null || echo "   PoliceStationsSeeder skipped (may not be needed)"
+
+echo "✅ Seeders complete."

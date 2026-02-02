@@ -86,23 +86,62 @@ const requireAdminRole = (req, res, next) => {
  * Get verified user role from request (for file serving routes)
  * This checks the database instead of trusting client input
  * Checks BOTH user_admin (AdminSide) and users_public (UserSide) tables
+ * Uses RBAC tables (user_admin_roles, roles) with optimized single query
  */
+
+// Cache for RBAC table existence (checked once per server startup)
+let rbacTablesExist = null;
+
 const getVerifiedUserRole = async (userId) => {
   try {
     if (!userId) {
       return 'user';
     }
 
-    // First check user_admin table (AdminSide: admins and police)
-    const [adminUsers] = await db.query(
-      "SELECT role FROM user_admin WHERE id = $1",
-      [userId]
-    );
+    // Check RBAC tables exist (cached after first check)
+    if (rbacTablesExist === null) {
+      try {
+        const [tableCheck] = await db.query(
+          "SELECT to_regclass('public.user_admin_roles') AS uar, to_regclass('public.roles') AS roles",
+          []
+        );
+        rbacTablesExist = Boolean(tableCheck?.[0]?.uar && tableCheck?.[0]?.roles);
+      } catch {
+        rbacTablesExist = false;
+      }
+    }
 
-    if (adminUsers.length > 0) {
-      const role = normalizeRole(adminUsers[0].role || 'admin');
-      console.log(`✅ Found admin/police user ${userId} with role: ${role}`);
-      return role;
+    // Optimized: Single query to check user_admin with RBAC fallback
+    if (rbacTablesExist) {
+      const [adminUsers] = await db.query(
+        `SELECT 
+           ua.id,
+           COALESCE(NULLIF(ua.user_role, ''), r.role_name, 'admin') AS effective_role
+         FROM user_admin ua
+         LEFT JOIN user_admin_roles uar ON uar.user_admin_id = ua.id
+         LEFT JOIN roles r ON r.role_id = uar.role_id
+         WHERE ua.id = $1
+         LIMIT 1`,
+        [userId]
+      );
+
+      if (adminUsers.length > 0) {
+        const role = normalizeRole(adminUsers[0].effective_role);
+        console.log(`✅ Found admin/police user ${userId} with role: ${role} (RBAC optimized)`);
+        return role;
+      }
+    } else {
+      // Fallback if RBAC tables don't exist: just check user_role column
+      const [adminUsers] = await db.query(
+        "SELECT id, COALESCE(user_role, 'admin') AS user_role FROM user_admin WHERE id = $1",
+        [userId]
+      );
+
+      if (adminUsers.length > 0) {
+        const role = normalizeRole(adminUsers[0].user_role);
+        console.log(`✅ Found admin/police user ${userId} with role: ${role}`);
+        return role;
+      }
     }
 
     // If not in user_admin, check users_public (UserSide app users)
