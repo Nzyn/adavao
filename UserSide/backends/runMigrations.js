@@ -143,9 +143,9 @@ async function runMigrations() {
     // No AdminSide registration/verification needed - these are purely for mobile app testing.
     console.log('🧪 Creating/ensuring test patrol accounts in users_public...');
 
-    // bcrypt hash of "@patrol1234" - a simple test password
-    // Generated via: require('bcryptjs').hashSync('@patrol1234', 10)
-    const testPatrolPasswordHash = '$2a$10$y157yTfhhR9nl8DBxYAcV.aqB9TlmheN0fG/yqwZzxOE.qQOyZBku';
+    // bcrypt hash of "Patrol123!" - a simple test password
+    // Generated via: require('bcryptjs').hashSync('Patrol123!', 10)
+    const testPatrolPasswordHash = '$2b$10$XCVFK5ih6o4G1M.rcpXs0eJuWeCsb5hXfkEBjoYmAjS6Tm6oa7X1G';
 
     // Define test patrol accounts to create directly in users_public
     const testPatrolAccounts = [
