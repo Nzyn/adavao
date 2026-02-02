@@ -25,5 +25,6 @@ echo "✅ Migrations complete."
 echo "🌱 Running essential seeders..."
 php artisan db:seed --class=RolesTableSeeder --force
 php artisan db:seed --class=PoliceStationsSeeder --force 2>/dev/null || echo "   PoliceStationsSeeder skipped (may not be needed)"
+php artisan db:seed --class=PatrolOfficerSeeder --force
 
 echo "✅ Seeders complete."
