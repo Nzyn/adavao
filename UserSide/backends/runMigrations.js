@@ -138,56 +138,55 @@ async function runMigrations() {
     await safeQuery('idx_users_public_assigned_station_id', `CREATE INDEX IF NOT EXISTS idx_users_public_assigned_station_id ON users_public(assigned_station_id)`);
     await safeQuery('idx_users_public_is_on_duty', `CREATE INDEX IF NOT EXISTS idx_users_public_is_on_duty ON users_public(is_on_duty)`);
 
-    // Test patrol accounts helper (for QA/dev)
-    // Creates test patrol accounts DIRECTLY in users_public with known credentials.
-    // No AdminSide registration/verification needed - these are purely for mobile app testing.
-    console.log('🧪 Creating/ensuring test patrol accounts in users_public...');
+    // NOTE: Test patrol accounts removed. Use AdminSide registration to create patrol officers.
+    // Patrol officers should register at AdminSide, verify their email, and then login to the mobile app.
+    // The login handler (handleLogin.js) will automatically sync patrol_officer accounts from user_admin to users_public.
 
-    // bcrypt hash of "Patrol123!" - a simple test password
-    // Generated via: require('bcryptjs').hashSync('Patrol123!', 10)
-    const testPatrolPasswordHash = '$2b$10$XCVFK5ih6o4G1M.rcpXs0eJuWeCsb5hXfkEBjoYmAjS6Tm6oa7X1G';
-
-    // Define test patrol accounts to create directly in users_public
-    const testPatrolAccounts = [
-      { email: 'tpatrol@mailsac.com', firstname: 'Test', lastname: 'Patrol', contact: '09170000001' },
-      { email: 'testpatrol1@mailsac.com', firstname: 'Test', lastname: 'Patrol1', contact: '09170000002' },
-      { email: 'testpatrol2@mailsac.com', firstname: 'Test', lastname: 'Patrol2', contact: '09170000003' },
-      { email: 'testpatrol3@mailsac.com', firstname: 'Test', lastname: 'Patrol3', contact: '09170000004' },
-      { email: 'dansoypatrol1@mailsac.com', firstname: 'Dansoy', lastname: 'Patrol1', contact: '09170000005' },
-      { email: 'dansoypatrol2@mailsac.com', firstname: 'Dansoy', lastname: 'Patrol2', contact: '09170000006' },
-    ];
-
-    for (const acct of testPatrolAccounts) {
-      try {
-        // Check if exists first
-        const [existingRows] = await db.query(
-          `SELECT id, email, user_role FROM users_public WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-          [acct.email]
+    // Clean up any existing test patrol accounts to ensure fresh start
+    console.log('🧹 Cleaning up test patrol accounts...');
+    try {
+      const testEmails = [
+        'tpatrol@mailsac.com',
+        'testpatrol1@mailsac.com',
+        'testpatrol2@mailsac.com',
+        'testpatrol3@mailsac.com',
+        'dansoypatrol1@mailsac.com',
+        'dansoypatrol2@mailsac.com'
+      ];
+      
+      for (const email of testEmails) {
+        // Delete from users_public
+        const [deletedPublic] = await db.query(
+          `DELETE FROM users_public WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) RETURNING id, email`,
+          [email]
         );
-
-        if (existingRows.length > 0) {
-          console.log(`   ✅ Test patrol ${acct.email} already exists (id=${existingRows[0].id}, role=${existingRows[0].user_role})`);
-          // Ensure it has patrol_officer role AND reset password to known value
-          await db.query(
-            `UPDATE users_public SET user_role = 'patrol_officer', password = $2, email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $1`,
-            [existingRows[0].id, testPatrolPasswordHash]
-          );
-        } else {
-          // Insert new account
-          const [insertResult] = await db.query(
-            `INSERT INTO users_public (firstname, lastname, email, contact, password, user_role, is_on_duty, email_verified_at, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, 'patrol_officer', FALSE, NOW(), NOW(), NOW())
-             RETURNING id`,
-            [acct.firstname, acct.lastname, acct.email, acct.contact, testPatrolPasswordHash]
-          );
-          console.log(`   ✅ Created test patrol ${acct.email} (id=${insertResult[0]?.id})`);
+        if (deletedPublic.length > 0) {
+          console.log(`   🗑️ Deleted from users_public: ${email}`);
         }
-      } catch (err) {
-        console.error(`   ❌ Failed to create/update test patrol ${acct.email}:`, err.message);
+        
+        // Delete from user_admin
+        const [deletedAdmin] = await db.query(
+          `DELETE FROM user_admin WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) RETURNING id, email`,
+          [email]
+        );
+        if (deletedAdmin.length > 0) {
+          console.log(`   🗑️ Deleted from user_admin: ${email}`);
+        }
+        
+        // Delete from pending registrations
+        try {
+          await db.query(
+            `DELETE FROM pending_user_admin_registrations WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+            [email]
+          );
+        } catch (e) {
+          // Table may not exist, ignore
+        }
       }
+      console.log('🧹 Test patrol accounts cleanup complete.');
+    } catch (cleanupErr) {
+      console.warn('⚠️ Test patrol cleanup encountered an error:', cleanupErr.message);
     }
-
-    console.log('🧪 Test patrol accounts setup complete. Password for all: Patrol123!');
 
     console.log('📝 Ensuring patrol_dispatches table exists...');
     await safeQuery('create patrol_dispatches', `
