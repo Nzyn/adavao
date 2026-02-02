@@ -191,9 +191,38 @@ export const reportService = {
 
         try {
           const errorJson = JSON.parse(errorText);
-          const errorMessage = errorJson.message || `HTTP ${response.status}: ${response.statusText}`;
+          let errorMessage = errorJson.message || `HTTP ${response.status}: ${response.statusText}`;
+          
+          // Provide user-friendly error messages based on status codes
+          if (response.status === 422) {
+            // Validation errors
+            if (errorMessage.toLowerCase().includes('evidence')) {
+              errorMessage = 'Please upload at least one photo or video as evidence for your report.';
+            } else if (errorMessage.toLowerCase().includes('crime')) {
+              errorMessage = 'Please select at least one crime type for your report.';
+            } else if (errorMessage.toLowerCase().includes('description')) {
+              errorMessage = 'Please provide a description of the incident.';
+            } else if (errorMessage.toLowerCase().includes('date')) {
+              errorMessage = 'Please select the date when the incident occurred.';
+            } else {
+              errorMessage = 'Some required information is missing. Please check all fields and try again.';
+            }
+          } else if (response.status === 413) {
+            errorMessage = 'The uploaded files are too large. Please reduce the file size and try again (max 50MB total).';
+          } else if (response.status === 401 || response.status === 403) {
+            errorMessage = 'You are not authorized to submit this report. Please log in and try again.';
+          } else if (response.status === 429) {
+            errorMessage = 'Too many requests. Please wait a moment before submitting another report.';
+          } else if (response.status >= 500) {
+            errorMessage = 'The server is experiencing issues. Please try again in a few minutes.';
+          }
+          
           throw new Error(errorMessage);
         } catch (parseError) {
+          // If we already threw a user-friendly error, rethrow it
+          if (parseError instanceof Error && !parseError.message.includes('JSON')) {
+            throw parseError;
+          }
           throw new Error(`Failed to submit report: HTTP ${response.status} - ${response.statusText}`);
         }
       }

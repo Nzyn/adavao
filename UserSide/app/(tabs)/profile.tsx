@@ -12,6 +12,21 @@ import { notificationService } from '../../services/notificationService';
 import { BACKEND_URL } from '../../config/backend';
 import ChangePasswordModal from '../../components/ChangePasswordModal';
 
+// Dashboard-matching color palette
+const COLORS = {
+  primary: '#1D3557',
+  accent: '#E63946',
+  success: '#10b981',
+  warning: '#f59e0b',
+  background: '#F8FAFC',
+  white: '#FFFFFF',
+  text: '#1e293b',
+  textSecondary: '#64748b',
+  textMuted: '#94a3b8',
+  border: '#e2e8f0',
+  cardBg: '#FFFFFF',
+};
+
 export default function ProfileScreen() {
   // 📊 Performance Timing - Start
   const pageStartTime = React.useRef(Date.now());
@@ -310,40 +325,56 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: '#fff' }}
+      style={profileStyles.scrollView}
       contentContainerStyle={{ paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={true}
+      showsVerticalScrollIndicator={false}
       bounces={true}
       scrollEnabled={true}
       nestedScrollEnabled={true}
     >
-      {/* Header with Back Button and Title */}
-      <View style={styles.headerHistory}>
-        <TouchableOpacity onPress={() => router.push('/')}>
-          <Ionicons name="chevron-back" size={24} color="#000" />
+      {/* Header */}
+      <View style={profileStyles.header}>
+        <TouchableOpacity 
+          onPress={() => router.push('/')}
+          style={profileStyles.backButton}
+        >
+          <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={styles.textTitle}>
-            <Text style={styles.alertWelcome}>Alert</Text>
-            <Text style={styles.davao}>Davao</Text>
+        <View style={profileStyles.headerCenter}>
+          <Text style={profileStyles.headerTitle}>
+            <Text style={{ color: COLORS.primary }}>Alert</Text>
+            <Text style={{ color: '#000' }}>Davao</Text>
           </Text>
-          <Text style={styles.subheadingCenter}>Profile</Text>
+          <Text style={profileStyles.headerSubtitle}>Profile</Text>
         </View>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 40 }} />
       </View>
 
-      {/* Profile Header */}
-      <View style={styles.profileHeader}>
-        <Image
-          source={{ uri: 'https://i.pinimg.com/736x/3c/ae/07/3cae079ca0b9e55ec6bfc1b358c9b1e2.jpg' }} // Replace with user image
-          style={styles.profileImage}
-        />
-        <View style={styles.verifiedBadge}>
-          <Text style={styles.verifiedText}>{isUserVerified ? 'Verified' : 'Not Verified'}</Text>
+      {/* Profile Card */}
+      <View style={profileStyles.profileCard}>
+        <View style={profileStyles.profileImageContainer}>
+          <Image
+            source={{ uri: user.profileImage || 'https://i.pinimg.com/736x/3c/ae/07/3cae079ca0b9e55ec6bfc1b358c9b1e2.jpg' }}
+            style={profileStyles.profileImage}
+          />
+          <View style={[
+            profileStyles.verificationBadge,
+            { backgroundColor: isUserVerified ? COLORS.success : COLORS.warning }
+          ]}>
+            <Ionicons 
+              name={isUserVerified ? 'checkmark-circle' : 'alert-circle'} 
+              size={14} 
+              color={COLORS.white} 
+            />
+            <Text style={profileStyles.verificationBadgeText}>
+              {isUserVerified ? 'Verified' : 'Unverified'}
+            </Text>
+          </View>
         </View>
+
         {flagStatus && (
-          <View style={styles.flagBadgeContainer}>
+          <View style={profileStyles.flagBadgeContainer}>
             <FlagStatusBadge
               flagData={flagStatus}
               size="medium"
@@ -351,74 +382,111 @@ export default function ProfileScreen() {
             />
           </View>
         )}
-      </View>
 
-      {/* User Info */}
-      <View style={styles.infoContainer}>
-        <Text style={styles.name}>{user.firstName} {user.lastName}</Text>
-        <Text style={styles.email}>{user.email}</Text>
-        <Text style={styles.phone}>{user.phone}</Text>
-        <Text style={styles.address}>
-          {user.address}
-        </Text>
+        <Text style={profileStyles.userName}>{user.firstName} {user.lastName}</Text>
+        
+        <View style={profileStyles.infoGrid}>
+          <View style={profileStyles.infoItem}>
+            <View style={[profileStyles.infoIcon, { backgroundColor: '#e0f2fe' }]}>
+              <Ionicons name="mail" size={18} color={COLORS.primary} />
+            </View>
+            <View style={profileStyles.infoTextContainer}>
+              <Text style={profileStyles.infoLabel}>Email</Text>
+              <Text style={profileStyles.infoValue}>{user.email}</Text>
+            </View>
+          </View>
 
-        {/* Database Status Indicator - Removed per user request */}
+          <View style={profileStyles.infoItem}>
+            <View style={[profileStyles.infoIcon, { backgroundColor: '#dcfce7' }]}>
+              <Ionicons name="call" size={18} color={COLORS.success} />
+            </View>
+            <View style={profileStyles.infoTextContainer}>
+              <Text style={profileStyles.infoLabel}>Phone</Text>
+              <Text style={profileStyles.infoValue}>{user.phone || 'Not provided'}</Text>
+            </View>
+          </View>
+
+          <View style={profileStyles.infoItem}>
+            <View style={[profileStyles.infoIcon, { backgroundColor: '#fef3c7' }]}>
+              <Ionicons name="location" size={18} color={COLORS.warning} />
+            </View>
+            <View style={profileStyles.infoTextContainer}>
+              <Text style={profileStyles.infoLabel}>Address</Text>
+              <Text style={profileStyles.infoValue}>{user.address || 'Not provided'}</Text>
+            </View>
+          </View>
+        </View>
 
         {user.updatedAt && (
-          <View style={profileStyles.statusContainer}>
-            <Ionicons name="time-outline" size={16} color="#666" />
-            <Text style={profileStyles.statusText}>
-              Last updated: {new Date(user.updatedAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}
+          <View style={profileStyles.lastUpdated}>
+            <Ionicons name="time-outline" size={14} color={COLORS.textMuted} />
+            <Text style={profileStyles.lastUpdatedText}>
+              Last updated: {new Date(user.updatedAt).toLocaleDateString('en-US', { 
+                timeZone: 'Asia/Manila',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })}
             </Text>
           </View>
         )}
+      </View>
 
-        {/* Edit Profile Button */}
+      {/* Action Buttons */}
+      <View style={profileStyles.actionsContainer}>
         <TouchableOpacity
-          style={profileStyles.editButton}
+          style={profileStyles.actionButton}
           onPress={() => router.push('/edit-profile')}
         >
-          <Ionicons name="create-outline" size={20} color="#FF6B35" />
-          <Text style={profileStyles.editButtonText}>Edit Profile</Text>
+          <View style={[profileStyles.actionIcon, { backgroundColor: '#e0f2fe' }]}>
+            <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+          </View>
+          <View style={profileStyles.actionTextContainer}>
+            <Text style={profileStyles.actionTitle}>Edit Profile</Text>
+            <Text style={profileStyles.actionSubtitle}>Update your personal information</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
         </TouchableOpacity>
 
-        {/* Change Password Button */}
         <TouchableOpacity
-          style={profileStyles.editButton}
+          style={profileStyles.actionButton}
           onPress={() => setShowPasswordModal(true)}
         >
-          <Ionicons name="lock-closed-outline" size={20} color="#FF6B35" />
-          <Text style={profileStyles.editButtonText}>Change Password</Text>
+          <View style={[profileStyles.actionIcon, { backgroundColor: '#fef3c7' }]}>
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.warning} />
+          </View>
+          <View style={profileStyles.actionTextContainer}>
+            <Text style={profileStyles.actionTitle}>Change Password</Text>
+            <Text style={profileStyles.actionSubtitle}>Update your account password</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
         </TouchableOpacity>
       </View>
 
       {/* Verification Section */}
       <View style={profileStyles.verificationContainer}>
-        <Text style={profileStyles.sectionTitle}>Verification</Text>
+        <Text style={profileStyles.sectionTitle}>Account Verification</Text>
 
         {loadingVerification ? (
-          <Text style={profileStyles.loadingText}>Loading verification status...</Text>
+          <View style={profileStyles.loadingContainer}>
+            <Text style={profileStyles.loadingText}>Loading verification status...</Text>
+          </View>
         ) : (
           <>
             {/* Verified Users - Show status only */}
             {isUserVerified && (
-              <View style={{
-                backgroundColor: '#d1fae5',
-                padding: 16,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: '#10b981',
-                alignItems: 'center'
-              }}>
-                <Ionicons name="checkmark-circle" size={48} color="#10b981" />
-                <Text style={{ fontSize: 18, fontWeight: '600', color: '#065f46', marginTop: 8 }}>
+              <View style={profileStyles.statusCard}>
+                <View style={[profileStyles.statusIconContainer, { backgroundColor: '#dcfce7' }]}>
+                  <Ionicons name="checkmark-circle" size={32} color={COLORS.success} />
+                </View>
+                <Text style={[profileStyles.statusTitle, { color: '#065f46' }]}>
                   Account Verified
                 </Text>
-                <Text style={{ fontSize: 14, color: '#047857', marginTop: 4 }}>
+                <Text style={profileStyles.statusDescription}>
                   Your identity has been verified by an administrator.
                 </Text>
                 {verificationStatus?.updated_at && (
-                  <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
+                  <Text style={profileStyles.statusDate}>
                     Verified on: {new Date(verificationStatus.updated_at).toLocaleDateString('en-US', {
                       year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Manila'
                     })}
@@ -429,19 +497,14 @@ export default function ProfileScreen() {
 
             {/* Pending Verification */}
             {hasPendingVerification && (
-              <View style={{
-                backgroundColor: '#fef3c7',
-                padding: 16,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: '#f59e0b',
-                alignItems: 'center'
-              }}>
-                <Ionicons name="time" size={48} color="#f59e0b" />
-                <Text style={{ fontSize: 18, fontWeight: '600', color: '#92400e', marginTop: 8 }}>
+              <View style={profileStyles.statusCard}>
+                <View style={[profileStyles.statusIconContainer, { backgroundColor: '#fef3c7' }]}>
+                  <Ionicons name="time" size={32} color={COLORS.warning} />
+                </View>
+                <Text style={[profileStyles.statusTitle, { color: '#92400e' }]}>
                   Verification Pending
                 </Text>
-                <Text style={{ fontSize: 14, color: '#b45309', marginTop: 4, textAlign: 'center' }}>
+                <Text style={profileStyles.statusDescription}>
                   Your verification request is being reviewed. Please wait for admin approval.
                 </Text>
               </View>
@@ -450,56 +513,95 @@ export default function ProfileScreen() {
             {/* Rejected or Not Verified - Show upload form */}
             {!isUserVerified && !hasPendingVerification && (
               <>
-                <View style={profileStyles.verificationStatus}>
-                  <Text style={profileStyles.statusText}>
-                    Status: {wasRejected ? 'Rejected - Please resubmit' : 'Not verified'}
-                  </Text>
+                <View style={profileStyles.uploadSection}>
                   {wasRejected && (
-                    <Text style={{ fontSize: 13, color: '#dc2626', marginTop: 4 }}>
-                      Your previous request was rejected. Please upload new documents.
-                    </Text>
+                    <View style={profileStyles.rejectedBanner}>
+                      <Ionicons name="close-circle" size={20} color={COLORS.accent} />
+                      <Text style={profileStyles.rejectedText}>
+                        Your previous request was rejected. Please upload new documents.
+                      </Text>
+                    </View>
                   )}
-                </View>
 
-                {/* Upload Buttons */}
-                <View style={styles.buttonsContainer}>
+                  <Text style={profileStyles.uploadInstructions}>
+                    Upload at least one document to verify your identity
+                  </Text>
+
+                  {/* Upload Buttons */}
                   <TouchableOpacity
-                    style={[styles.button, uploading ? styles.disabledButton : {}]}
+                    style={[profileStyles.uploadButton, idPicture && profileStyles.uploadButtonSuccess]}
                     disabled={uploading}
                     onPress={() => pickImage(setIdPicture)}
                   >
-                    <Text style={styles.buttonText}>
-                      {idPicture ? '✓ ID Picture Uploaded' : 'ID Picture: No file uploaded'}
-                    </Text>
+                    <View style={profileStyles.uploadButtonContent}>
+                      <Ionicons 
+                        name={idPicture ? 'checkmark-circle' : 'id-card-outline'} 
+                        size={24} 
+                        color={idPicture ? COLORS.success : COLORS.primary} 
+                      />
+                      <View style={profileStyles.uploadButtonTextContainer}>
+                        <Text style={profileStyles.uploadButtonTitle}>ID Picture</Text>
+                        <Text style={profileStyles.uploadButtonSubtitle}>
+                          {idPicture ? 'Document uploaded ✓' : 'Upload a clear photo of your ID'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="cloud-upload-outline" size={20} color={COLORS.textMuted} />
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.button, uploading ? styles.disabledButton : {}]}
+                    style={[profileStyles.uploadButton, idSelfie && profileStyles.uploadButtonSuccess]}
                     disabled={uploading}
                     onPress={() => pickImage(setIdSelfie)}
                   >
-                    <Text style={styles.buttonText}>
-                      {idSelfie ? '✓ Selfie with ID Uploaded' : 'Selfie with ID: No file uploaded'}
-                    </Text>
+                    <View style={profileStyles.uploadButtonContent}>
+                      <Ionicons 
+                        name={idSelfie ? 'checkmark-circle' : 'camera-outline'} 
+                        size={24} 
+                        color={idSelfie ? COLORS.success : COLORS.primary} 
+                      />
+                      <View style={profileStyles.uploadButtonTextContainer}>
+                        <Text style={profileStyles.uploadButtonTitle}>Selfie with ID</Text>
+                        <Text style={profileStyles.uploadButtonSubtitle}>
+                          {idSelfie ? 'Document uploaded ✓' : 'Take a selfie holding your ID'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="cloud-upload-outline" size={20} color={COLORS.textMuted} />
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.button, uploading ? styles.disabledButton : {}]}
+                    style={[profileStyles.uploadButton, billingDocument && profileStyles.uploadButtonSuccess]}
                     disabled={uploading}
                     onPress={() => pickImage(setBillingDocument)}
                   >
-                    <Text style={styles.buttonText}>
-                      {billingDocument ? '✓ Billing Document Uploaded' : 'Billing Document: No file uploaded'}
-                    </Text>
+                    <View style={profileStyles.uploadButtonContent}>
+                      <Ionicons 
+                        name={billingDocument ? 'checkmark-circle' : 'document-text-outline'} 
+                        size={24} 
+                        color={billingDocument ? COLORS.success : COLORS.primary} 
+                      />
+                      <View style={profileStyles.uploadButtonTextContainer}>
+                        <Text style={profileStyles.uploadButtonTitle}>Billing Document</Text>
+                        <Text style={profileStyles.uploadButtonSubtitle}>
+                          {billingDocument ? 'Document uploaded ✓' : 'Upload a utility bill or similar'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="cloud-upload-outline" size={20} color={COLORS.textMuted} />
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.button, (!idPicture && !idSelfie && !billingDocument) || uploading ? styles.disabledButton : {}]}
+                    style={[
+                      profileStyles.submitButton,
+                      ((!idPicture && !idSelfie && !billingDocument) || uploading) && profileStyles.submitButtonDisabled
+                    ]}
                     disabled={(!idPicture && !idSelfie && !billingDocument) || uploading}
                     onPress={submitVerification}
                   >
-                    <Text style={styles.buttonText}>
-                      {uploading ? 'Submitting...' : wasRejected ? 'Resubmit Verification' : 'Submit Verification'}
+                    <Ionicons name="shield-checkmark" size={20} color={COLORS.white} />
+                    <Text style={profileStyles.submitButtonText}>
+                      {uploading ? 'Submitting...' : wasRejected ? 'Resubmit Verification' : 'Submit for Verification'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -513,100 +615,309 @@ export default function ProfileScreen() {
         visible={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
       />
-    </ScrollView >
+    </ScrollView>
   );
 }
 
 const profileStyles = StyleSheet.create({
-  editButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    backgroundColor: '#fff',
-    borderColor: '#FF6B35',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    marginTop: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  // Main Container
+  scrollView: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  editButtonText: {
-    color: '#FF6B35',
-    fontSize: 16,
-    fontWeight: '600' as const,
-    marginLeft: 8,
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? 40 : 50,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  statusContainer: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    marginTop: 10,
-    paddingVertical: 5,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  statusText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 5,
-    fontStyle: 'italic' as const,
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
   },
-  debugButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    backgroundColor: '#f5f5f5',
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    marginTop: 10,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
   },
-  debugButtonText: {
-    color: '#666',
+  headerSubtitle: {
     fontSize: 14,
-    fontWeight: '500' as const,
-    marginLeft: 6,
+    color: COLORS.textSecondary,
+    marginTop: 2,
   },
+  // Profile Card
+  profileCard: {
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+  },
+  verificationBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: -10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  verificationBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  flagBadgeContainer: {
+    marginBottom: 8,
+  },
+  userName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 16,
+  },
+  // Info Grid
+  infoGrid: {
+    width: '100%',
+    gap: 12,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    padding: 12,
+    borderRadius: 12,
+  },
+  infoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.text,
+  },
+  lastUpdated: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    gap: 6,
+  },
+  lastUpdatedText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+  },
+  // Actions Container
+  actionsContainer: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    gap: 10,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  actionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionTextContainer: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  actionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  actionSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  // Verification Container
   verificationContainer: {
+    marginHorizontal: 16,
     marginTop: 20,
-    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold' as const,
-    marginBottom: 15,
-    color: '#333',
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 16,
   },
-  verificationStatus: {
-    marginBottom: 15,
-    padding: 15,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  pendingText: {
-    fontSize: 14,
-    color: '#ff9800',
-    marginTop: 5,
-    fontStyle: 'italic' as const,
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
   },
   loadingText: {
-    textAlign: 'center' as const,
-    padding: 20,
-    fontSize: 16,
-    color: '#666',
-  },
-  infoText: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textSecondary,
+  },
+  // Status Card
+  statusCard: {
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: COLORS.background,
+  },
+  statusIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  statusDescription: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    marginTop: 10,
-    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  statusDate: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 12,
+  },
+  // Upload Section
+  uploadSection: {
+    gap: 12,
+  },
+  rejectedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    padding: 12,
+    borderRadius: 10,
+    gap: 10,
+    marginBottom: 4,
+  },
+  rejectedText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.accent,
+    lineHeight: 18,
+  },
+  uploadInstructions: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  uploadButtonSuccess: {
+    borderColor: COLORS.success,
+    backgroundColor: '#f0fdf4',
+  },
+  uploadButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  uploadButtonTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  uploadButtonTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  uploadButtonSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+    gap: 10,
+  },
+  submitButtonDisabled: {
+    backgroundColor: COLORS.textMuted,
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
   },
 });

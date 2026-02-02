@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, FlatList } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, FlatList, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useUser } from '../../contexts/UserContext';
@@ -7,6 +7,21 @@ import * as Location from 'expo-location';
 import styles from './styles';
 import { BACKEND_URL } from '../../config/backend';
 import { searchBarangay } from '../../services/policeStationService';
+
+// Dashboard-matching color palette
+const COLORS = {
+  primary: '#1D3557',
+  accent: '#E63946',
+  success: '#10b981',
+  warning: '#f59e0b',
+  background: '#F8FAFC',
+  white: '#FFFFFF',
+  text: '#1e293b',
+  textSecondary: '#64748b',
+  textMuted: '#94a3b8',
+  border: '#e2e8f0',
+  cardBg: '#FFFFFF',
+};
 
 interface Barangay {
   barangay_id: number;
@@ -567,36 +582,56 @@ const LocationScreen = () => {
   return (
     <View style={localStyles.container}>
       {/* Header */}
-      <View style={styles.headerHistory}>
-        <TouchableOpacity onPress={() => router.push("/")}>
-          <Ionicons name="chevron-back" size={24} color="#000" />
+      <View style={localStyles.header}>
+        <TouchableOpacity 
+          onPress={() => router.push("/")}
+          style={localStyles.backButton}
+        >
+          <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={styles.textTitle}>
-            <Text style={styles.alertWelcome}>Alert</Text>
-            <Text style={styles.davao}>Davao</Text>
+        <View style={localStyles.headerCenter}>
+          <Text style={localStyles.headerTitle}>
+            <Text style={{ color: COLORS.primary }}>Alert</Text>
+            <Text style={{ color: '#000' }}>Davao</Text>
           </Text>
-          <Text style={styles.subheadingCenter}>Police Stations</Text>
+          <Text style={localStyles.headerSubtitle}>Police Stations</Text>
         </View>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Stats Summary */}
+      <View style={localStyles.statsContainer}>
+        <View style={[localStyles.statBox, { backgroundColor: '#e0f2fe' }]}>
+          <Ionicons name="shield-checkmark" size={20} color={COLORS.primary} />
+          <Text style={localStyles.statNumber}>{stations.length}</Text>
+          <Text style={localStyles.statLabel}>Total Stations</Text>
+        </View>
+        <View style={[localStyles.statBox, { backgroundColor: '#dcfce7' }]}>
+          <Ionicons name="location" size={20} color={COLORS.success} />
+          <Text style={localStyles.statNumber}>{sortedStations.length}</Text>
+          <Text style={localStyles.statLabel}>Results</Text>
+        </View>
       </View>
 
       {/* Display User Address */}
       {userAddress && !searchAddress && (
         <View style={localStyles.userAddressContainer}>
-          <Ionicons name="location" size={20} color="#1d3557" style={{ marginRight: 8 }} />
-          <Text style={localStyles.userAddressText}>Saved Address: {userAddress}</Text>
+          <Ionicons name="home" size={18} color={COLORS.primary} style={{ marginRight: 10 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={localStyles.userAddressLabel}>Your Saved Address</Text>
+            <Text style={localStyles.userAddressText}>{userAddress}</Text>
+          </View>
         </View>
       )}
 
       {/* Search Input */}
       <View style={{ zIndex: 10 }}>
         <View style={localStyles.searchBar}>
-          <Ionicons name="search-outline" size={20} color="#999" style={{ marginRight: 8 }} />
+          <Ionicons name="search-outline" size={20} color={COLORS.textMuted} style={{ marginRight: 10 }} />
           <TextInput
             style={localStyles.searchInput}
             placeholder="Search by Barangay or Address..."
-            placeholderTextColor="#999"
+            placeholderTextColor={COLORS.textMuted}
             value={searchAddress}
             onChangeText={(text) => {
               setSearchAddress(text);
@@ -609,8 +644,11 @@ const LocationScreen = () => {
             onSubmitEditing={handleSearchAddress}
             returnKeyType="search"
           />
-          <TouchableOpacity onPress={handleSearchAddress}>
-            <Ionicons name="search-circle" size={32} color="#1d3557" />
+          <TouchableOpacity 
+            onPress={handleSearchAddress}
+            style={localStyles.searchButton}
+          >
+            <Ionicons name="search" size={20} color={COLORS.white} />
           </TouchableOpacity>
         </View>
 
@@ -623,7 +661,7 @@ const LocationScreen = () => {
                 style={localStyles.dropdownItem}
                 onPress={() => handleBarangaySelect(barangay)}
               >
-                <Ionicons name="location-outline" size={16} color="#666" style={{ marginRight: 8 }} />
+                <Ionicons name="location-outline" size={16} color={COLORS.primary} style={{ marginRight: 10 }} />
                 <Text style={localStyles.dropdownText}>{barangay.barangay_name}</Text>
               </TouchableOpacity>
             ))}
@@ -633,25 +671,26 @@ const LocationScreen = () => {
 
       {/* Use Current Location Button */}
       <TouchableOpacity
-        style={localStyles.useLocationButton}
+        style={[localStyles.useLocationButton, isGeocoding && localStyles.useLocationButtonDisabled]}
         onPress={handleUseCurrentLocation}
         disabled={isGeocoding}
       >
         <Ionicons
-          name="locate"
+          name="navigate"
           size={20}
-          color="#fff"
-          style={{ marginRight: 8 }}
+          color={COLORS.white}
+          style={{ marginRight: 10 }}
         />
         <Text style={localStyles.useLocationButtonText}>
           {isGeocoding ? 'Getting location...' : 'Use My Current Location'}
         </Text>
+        {isGeocoding && <ActivityIndicator size="small" color={COLORS.white} style={{ marginLeft: 10 }} />}
       </TouchableOpacity>
 
       {/* Loading Indicator */}
       {isGeocoding && (
         <View style={localStyles.loadingContainer}>
-          <ActivityIndicator size="small" color="#1d3557" />
+          <ActivityIndicator size="small" color={COLORS.primary} />
           <Text style={localStyles.loadingText}>Finding nearest stations...</Text>
         </View>
       )}
@@ -659,23 +698,28 @@ const LocationScreen = () => {
       {/* Current Location Indicator */}
       {currentLocationName && userCoordinates && (
         <View style={localStyles.currentLocationContainer}>
-          <Ionicons name="navigate" size={18} color="#28a745" style={{ marginRight: 6 }} />
+          <Ionicons name="navigate-circle" size={20} color={COLORS.success} style={{ marginRight: 8 }} />
           <Text style={localStyles.currentLocationText}>
-            Showing nearest stations from: <Text style={{ fontWeight: '600' }}>{currentLocationName}</Text>
+            Showing nearest stations from: <Text style={{ fontWeight: '700' }}>{currentLocationName}</Text>
           </Text>
         </View>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={localStyles.sectionTitle}>
-          {userCoordinates ? "Results" : (sortedStations.length > 0 ? "Police Stations" : "")}
-        </Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+        {sortedStations.length > 0 && (
+          <Text style={localStyles.sectionTitle}>
+            {userCoordinates ? "Nearest Police Stations" : "Search Results"}
+          </Text>
+        )}
 
         {!userCoordinates && sortedStations.length === 0 && (
-          <View style={{ alignItems: 'center', marginTop: 40, paddingHorizontal: 20 }}>
-            <Ionicons name="search" size={48} color="#ccc" />
-            <Text style={{ textAlign: 'center', color: '#666', marginTop: 16, fontSize: 16 }}>
-              Search for a Barangay or use your location to find the nearest police station.
+          <View style={localStyles.emptyState}>
+            <View style={localStyles.emptyIconContainer}>
+              <Ionicons name="shield-outline" size={48} color={COLORS.textMuted} />
+            </View>
+            <Text style={localStyles.emptyTitle}>Find Your Nearest Station</Text>
+            <Text style={localStyles.emptyText}>
+              Search for a Barangay or use your current location to find the nearest police station.
             </Text>
           </View>
         )}
@@ -683,14 +727,36 @@ const LocationScreen = () => {
         {sortedStations.map((station, index) => (
           <View key={index} style={localStyles.card}>
             <View style={localStyles.cardHeader}>
-              <Text style={localStyles.cardTitle}>{station.name}</Text>
-              {station.distance && (
-                <Text style={localStyles.distanceText}>{station.distance.toFixed(2)} km</Text>
+              <View style={localStyles.cardTitleRow}>
+                <View style={localStyles.stationIcon}>
+                  <Ionicons name="shield-checkmark" size={18} color={COLORS.white} />
+                </View>
+                <Text style={localStyles.cardTitle}>{station.name}</Text>
+              </View>
+              {station.distance > 0 && (
+                <View style={localStyles.distanceBadge}>
+                  <Ionicons name="navigate" size={12} color={COLORS.primary} />
+                  <Text style={localStyles.distanceText}>{station.distance.toFixed(2)} km</Text>
+                </View>
               )}
             </View>
-            <Text style={localStyles.phone}>{station.phone}</Text>
-            <Text style={localStyles.address}>{station.address}</Text>
-            <Text style={localStyles.coordinates}>📍 {station.coordinates}</Text>
+            
+            <View style={localStyles.cardDivider} />
+            
+            <View style={localStyles.cardContent}>
+              <View style={localStyles.cardRow}>
+                <Ionicons name="call" size={16} color={COLORS.success} />
+                <Text style={localStyles.cardPhone}>{station.phone}</Text>
+              </View>
+              <View style={localStyles.cardRow}>
+                <Ionicons name="location" size={16} color={COLORS.accent} />
+                <Text style={localStyles.cardAddress}>{station.address}</Text>
+              </View>
+              <View style={localStyles.cardRow}>
+                <Ionicons name="map" size={16} color={COLORS.textMuted} />
+                <Text style={localStyles.cardCoordinates}>{station.coordinates}</Text>
+              </View>
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -703,174 +769,321 @@ export default LocationScreen;
 const localStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.background,
+    paddingTop: Platform.OS === 'android' ? 40 : 50,
+  },
+  // Header Styles
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 50,
-  },
-  headerHistory: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  textTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#000",
-  },
-  userAddressContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#e8f4f8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
     paddingVertical: 12,
-    marginBottom: 20,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  // Stats Summary
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  statBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  // User Address
+  userAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
+  },
+  userAddressLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 2,
   },
   userAddressText: {
-    flex: 1,
     fontSize: 14,
-    color: "#1d3557",
-    fontWeight: "500",
+    color: COLORS.text,
+    fontWeight: '500',
   },
+  // Loading
   loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginHorizontal: 16,
   },
   loadingText: {
-    marginLeft: 8,
+    marginLeft: 10,
     fontSize: 14,
-    color: "#1d3557",
+    color: COLORS.textSecondary,
   },
+  // Current Location
   currentLocationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#e8f8f0",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    borderLeftWidth: 3,
-    borderLeftColor: "#28a745",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dcfce7',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.success,
   },
   currentLocationText: {
     flex: 1,
     fontSize: 13,
-    color: "#155724",
+    color: '#166534',
   },
+  // Search Bar
   searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f2f2f2",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
-    color: "#333",
+    fontSize: 15,
+    color: COLORS.text,
+    paddingVertical: 4,
   },
+  searchButton: {
+    backgroundColor: COLORS.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Dropdown
   dropdown: {
     position: 'absolute',
-    top: 55, // Height of searchBar + margin/padding
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    elevation: 5,
+    top: 62,
+    left: 16,
+    right: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    elevation: 8,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
     zIndex: 100,
-    marginTop: 5,
     borderWidth: 1,
-    borderColor: '#eee'
+    borderColor: COLORS.border,
+    overflow: 'hidden',
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0'
+    borderBottomColor: COLORS.border,
   },
   dropdownText: {
     fontSize: 14,
-    color: '#333'
+    color: COLORS.text,
+    fontWeight: '500',
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#0a2a66",
-    marginBottom: 10,
-    marginTop: 10,
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
+  // Use Location Button
+  useLocationButton: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginTop: 12,
     marginBottom: 16,
-    shadowColor: "#000",
+    borderRadius: 12,
+    elevation: 3,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  useLocationButtonDisabled: {
+    opacity: 0.7,
+  },
+  useLocationButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Section Title
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  // Empty State
+  emptyState: {
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  // Station Cards
+  card: {
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  stationIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
   cardTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1d3557",
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+    flex: 1,
+  },
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
   },
   distanceText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#457b9d",
-    backgroundColor: "#e8f4f8",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
-  phone: {
+  cardDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: 12,
+  },
+  cardContent: {
+    gap: 10,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  cardPhone: {
     fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 4,
+    fontWeight: '600',
+    color: COLORS.text,
+    flex: 1,
   },
-  address: {
+  cardAddress: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    flex: 1,
+    lineHeight: 20,
+  },
+  cardCoordinates: {
     fontSize: 12,
-    color: "#555",
-    lineHeight: 16,
-  },
-  coordinates: {
-    fontSize: 12,
-    color: "#333",
-    marginTop: 4,
-  },
-  useLocationButton: {
-    backgroundColor: "#1d3557",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  useLocationButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: COLORS.textMuted,
+    flex: 1,
   },
 });

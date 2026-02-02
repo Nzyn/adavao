@@ -702,7 +702,7 @@ const localStyles = StyleSheet.create({
     // Input Area
     inputWrapper: {
         backgroundColor: COLORS.white,
-        paddingBottom: Platform.OS === 'android' ? 90 : 30,
+        paddingBottom: Platform.OS === 'android' ? 20 : 20,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
     },

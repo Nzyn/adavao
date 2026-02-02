@@ -500,17 +500,18 @@ async function submitReport(req, res) {
       const hasImage = files.some((f) => (f.mimetype || '').startsWith('image/'));
       const hasVideo = files.some((f) => (f.mimetype || '').startsWith('video/'));
 
-      if (!hasImage || !hasVideo) {
-        console.log('❌ Evidence incomplete (need photo + video). Provided:', files.map(f => f.mimetype));
+      if (!hasImage && !hasVideo) {
+        console.log('❌ Evidence incomplete (need photo or video). Provided:', files.map(f => f.mimetype));
         await connection.rollback();
         return res.status(422).json({
           success: false,
           message: "Incomplete evidence",
           errors: {
-            media: ["Please upload BOTH a photo AND a video. One of the two is missing."]
+            media: ["Please upload a photo OR a video of this incident."]
           }
         });
       }
+      console.log('✅ Evidence check passed: hasImage=' + hasImage + ', hasVideo=' + hasVideo);
     }
 
     if (hasFiles) {

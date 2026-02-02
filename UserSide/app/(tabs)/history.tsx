@@ -1,22 +1,38 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Modal, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Modal, ScrollView, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from 'expo-router';
 import { useUser } from '../../contexts/UserContext';
 import { reportService } from '../../services/reportService';
-import styles from "./styles";
 import { BACKEND_URL } from '../../config/backend';
+
+// Color palette matching dashboard
+const COLORS = {
+  primary: '#1D3557',
+  primaryDark: '#152741',
+  primaryLight: '#2a4a7a',
+  accent: '#E63946',
+  white: '#ffffff',
+  background: '#f5f7fa',
+  cardBg: '#ffffff',
+  textPrimary: '#1D3557',
+  textSecondary: '#6b7280',
+  textMuted: '#9ca3af',
+  border: '#e5e7eb',
+  success: '#10b981',
+  warning: '#f59e0b',
+};
 
 interface Report {
   report_id: number;
   title: string;
-  report_type: string | string[]; // Array of crime types or single string (for backward compatibility)
+  report_type: string | string[];
   description: string;
   status: string;
   is_anonymous: boolean;
   date_reported: string;
   created_at: string;
-  assigned_station_id?: number; // Station assigned to handle the report
+  assigned_station_id?: number;
   location: {
     latitude: number;
     longitude: number;
@@ -26,133 +42,101 @@ interface Report {
   media: Array<{
     media_id: number;
     media_url: string;
-    media_type: string; // 'image', 'video', or 'audio'
+    media_type: string;
   }>;
 }
 
 const formatDateTimeManila = (dateString?: string) => {
   if (!dateString) return 'N/A';
-
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return 'N/A';
-
-  // Prefer proper timezone formatting when available
   try {
     return date.toLocaleString('en-US', {
       timeZone: 'Asia/Manila',
       year: 'numeric',
-      month: '2-digit',
+      month: 'short',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false,
+      hour12: true,
     });
   } catch {
-    // Fallback: convert to UTC+8 (Asia/Manila)
     const utcMs = date.getTime() + date.getTimezoneOffset() * 60000;
     const manila = new Date(utcMs + 8 * 3600000);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const month = pad(manila.getMonth() + 1);
-    const day = pad(manila.getDate());
-    const year = manila.getFullYear();
-    const hours = pad(manila.getHours());
-    const minutes = pad(manila.getMinutes());
-    return `${month}/${day}/${year} ${hours}:${minutes}`;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[manila.getMonth()]} ${manila.getDate()}, ${manila.getFullYear()} ${manila.getHours() % 12 || 12}:${String(manila.getMinutes()).padStart(2, '0')} ${manila.getHours() >= 12 ? 'PM' : 'AM'}`;
   }
 };
 
-const getIncidentDateString = (report: Report) => {
-  // The backend uses date_reported in many places as the incident time.
-  // Fall back to created_at to avoid blank/invalid values.
-  return report.date_reported || report.created_at;
+const getStatusConfig = (status: string) => {
+  const configs: Record<string, { color: string; bg: string; icon: string }> = {
+    pending: { color: '#d97706', bg: '#fef3c7', icon: 'time-outline' },
+    checking: { color: '#d97706', bg: '#fef3c7', icon: 'eye-outline' },
+    verified: { color: '#059669', bg: '#d1fae5', icon: 'checkmark-circle-outline' },
+    resolved: { color: '#059669', bg: '#d1fae5', icon: 'checkmark-done-outline' },
+    investigating: { color: '#2563eb', bg: '#dbeafe', icon: 'search-outline' },
+    rejected: { color: '#dc2626', bg: '#fee2e2', icon: 'close-circle-outline' },
+  };
+  return configs[status.toLowerCase()] || { color: '#6b7280', bg: '#f3f4f6', icon: 'help-circle-outline' };
 };
 
-const getSubmittedDateString = (report: Report) => {
-  // created_at is the most reliable for the actual submission time.
-  return report.created_at || report.date_reported;
-};
+const HistoryItem = React.memo(({ item, onPress }: { item: Report; onPress: (report: Report) => void }) => {
+  const statusConfig = getStatusConfig(item.status);
+  const crimeTypes = Array.isArray(item.report_type) ? item.report_type : [item.report_type];
 
-const getStatusColor = (status: string) => {
-  switch (status.toLowerCase()) {
-    case 'pending':
-      return '#FFA500';
-    case 'verified':
-    case 'resolved':
-      return '#28a745';
-    case 'investigating':
-      return '#007bff';
-    case 'rejected':
-      return '#dc3545';
-    default:
-      return '#6c757d';
-  }
-};
-
-const HistoryItem = React.memo(({ item, onPress }: {
-  item: Report;
-  onPress: (report: Report) => void;
-}) => (
-  <TouchableOpacity
-    style={styles.card}
-    onPress={() => onPress(item)}
-    activeOpacity={0.7}>
-
-    <View style={styles.cardContentHistory}>
-      <View style={{ flex: 1 }}>
-
-        {/* Title and Crime Type */}
-        <Text style={[styles.titleHistory, { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4 }]}>
-          {item.title}
-        </Text>
-        <Text style={[styles.subtitleHistory, { fontSize: 14, color: '#666', marginBottom: 8 }]}>
-          {Array.isArray(item.report_type) ? item.report_type.join(', ') : item.report_type}
-        </Text>
-
-        {/* Location/Address */}
-        <Text style={[styles.addressHistory, { fontSize: 13, color: '#888', lineHeight: 18 }]} numberOfLines={2}>
-          {item.location.barangay}
-        </Text>
-
-        {/* Anonymous Indicator */}
-        {item.is_anonymous && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-            <Ionicons name="eye-off" size={16} color="#999" />
-            <Text style={{ fontSize: 12, color: '#999', marginLeft: 4 }}>Anonymous</Text>
+  return (
+    <TouchableOpacity style={styles.card} onPress={() => onPress(item)} activeOpacity={0.7}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardHeaderLeft}>
+          <View style={[styles.statusIconContainer, { backgroundColor: statusConfig.bg }]}>
+            <Ionicons name={statusConfig.icon as any} size={20} color={statusConfig.color} />
           </View>
-        )}
-      </View>
-
-      {/* Right Section - Date and Status */}
-      <View style={{ alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <Text style={[styles.dateHistory, { fontSize: 13, color: '#999', marginBottom: 8 }]}>
-          {formatDateTimeManila(getSubmittedDateString(item))}
-        </Text>
-        <View style={[
-          styles.statusBadgeHistory,
-          {
-            backgroundColor: getStatusColor(item.status),
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 12,
-          }
-        ]}>
-          <Text style={[styles.statusTextHistory, { fontSize: 12, fontWeight: '600' }]}>
+          <View style={styles.cardTitleContainer}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.cardSubtitle} numberOfLines={1}>{crimeTypes.join(', ')}</Text>
+          </View>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+          <Text style={[styles.statusText, { color: statusConfig.color }]}>
             {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
           </Text>
         </View>
       </View>
-    </View>
-  </TouchableOpacity>
-));
+
+      <View style={styles.cardBody}>
+        <View style={styles.cardInfoRow}>
+          <Ionicons name="location-outline" size={16} color={COLORS.textMuted} />
+          <Text style={styles.cardInfoText} numberOfLines={1}>
+            {item.location.barangay || 'Location not specified'}
+          </Text>
+        </View>
+        <View style={styles.cardInfoRow}>
+          <Ionicons name="calendar-outline" size={16} color={COLORS.textMuted} />
+          <Text style={styles.cardInfoText}>{formatDateTimeManila(item.created_at)}</Text>
+        </View>
+      </View>
+
+      {item.is_anonymous && (
+        <View style={styles.anonymousBadge}>
+          <Ionicons name="eye-off" size={14} color={COLORS.textMuted} />
+          <Text style={styles.anonymousText}>Anonymous</Text>
+        </View>
+      )}
+
+      <View style={styles.cardFooter}>
+        <Text style={styles.viewDetailsText}>View Details</Text>
+        <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 const history = () => {
-  // 📊 Performance Timing - Start
   const pageStartTime = React.useRef(Date.now());
   React.useEffect(() => {
     const loadTime = Date.now() - pageStartTime.current;
     console.log(`📊 [History] Page Load Time: ${loadTime}ms`);
   }, []);
-  // 📊 Performance Timing - End
 
   const { user } = useUser();
   const [reports, setReports] = useState<Report[]>([]);
@@ -175,10 +159,9 @@ const history = () => {
       const response = await reportService.getUserReports(user.id);
 
       if (response.success) {
-        // Only update if data actually changed to prevent flickering
         setReports(prev => {
           const newIds = response.data.map((r: any) => `${r.id}-${r.status}`);
-          const oldIds = prev.map(r => `${r.id}-${r.status}`);
+          const oldIds = prev.map(r => `${r.report_id}-${r.status}`);
           if (JSON.stringify(newIds) === JSON.stringify(oldIds)) return prev;
           return response.data;
         });
@@ -197,16 +180,12 @@ const history = () => {
     fetchReports(true);
   }, [user]);
 
-  // Refresh when screen comes into focus AND start polling for real-time updates
   useFocusEffect(
     React.useCallback(() => {
       fetchReports(false);
-      
-      // Poll for updates every 2 seconds for real-time status changes (silent)
       const pollInterval = setInterval(() => {
         fetchReports(false);
       }, 2000);
-      
       return () => clearInterval(pollInterval);
     }, [user])
   );
@@ -216,25 +195,18 @@ const history = () => {
     fetchReports();
   };
 
-
-
-
-
   const handleReportClick = React.useCallback((report: Report) => {
     setSelectedReport(report);
     setShowReportDetail(true);
     setDecodedAddress('Loading address...');
 
-    // Reverse geocode the coordinates to get human-readable address
     if (report.location.latitude !== 0 || report.location.longitude !== 0) {
       fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${report.location.latitude}&lon=${report.location.longitude}&zoom=18&addressdetails=1`)
         .then(response => response.json())
         .then(data => {
-          console.log('🗺️ Reverse geocoded address:', data);
           setDecodedAddress(data.display_name || 'Address unavailable');
         })
-        .catch(error => {
-          console.error('❌ Reverse geocoding failed:', error);
+        .catch(() => {
           setDecodedAddress('Address unavailable');
         });
     } else {
@@ -254,58 +226,77 @@ const history = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#1D3557" />
-        <Text style={{ marginTop: 12, color: '#666' }}>Loading your reports...</Text>
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingSpinner}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+        <Text style={styles.loadingText}>Loading your reports...</Text>
       </View>
     );
   }
 
+  const statusConfig = selectedReport ? getStatusConfig(selectedReport.status) : null;
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* Header with Back Button and Title */}
-      <View style={styles.headerHistory}>
-        <TouchableOpacity onPress={() => router.push('/')}>
-          <Ionicons name="chevron-back" size={24} color="#000" />
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.push('/')} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={styles.textTitle}>
-            <Text style={styles.alertWelcome}>Alert</Text>
-            <Text style={styles.davao}>Davao</Text>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>
+            <Text style={{ color: COLORS.primary }}>Alert</Text>
+            <Text style={{ color: '#000' }}>Davao</Text>
           </Text>
-          <Text style={styles.subheadingCenter}>Report History</Text>
+          <Text style={styles.headerSubtitle}>Report History</Text>
         </View>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 40 }} />
       </View>
+
+      {/* Stats Summary */}
+      {reports.length > 0 && (
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{reports.length}</Text>
+            <Text style={styles.statLabel}>Total</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: COLORS.warning }]}>
+              {reports.filter(r => r.status.toLowerCase() === 'pending' || r.status.toLowerCase() === 'checking').length}
+            </Text>
+            <Text style={styles.statLabel}>Pending</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: COLORS.success }]}>
+              {reports.filter(r => r.status.toLowerCase() === 'resolved' || r.status.toLowerCase() === 'verified').length}
+            </Text>
+            <Text style={styles.statLabel}>Resolved</Text>
+          </View>
+        </View>
+      )}
 
       {/* Error Message */}
       {error && (
-        <View style={{ padding: 16, backgroundColor: '#fee', margin: 16, borderRadius: 8 }}>
-          <Text style={{ color: '#c00', textAlign: 'center' }}>{error}</Text>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={20} color={COLORS.accent} />
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
       {/* Empty State */}
       {!error && reports.length === 0 && (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <Ionicons name="document-text-outline" size={64} color="#ccc" />
-          <Text style={{ fontSize: 18, color: '#666', marginTop: 16, fontWeight: '600' }}>
-            No Reports Yet
-          </Text>
-          <Text style={{ fontSize: 14, color: '#999', marginTop: 8, textAlign: 'center' }}>
-            Your submitted reports will appear here
-          </Text>
-          <TouchableOpacity
-            style={{
-              marginTop: 24,
-              backgroundColor: '#1D3557',
-              paddingHorizontal: 24,
-              paddingVertical: 12,
-              borderRadius: 8
-            }}
-            onPress={() => router.push('/report')}
-          >
-            <Text style={{ color: '#fff', fontWeight: '600' }}>Submit a Report</Text>
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconContainer}>
+            <Ionicons name="document-text-outline" size={64} color={COLORS.textMuted} />
+          </View>
+          <Text style={styles.emptyTitle}>No Reports Yet</Text>
+          <Text style={styles.emptyText}>Your submitted reports will appear here</Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/report')}>
+            <Ionicons name="add-circle-outline" size={20} color={COLORS.white} />
+            <Text style={styles.emptyButtonText}>Submit a Report</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -316,138 +307,530 @@ const history = () => {
           data={reports}
           keyExtractor={(item) => item.report_id.toString()}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          showsVerticalScrollIndicator={true}
-          scrollEnabled={true}
-          nestedScrollEnabled={true}
-          bounces={true}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={5}
           removeClippedSubviews={true}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1D3557']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
           }
         />
       )}
 
       {/* Report Detail Modal */}
-      <Modal
-        transparent
-        visible={showReportDetail}
-        animationType="fade"
-        onRequestClose={closeReportDetail}
-      >
+      <Modal transparent visible={showReportDetail} animationType="fade" onRequestClose={closeReportDetail}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '85%', width: '90%', maxWidth: 500 }]}>
-            <ScrollView>
-              {/* Header */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
-                <Text style={{ fontSize: 20, fontWeight: '700', color: '#1D3557', flex: 1 }}>Report Details</Text>
-                <TouchableOpacity onPress={closeReportDetail}>
-                  <Ionicons name="close" size={28} color="#666" />
-                </TouchableOpacity>
-              </View>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Report Details</Text>
+              <TouchableOpacity onPress={closeReportDetail} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
 
-              {selectedReport && (
-                <View>
-                  {/* Title */}
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 4 }}>Title</Text>
-                    <Text style={{ fontSize: 16, color: '#333', fontWeight: '600' }}>{selectedReport.title}</Text>
-                  </View>
-
-                  {/* Status */}
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 4 }}>Status</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={[
-                        {
-                          backgroundColor: getStatusColor(selectedReport.status),
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          borderRadius: 12,
-                        }
-                      ]}>
-                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
-                          {selectedReport.status.charAt(0).toUpperCase() + selectedReport.status.slice(1)}
-                        </Text>
-                      </View>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {selectedReport && statusConfig && (
+                <>
+                  {/* Status Banner */}
+                  <View style={[styles.statusBanner, { backgroundColor: statusConfig.bg }]}>
+                    <Ionicons name={statusConfig.icon as any} size={24} color={statusConfig.color} />
+                    <View style={styles.statusBannerText}>
+                      <Text style={[styles.statusBannerTitle, { color: statusConfig.color }]}>
+                        {selectedReport.status.charAt(0).toUpperCase() + selectedReport.status.slice(1)}
+                      </Text>
                       {selectedReport.is_anonymous && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
-                          <Ionicons name="eye-off" size={16} color="#999" />
-                          <Text style={{ fontSize: 12, color: '#999', marginLeft: 4 }}>Anonymous</Text>
+                        <View style={styles.anonymousIndicator}>
+                          <Ionicons name="eye-off" size={12} color={COLORS.textMuted} />
+                          <Text style={styles.anonymousIndicatorText}>Anonymous Report</Text>
                         </View>
                       )}
                     </View>
                   </View>
 
-                  {/* Location */}
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 4 }}>📍 Crime Location</Text>
+                  {/* Title */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Report Title</Text>
+                    <Text style={styles.detailValue}>{selectedReport.title}</Text>
+                  </View>
 
-                    {/* Crime Type */}
-                    <Text style={{ fontSize: 16, color: '#333', fontWeight: '600', marginBottom: 8 }}>
+                  {/* Crime Type */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Crime Type</Text>
+                    <Text style={styles.detailValue}>
                       {Array.isArray(selectedReport.report_type) ? selectedReport.report_type.join(', ') : selectedReport.report_type}
                     </Text>
+                  </View>
 
-                    {/* Street Address - Only show the first part (street name) */}
+                  {/* Location */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Location</Text>
                     {selectedReport.location.reporters_address && (
-                      <Text style={{ fontSize: 15, color: '#333', marginBottom: 4 }}>
-                        {selectedReport.location.reporters_address.split(',')[0].trim()}
-                      </Text>
+                      <Text style={styles.detailValue}>{selectedReport.location.reporters_address.split(',')[0].trim()}</Text>
                     )}
-
-                    {/* Barangay Name Only */}
-                    {selectedReport.location.barangay &&
-                      !selectedReport.location.barangay.startsWith('Lat:') &&
-                      selectedReport.location.barangay !== selectedReport.location.reporters_address?.split(',')[0].trim() && (
-                        <Text style={{ fontSize: 15, color: '#333', marginBottom: 6 }}>
-                          {selectedReport.location.barangay.split(',')[0].trim()}
-                        </Text>
-                      )}
-
-                    {/* Decoded Address from Coordinates */}
+                    {selectedReport.location.barangay && !selectedReport.location.barangay.startsWith('Lat:') && (
+                      <Text style={styles.detailValueSecondary}>{selectedReport.location.barangay.split(',')[0].trim()}</Text>
+                    )}
                     {(selectedReport.location.latitude !== 0 || selectedReport.location.longitude !== 0) && (
-                      <Text style={{ fontSize: 13, color: '#3B82F6', marginTop: 4, fontStyle: 'italic', lineHeight: 18 }}>
-                        {decodedAddress}
-                      </Text>
+                      <Text style={styles.detailValueAddress}>{decodedAddress}</Text>
                     )}
                   </View>
 
                   {/* Description */}
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 4 }}>Description</Text>
-                    <Text style={{ fontSize: 15, color: '#333', lineHeight: 22 }}>{selectedReport.description}</Text>
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Description</Text>
+                    <Text style={styles.detailValueDescription}>{selectedReport.description}</Text>
                   </View>
 
-                  {/* Date of Incident */}
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 4 }}>Date of Incident</Text>
-                    <Text style={{ fontSize: 15, color: '#333' }}>{formatDateTimeManila(getIncidentDateString(selectedReport))}</Text>
+                  {/* Dates */}
+                  <View style={styles.dateRow}>
+                    <View style={styles.dateItem}>
+                      <Ionicons name="calendar-outline" size={16} color={COLORS.textMuted} />
+                      <View>
+                        <Text style={styles.dateLabel}>Date of Incident</Text>
+                        <Text style={styles.dateValue}>{formatDateTimeManila(selectedReport.date_reported || selectedReport.created_at)}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.dateItem}>
+                      <Ionicons name="time-outline" size={16} color={COLORS.textMuted} />
+                      <View>
+                        <Text style={styles.dateLabel}>Submitted On</Text>
+                        <Text style={styles.dateValue}>{formatDateTimeManila(selectedReport.created_at)}</Text>
+                      </View>
+                    </View>
                   </View>
 
-                  {/* Submitted Date */}
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 4 }}>Submitted On</Text>
-                    <Text style={{ fontSize: 15, color: '#333' }}>{formatDateTimeManila(getSubmittedDateString(selectedReport))}</Text>
-                  </View>
-
-                  {/* Evidence Attachments (police/admin-only by policy) */}
-                  <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e9ecef' }}>
-                    <Text style={{ fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 6 }}>Evidence Attachments</Text>
-                    <Text style={{ fontSize: 13, color: '#666' }}>
-                      Attachments are only visible to police/admin for privacy and safety.
+                  {/* Evidence Notice */}
+                  <View style={styles.evidenceNotice}>
+                    <Ionicons name="lock-closed-outline" size={18} color={COLORS.textMuted} />
+                    <Text style={styles.evidenceNoticeText}>
+                      Evidence attachments are only visible to police/admin for privacy and safety.
                     </Text>
                   </View>
-                </View>
+                </>
               )}
             </ScrollView>
+
+            {/* Modal Footer */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={closeReportDetail}>
+                <Text style={styles.modalCloseBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingSpinner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: COLORS.white,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 16,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fee2e2',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  errorText: {
+    color: COLORS.accent,
+    fontSize: 14,
+    flex: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  emptyButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingBottom: 12,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  statusIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  cardTitleContainer: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 6,
+  },
+  cardInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardInfoText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    flex: 1,
+  },
+  anonymousBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  anonymousText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 4,
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '85%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBody: {
+    paddingHorizontal: 20,
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 12,
+  },
+  statusBannerText: {
+    flex: 1,
+  },
+  statusBannerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  anonymousIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  anonymousIndicatorText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  detailSection: {
+    marginTop: 20,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  detailValueSecondary: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  detailValueAddress: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontStyle: 'italic',
+    marginTop: 6,
+    lineHeight: 20,
+  },
+  detailValueDescription: {
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    lineHeight: 22,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 16,
+  },
+  dateItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: COLORS.background,
+    padding: 12,
+    borderRadius: 10,
+  },
+  dateLabel: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  dateValue: {
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    marginTop: 2,
+  },
+  evidenceNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 20,
+    marginBottom: 16,
+    gap: 10,
+  },
+  evidenceNoticeText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    flex: 1,
+    lineHeight: 18,
+  },
+  modalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  modalCloseBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalCloseBtnText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 
 export default history;

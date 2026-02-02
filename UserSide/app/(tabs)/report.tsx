@@ -341,6 +341,7 @@ export default function ReportCrime() {
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
+    const [showAllGuidelinesModal, setShowAllGuidelinesModal] = useState(false); // For anonymous users clicking "crimes" link
     const [selectedCrimeForGuidelines, setSelectedCrimeForGuidelines] = useState<string>('');
 
     type ConfirmSnapshot = {
@@ -1031,11 +1032,46 @@ export default function ReportCrime() {
             console.error('\n❌ Error submitting report:', error);
             console.log('='.repeat(50) + '\n');
 
-            const errorMessage = error instanceof Error
-                ? error.message
-                : 'An unexpected error occurred. Please try again.';
+            let errorTitle = 'Submission Failed';
+            let errorMessage = 'An unexpected error occurred. Please try again.';
 
-            Alert.alert('Submission Failed', errorMessage);
+            if (error instanceof Error) {
+                errorMessage = error.message;
+                
+                // Customize title based on error type
+                if (errorMessage.toLowerCase().includes('evidence') || 
+                    errorMessage.toLowerCase().includes('photo') || 
+                    errorMessage.toLowerCase().includes('video')) {
+                    errorTitle = 'Evidence Required';
+                } else if (errorMessage.toLowerCase().includes('connection') || 
+                           errorMessage.toLowerCase().includes('network') ||
+                           errorMessage.toLowerCase().includes('timeout')) {
+                    errorTitle = 'Connection Error';
+                } else if (errorMessage.toLowerCase().includes('authorized') || 
+                           errorMessage.toLowerCase().includes('log in')) {
+                    errorTitle = 'Authentication Required';
+                } else if (errorMessage.toLowerCase().includes('too large') || 
+                           errorMessage.toLowerCase().includes('file size')) {
+                    errorTitle = 'File Too Large';
+                } else if (errorMessage.toLowerCase().includes('server')) {
+                    errorTitle = 'Server Error';
+                } else if (errorMessage.toLowerCase().includes('missing') || 
+                           errorMessage.toLowerCase().includes('required')) {
+                    errorTitle = 'Missing Information';
+                }
+            }
+
+            Alert.alert(
+                errorTitle, 
+                errorMessage,
+                [
+                    { 
+                        text: 'OK', 
+                        style: 'default' 
+                    }
+                ],
+                { cancelable: true }
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -1085,11 +1121,17 @@ export default function ReportCrime() {
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 8 }}>
                     <Text style={styles.subheading}>Select the type of </Text>
-                    <Link href={{ pathname: "/guidelines", params: { scrollToSection: "crime-types" } }} asChild>
-                        <TouchableOpacity>
+                    {isAnonymous ? (
+                        <TouchableOpacity onPress={() => setShowAllGuidelinesModal(true)}>
                             <Text style={[styles.subheading, { color: '#0066cc', textDecorationLine: 'underline' }]}>crimes</Text>
                         </TouchableOpacity>
-                    </Link>
+                    ) : (
+                        <Link href={{ pathname: "/guidelines", params: { scrollToSection: "crime-types" } }} asChild>
+                            <TouchableOpacity>
+                                <Text style={[styles.subheading, { color: '#0066cc', textDecorationLine: 'underline' }]}>crimes</Text>
+                            </TouchableOpacity>
+                        </Link>
+                    )}
                     <Text style={{ color: '#E63946', fontWeight: '700', fontSize: 18 }}> *</Text>
                 </View>
                 <View style={[styles.card, isFlagged && { opacity: 0.6, pointerEvents: 'none' }]}>
@@ -1911,6 +1953,187 @@ export default function ReportCrime() {
                                     elevation: 3
                                 }}
                                 onPress={() => setShowGuidelinesModal(false)}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>I Understand</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* All Crime Types Guidelines Modal for Anonymous Users */}
+            <Modal
+                visible={showAllGuidelinesModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowAllGuidelinesModal(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 0, maxHeight: '85%', overflow: 'hidden' }}>
+                        {/* Header */}
+                        <View style={{ 
+                            backgroundColor: '#1D3557', 
+                            paddingHorizontal: 20, 
+                            paddingVertical: 16,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <Ionicons name="shield-checkmark" size={24} color="#fff" />
+                                <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', marginLeft: 10 }}>
+                                    Crime Reporting Guidelines
+                                </Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowAllGuidelinesModal(false)}>
+                                <Ionicons name="close" size={26} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+                            {/* General Guidelines */}
+                            <View style={{ 
+                                backgroundColor: '#E3F2FD', 
+                                padding: 14, 
+                                borderRadius: 10, 
+                                marginBottom: 16,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#1D3557'
+                            }}>
+                                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1D3557', marginBottom: 8 }}>
+                                    📋 General Guidelines
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#1D3557', lineHeight: 20, marginBottom: 4 }}>
+                                    • Provide accurate and truthful information
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#1D3557', lineHeight: 20, marginBottom: 4 }}>
+                                    • Include specific details about time and location
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#1D3557', lineHeight: 20, marginBottom: 4 }}>
+                                    • Describe suspects or vehicles if applicable
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#1D3557', lineHeight: 20 }}>
+                                    • Do not exaggerate or fabricate details
+                                </Text>
+                            </View>
+
+                            {/* Evidence Requirements */}
+                            <View style={{ 
+                                backgroundColor: '#FFF3E0', 
+                                padding: 14, 
+                                borderRadius: 10, 
+                                marginBottom: 16,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#FF9800'
+                            }}>
+                                <Text style={{ fontSize: 15, fontWeight: '700', color: '#E65100', marginBottom: 8 }}>
+                                    📸 Evidence Requirements
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#E65100', lineHeight: 20, marginBottom: 4 }}>
+                                    • Most crimes require a photo OR video evidence
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#E65100', lineHeight: 20, marginBottom: 4 }}>
+                                    • Evidence helps police verify and respond faster
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#E65100', lineHeight: 20 }}>
+                                    • Some crimes like threats or noise complaints don't require evidence
+                                </Text>
+                            </View>
+
+                            {/* Crime Categories */}
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: '#1D3557', marginBottom: 12 }}>
+                                📁 Crime Categories:
+                            </Text>
+
+                            {Object.entries(CRIME_CATEGORIES).map(([category, subcategories]) => (
+                                <View key={category} style={{ marginBottom: 16 }}>
+                                    <View style={{
+                                        backgroundColor: '#1D3557',
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 10,
+                                        borderRadius: 8,
+                                        marginBottom: 8
+                                    }}>
+                                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>{category}</Text>
+                                    </View>
+                                    <View style={{ paddingLeft: 8 }}>
+                                        {Object.keys(subcategories).map((subcategory, index) => (
+                                            <View key={subcategory} style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                paddingVertical: 6,
+                                                borderBottomWidth: index < Object.keys(subcategories).length - 1 ? 1 : 0,
+                                                borderBottomColor: '#f0f0f0'
+                                            }}>
+                                                <Ionicons name="chevron-forward" size={14} color="#666" />
+                                                <Text style={{ fontSize: 13, color: '#333', marginLeft: 6 }}>{subcategory}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                            ))}
+
+                            {/* Anonymous Warning */}
+                            <View style={{ 
+                                backgroundColor: '#fff3cd', 
+                                padding: 14, 
+                                borderRadius: 10, 
+                                marginTop: 8,
+                                marginBottom: 8,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#ffc107'
+                            }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                    <Ionicons name="eye-off" size={20} color="#856404" style={{ marginRight: 10, marginTop: 2 }} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: '#856404', fontWeight: '700', marginBottom: 4, fontSize: 14 }}>
+                                            Anonymous Reporting
+                                        </Text>
+                                        <Text style={{ color: '#856404', fontSize: 13, lineHeight: 18 }}>
+                                            You will NOT receive updates about your report. Provide accurate details to help police respond effectively.
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* False Report Warning */}
+                            <View style={{ 
+                                backgroundColor: '#fee2e2', 
+                                padding: 14, 
+                                borderRadius: 10, 
+                                marginBottom: 8,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#dc2626'
+                            }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                    <Ionicons name="warning" size={20} color="#dc2626" style={{ marginRight: 10, marginTop: 2 }} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: '#991b1b', fontWeight: '700', marginBottom: 4, fontSize: 14 }}>
+                                            Warning
+                                        </Text>
+                                        <Text style={{ color: '#991b1b', fontSize: 13, lineHeight: 18 }}>
+                                            Filing false or misleading reports is punishable by law. Only report genuine incidents.
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </ScrollView>
+
+                        {/* Close Button */}
+                        <View style={{ paddingHorizontal: 20, paddingBottom: 20, paddingTop: 8 }}>
+                            <TouchableOpacity
+                                style={{ 
+                                    backgroundColor: '#1D3557', 
+                                    paddingVertical: 14, 
+                                    borderRadius: 10, 
+                                    alignItems: 'center',
+                                    shadowColor: '#1D3557',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 4,
+                                    elevation: 3
+                                }}
+                                onPress={() => setShowAllGuidelinesModal(false)}
                             >
                                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>I Understand</Text>
                             </TouchableOpacity>
