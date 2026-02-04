@@ -4194,6 +4194,8 @@ function generatePDF(report) {
     function dispatchToNearestPatrol() {
         const reportId = document.getElementById('dispatch_report_id').value;
         
+        console.log('🚓 Dispatching patrol for report:', reportId);
+        
         // Show loading
         document.getElementById('dispatch-confirm').style.display = 'none';
         document.getElementById('dispatch-loading').style.display = 'block';
@@ -4208,20 +4210,26 @@ function generatePDF(report) {
             },
             body: JSON.stringify({ report_id: reportId })
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('📡 Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('📊 Response data:', data);
             document.getElementById('dispatch-loading').style.display = 'none';
             if (data.success) {
                 document.getElementById('dispatch-success').style.display = 'block';
+                console.log('✅ Dispatch successful:', data.message);
             } else {
                 document.getElementById('dispatch-error-message').textContent = data.message || 'No patrol officers are currently on duty or available.';
                 document.getElementById('dispatch-error').style.display = 'block';
+                console.error('❌ Dispatch failed:', data.message);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('🔥 Dispatch error:', error);
             document.getElementById('dispatch-loading').style.display = 'none';
-            document.getElementById('dispatch-error-message').textContent = 'Failed to dispatch. Please try again.';
+            document.getElementById('dispatch-error-message').textContent = 'Failed to dispatch. Please try again. Error: ' + error.message;
             document.getElementById('dispatch-error').style.display = 'block';
         });
     }
