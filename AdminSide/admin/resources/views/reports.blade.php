@@ -4180,8 +4180,9 @@ function generatePDF(report) {
     </style>
 
     <script>
-    // Dispatch Modal Functions
-    function openDispatchModal(reportId) {
+    // Dispatch Modal Functions - Made global for onclick handlers
+    window.openDispatchModal = function(reportId) {
+        console.log('🚓 Opening dispatch modal for report:', reportId);
         document.getElementById('dispatch_report_id').value = reportId;
         // Reset to confirm state
         document.getElementById('dispatch-loading').style.display = 'none';
@@ -4191,7 +4192,7 @@ function generatePDF(report) {
         document.getElementById('dispatchModal').style.display = 'flex';
     }
     
-    function dispatchToNearestPatrol() {
+    window.dispatchToNearestPatrol = function() {
         const reportId = document.getElementById('dispatch_report_id').value;
         
         console.log('🚓 Dispatching patrol for report:', reportId);
@@ -4234,7 +4235,7 @@ function generatePDF(report) {
         });
     }
 
-    function closeDispatchModal() {
+    window.closeDispatchModal = function() {
         document.getElementById('dispatchModal').style.display = 'none';
     }
 
