@@ -116,17 +116,46 @@ class AuthController extends Controller
                 'verification_token' => $verificationToken,
                 'token_expires_at' => $tokenExpiresAt,
             ]);
-        } else {
-            $pending = PendingUserAdminRegistration::create([
-                'firstname' => $request->firstname,
-                'lastname' => $request->lastname,
+            \Log::info('📧 Updated existing pending registration', [
                 'email' => $request->email,
-                'contact' => $request->contact,
-                'password' => Hash::make($request->password),
-                'verification_token' => $verificationToken,
-                'token_expires_at' => $tokenExpiresAt,
-                'user_role' => $userRole,
+                'pending_id' => $pending->id,
+                'token_prefix' => substr($verificationToken, 0, 12),
             ]);
+        } else {
+            try {
+                $pending = PendingUserAdminRegistration::create([
+                    'firstname' => $request->firstname,
+                    'lastname' => $request->lastname,
+                    'email' => $request->email,
+                    'contact' => $request->contact,
+                    'password' => Hash::make($request->password),
+                    'verification_token' => $verificationToken,
+                    'token_expires_at' => $tokenExpiresAt,
+                    'user_role' => $userRole,
+                ]);
+                \Log::info('📧 Created new pending registration', [
+                    'email' => $request->email,
+                    'pending_id' => $pending->id,
+                    'token_prefix' => substr($verificationToken, 0, 12),
+                    'user_role' => $userRole,
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('📧 Failed to create pending registration', [
+                    'email' => $request->email,
+                    'error' => $e->getMessage(),
+                ]);
+                return back()->withErrors(['email' => 'Failed to create registration. Please try again.'])->withInput();
+            }
+        }
+
+        // Verify the pending record was actually saved
+        $verifyPending = PendingUserAdminRegistration::where('verification_token', $verificationToken)->first();
+        if (!$verifyPending) {
+            \Log::error('📧 CRITICAL: Pending registration not found after save!', [
+                'email' => $request->email,
+                'token_prefix' => substr($verificationToken, 0, 12),
+            ]);
+            return back()->withErrors(['email' => 'Registration failed to save. Please try again.'])->withInput();
         }
 
         \Log::info('Pending registration created, awaiting email verification', [
@@ -797,6 +826,25 @@ class AuthController extends Controller
                 $matchedToken = $tryToken;
                 break;
             }
+        }
+
+        // Diagnostic: check if table exists and log current state
+        try {
+            $pendingCount = PendingUserAdminRegistration::count();
+            $allPending = PendingUserAdminRegistration::select('id', 'email', 'user_role', 'created_at')
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            
+            \Log::info('📧 Pending registrations diagnostic', [
+                'total_pending_count' => $pendingCount,
+                'recent_pending' => $allPending->toArray(),
+                'tokens_tried' => $tokensToTry,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('📧 CRITICAL: Cannot query pending_user_admin_registrations table!', [
+                'error' => $e->getMessage(),
+            ]);
         }
 
         if ($pending) {
