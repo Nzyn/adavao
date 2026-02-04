@@ -435,6 +435,7 @@ async function sendDispatchNotifications(pushTokens, dispatchInfo) {
 
 /**
  * Get pending dispatches for a station (for patrol officers to pick up)
+ * Also includes dispatches directly assigned to this officer regardless of station
  */
 async function getPendingDispatchesForStation(req, res) {
     try {
@@ -448,12 +449,15 @@ async function getPendingDispatchesForStation(req, res) {
             });
         }
 
-        // Get pending dispatches (not yet accepted by anyone)
+        // Get pending dispatches:
+        // 1. Dispatches assigned to this officer's station (and not assigned to someone else)
+        // 2. OR dispatches specifically assigned to this officer (regardless of station)
         const [rows] = await db.query(
             `SELECT
                 d.dispatch_id,
                 d.report_id,
                 d.station_id,
+                d.patrol_officer_id,
                 d.status,
                 d.dispatched_at,
                 d.notes,
@@ -470,9 +474,13 @@ async function getPendingDispatchesForStation(req, res) {
              JOIN reports r ON d.report_id = r.report_id
              LEFT JOIN locations l ON r.location_id = l.location_id
              LEFT JOIN police_stations ps ON d.station_id = ps.station_id
-             WHERE d.station_id = $1
-               AND d.status = 'pending'
-               AND (d.patrol_officer_id IS NULL OR d.patrol_officer_id = $2)
+             WHERE d.status = 'pending'
+               AND (
+                   -- Dispatches for this officer's station (not assigned to someone else)
+                   (d.station_id = $1 AND (d.patrol_officer_id IS NULL OR d.patrol_officer_id = $2))
+                   -- OR dispatches specifically assigned to this officer (regardless of station)
+                   OR d.patrol_officer_id = $2
+               )
              ORDER BY d.dispatched_at DESC`,
             [stationId, userId || 0]
         );

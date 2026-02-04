@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
     loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
     loadingText: { marginTop: spacing.md, fontSize: fontSize.md, color: COLORS.textSecondary },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: containerPadding.horizontal, paddingTop: containerPadding.vertical + 40, backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: containerPadding.horizontal, paddingTop: containerPadding.vertical + 10, backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.border },
     backBtn: { padding: spacing.sm },
     headerTitle: { fontSize: fontSize.lg, fontWeight: 'bold', color: COLORS.textPrimary },
     refreshBtn: { padding: spacing.sm },
