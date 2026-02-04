@@ -340,17 +340,26 @@ class DispatchController extends Controller
      */
     public function getOnDutyOfficers()
     {
-        $officers = User::where('user_role', 'patrol_officer')
-            ->where('is_on_duty', true)
-            ->with('station:station_id,station_name')
-            ->get()
-            ->map(function($officer) {
-                return [
-                    'id' => $officer->id,
-                    'name' => $officer->name,
-                    'station_name' => $officer->station->station_name ?? null,
-                ];
-            });
+        // Use raw SQL to join with patrol_locations for better accuracy
+        $officers = DB::select("
+            SELECT 
+                u.id,
+                CONCAT(u.firstname, ' ', u.lastname) as name,
+                ps.station_name,
+                pl.latitude,
+                pl.longitude,
+                pl.updated_at as location_updated_at,
+                CASE 
+                    WHEN pl.updated_at > NOW() - INTERVAL '10 minutes' THEN true 
+                    ELSE false 
+                END as has_recent_location
+            FROM users_public u
+            LEFT JOIN police_stations ps ON u.assigned_station_id = ps.station_id
+            LEFT JOIN patrol_locations pl ON u.id = pl.user_id
+            WHERE u.user_role = 'patrol_officer'
+              AND u.is_on_duty = true
+            ORDER BY pl.updated_at DESC NULLS LAST
+        ");
 
         return response()->json(['officers' => $officers]);
     }
@@ -390,19 +399,55 @@ class DispatchController extends Controller
                 ], 400);
             }
 
-            // Find all on-duty patrol officers with locations
-            $officers = User::where('user_role', 'patrol_officer')
-                ->where('is_on_duty', true)
-                ->whereNotNull('current_latitude')
-                ->whereNotNull('current_longitude')
-                ->whereNotNull('push_token')
-                ->get();
+            // Find all on-duty patrol officers with recent locations from patrol_locations table
+            // Only get officers whose location was updated within the last 10 minutes
+            $officers = DB::select("
+                SELECT 
+                    u.id,
+                    u.firstname,
+                    u.lastname,
+                    u.push_token,
+                    u.assigned_station_id,
+                    pl.latitude,
+                    pl.longitude,
+                    pl.updated_at as location_updated_at
+                FROM users_public u
+                JOIN patrol_locations pl ON u.id = pl.user_id
+                WHERE u.user_role = 'patrol_officer'
+                  AND u.is_on_duty = true
+                  AND u.push_token IS NOT NULL
+                  AND pl.latitude IS NOT NULL
+                  AND pl.longitude IS NOT NULL
+                  AND pl.updated_at > NOW() - INTERVAL '10 minutes'
+                ORDER BY pl.updated_at DESC
+            ");
 
-            if ($officers->isEmpty()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No patrol officers are currently on duty with location tracking enabled'
-                ], 400);
+            if (empty($officers)) {
+                // Try fallback: find any on-duty officers regardless of location recency
+                $officers = DB::select("
+                    SELECT 
+                        u.id,
+                        u.firstname,
+                        u.lastname,
+                        u.push_token,
+                        u.assigned_station_id,
+                        pl.latitude,
+                        pl.longitude,
+                        pl.updated_at as location_updated_at
+                    FROM users_public u
+                    LEFT JOIN patrol_locations pl ON u.id = pl.user_id
+                    WHERE u.user_role = 'patrol_officer'
+                      AND u.is_on_duty = true
+                      AND u.push_token IS NOT NULL
+                    ORDER BY pl.updated_at DESC NULLS LAST
+                ");
+                
+                if (empty($officers)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No patrol officers are currently on duty'
+                    ], 400);
+                }
             }
 
             // Calculate distance to each officer using Haversine formula
@@ -410,17 +455,28 @@ class DispatchController extends Controller
             $minDistance = PHP_FLOAT_MAX;
 
             foreach ($officers as $officer) {
+                // Skip officers without location
+                if (!$officer->latitude || !$officer->longitude) {
+                    continue;
+                }
+                
                 $distance = $this->calculateDistance(
                     $reportLat,
                     $reportLng,
-                    $officer->current_latitude,
-                    $officer->current_longitude
+                    $officer->latitude,
+                    $officer->longitude
                 );
 
                 if ($distance < $minDistance) {
                     $minDistance = $distance;
                     $nearestOfficer = $officer;
                 }
+            }
+
+            // If no officer with location found, just use the first on-duty officer
+            if (!$nearestOfficer && !empty($officers)) {
+                $nearestOfficer = $officers[0];
+                $minDistance = 0; // Unknown distance
             }
 
             if (!$nearestOfficer) {
@@ -438,7 +494,9 @@ class DispatchController extends Controller
                 'status' => 'pending',
                 'dispatched_at' => now(),
                 'dispatched_by' => auth()->id(),
-                'notes' => 'Auto-dispatched to nearest patrol officer (' . round($minDistance, 2) . ' km away)',
+                'notes' => $minDistance > 0 
+                    ? 'Auto-dispatched to nearest patrol officer (' . round($minDistance, 2) . ' km away)'
+                    : 'Auto-dispatched to available patrol officer',
             ]);
 
             // Send urgent notification with ring and vibrate to ONLY the nearest officer
@@ -451,15 +509,19 @@ class DispatchController extends Controller
                 'distance_km' => round($minDistance, 2),
             ]);
 
+            $officerName = ($nearestOfficer->firstname ?? '') . ' ' . ($nearestOfficer->lastname ?? '');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Patrol dispatched successfully',
-                'officer_name' => $nearestOfficer->name,
+                'officer_name' => trim($officerName) ?: 'Patrol Officer',
                 'distance_km' => round($minDistance, 2),
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to auto-dispatch: ' . $e->getMessage());
+            Log::error('Failed to auto-dispatch: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to dispatch: ' . $e->getMessage()
