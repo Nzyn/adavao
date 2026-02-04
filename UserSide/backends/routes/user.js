@@ -62,8 +62,8 @@ router.post('/duty-status', async (req, res) => {
             SET is_on_duty = $1, 
                     updated_at = NOW() 
             WHERE id = $2
-                AND LOWER(COALESCE(user_role, role, '')) = 'patrol_officer'
-            RETURNING id, firstname, lastname, is_on_duty, COALESCE(user_role, role, 'user') AS role
+                AND LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer'
+            RETURNING id, firstname, lastname, is_on_duty, COALESCE(user_role::text, role::text, 'user') AS role
         `;
 
         // db.query returns [rows, fields] - destructure properly
