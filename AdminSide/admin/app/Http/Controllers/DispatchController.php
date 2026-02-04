@@ -91,9 +91,12 @@ class DispatchController extends Controller
         ];
 
         // Get available officers
-        $officers = User::where('user_role', 'patrol_officer')
-            ->where('is_on_duty', true)
-            ->get();
+                $officers = User::where(function ($q) {
+                                $q->where('user_role', 'patrol_officer')
+                                    ->orWhere('role', 'patrol_officer');
+                        })
+                        ->where('is_on_duty', true)
+                        ->get();
 
         $stations = PoliceStation::all();
 
@@ -356,7 +359,7 @@ class DispatchController extends Controller
             FROM users_public u
             LEFT JOIN police_stations ps ON u.assigned_station_id = ps.station_id
             LEFT JOIN patrol_locations pl ON u.id = pl.user_id
-            WHERE u.user_role = 'patrol_officer'
+                        WHERE LOWER(COALESCE(u.user_role, u.role, '')) = 'patrol_officer'
               AND u.is_on_duty = true
             ORDER BY pl.updated_at DESC NULLS LAST
         ");
@@ -413,7 +416,7 @@ class DispatchController extends Controller
                     pl.updated_at as location_updated_at
                 FROM users_public u
                 JOIN patrol_locations pl ON u.id = pl.user_id
-                WHERE u.user_role = 'patrol_officer'
+                WHERE LOWER(COALESCE(u.user_role, u.role, '')) = 'patrol_officer'
                   AND u.is_on_duty = true
                   AND u.push_token IS NOT NULL
                   AND pl.latitude IS NOT NULL
@@ -436,7 +439,7 @@ class DispatchController extends Controller
                         pl.updated_at as location_updated_at
                     FROM users_public u
                     LEFT JOIN patrol_locations pl ON u.id = pl.user_id
-                    WHERE u.user_role = 'patrol_officer'
+                    WHERE LOWER(COALESCE(u.user_role, u.role, '')) = 'patrol_officer'
                       AND u.is_on_duty = true
                       AND u.push_token IS NOT NULL
                     ORDER BY pl.updated_at DESC NULLS LAST
