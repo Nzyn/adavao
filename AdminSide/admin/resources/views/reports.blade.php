@@ -2939,14 +2939,14 @@ function getVerificationBadge(report) {
  }
 
  function getActionButtons(report) {
-     const userRole = '{{ auth()->user()->hasRole("admin") ? "admin" : (auth()->user()->hasRole("police") ? "police" : "") }}';
-    //  console.log('Debug - User Role:', userRole); 
+     const userRole = '{{ auth()->user()->hasRole("super_admin") ? "super_admin" : (auth()->user()->hasRole("admin") ? "admin" : (auth()->user()->hasRole("police") ? "police" : "")) }}';
+     console.log('Debug - User Role:', userRole, 'Report ID:', report.report_id);
      const isUnassigned = !report.assigned_station_id;
      
      let buttons = '';
      
-     // For admin users - show assign/reassign button AND dispatch patrol button
-     if (userRole === 'admin') {
+     // For admin and super_admin users - show assign/reassign button AND dispatch patrol button
+     if (userRole === 'admin' || userRole === 'super_admin') {
          const buttonText = isUnassigned ? 'Assign to Station' : 'Reassign Station';
          buttons = `
              <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -2956,7 +2956,7 @@ function getVerificationBadge(report) {
                      </svg>
                      ${buttonText}
                  </button>
-                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="openDispatchModal(${report.report_id})">
+                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="window.openDispatchModal(${report.report_id})">
                      <span style="font-size: 18px; margin-right: 8px;">🚓</span>
                      Dispatch Patrol
                  </button>
@@ -2973,7 +2973,18 @@ function getVerificationBadge(report) {
                      </svg>
                      Request Reassignment
                  </button>
-                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="openDispatchModal(${report.report_id})">
+                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="window.openDispatchModal(${report.report_id})">
+                     <span style="font-size: 18px; margin-right: 8px;">🚓</span>
+                     Dispatch Patrol
+                 </button>
+             </div>
+         `;
+     }
+     // Fallback - show dispatch button for any authenticated user with no specific role
+     else {
+         buttons = `
+             <div style="display: flex; flex-direction: column; gap: 8px;">
+                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="window.openDispatchModal(${report.report_id})">
                      <span style="font-size: 18px; margin-right: 8px;">🚓</span>
                      Dispatch Patrol
                  </button>
