@@ -22,17 +22,23 @@ class CleanupServiceProvider extends ServiceProvider
                 \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
                 Log::info('Auto-Migration: Migrations completed successfully.');
 
-                // 2. Delete all test accounts automatically on deployment
+                // 2. Delete only SPECIFIC known test accounts (not all mailsac.com)
+                // NOTE: We allow mailsac.com emails for testing purposes
+                // Only delete accounts that have "test" in the name or are known test prefixes
                 $deletedAdmin = DB::table('user_admin')
-                    ->where('email', 'LIKE', '%@mailsac.com')
-                    ->orWhere('email', 'LIKE', '%test%')
-                    ->orWhere('email', 'LIKE', 'dansoy%')
+                    ->where(function($query) {
+                        $query->where('email', 'LIKE', 'test%@%')
+                              ->orWhere('email', 'LIKE', '%test%@%')
+                              ->orWhere('email', 'LIKE', 'dansoy%');
+                    })
                     ->delete();
                 
                 $deletedPublic = DB::table('users_public')
-                    ->where('email', 'LIKE', '%@mailsac.com')
-                    ->orWhere('email', 'LIKE', '%test%')
-                    ->orWhere('email', 'LIKE', 'dansoy%')
+                    ->where(function($query) {
+                        $query->where('email', 'LIKE', 'test%@%')
+                              ->orWhere('email', 'LIKE', '%test%@%')
+                              ->orWhere('email', 'LIKE', 'dansoy%');
+                    })
                     ->delete();
                 
                 if ($deletedAdmin > 0 || $deletedPublic > 0) {
