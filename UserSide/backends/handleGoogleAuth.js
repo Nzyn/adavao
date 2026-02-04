@@ -9,32 +9,48 @@ const { sendOtpInternal, verifyOtpInternal } = require('./handleOtp');
 
 // Handle Google Sign-In - Simplified flow (OPTIMIZED for speed)
 const handleGoogleLogin = async (req, res) => {
+  const startTime = Date.now();
   const { googleId, email, firstName, lastName, profilePicture } = req.body;
+
+  console.log(`🔵 [Google Login] Starting for ${email}`);
 
   if (!googleId || !email) {
     return res.status(400).json({ message: "Google ID and email are required" });
   }
 
   try {
-    // OPTIMIZED: Single query to check user AND update google_id + last_login in one go
+    // First, quickly check if user exists (faster than UPDATE with RETURNING)
+    const checkStart = Date.now();
     const [existingUsers] = await db.query(
-      `UPDATE users_public 
-       SET google_id = COALESCE(google_id, $1), 
-           last_login = NOW() 
-       WHERE email = $2 
-       RETURNING *`,
-      [googleId, email]
+      `SELECT * FROM users_public WHERE email = $1 LIMIT 1`,
+      [email]
     );
+    console.log(`   ⏱️ User check took ${Date.now() - checkStart}ms`);
 
     if (existingUsers.length > 0) {
-      // User exists - login successful
+      // User exists - update google_id if needed and login
       const user = existingUsers[0];
+      
+      // Update google_id and last_login in background (don't wait)
+      if (!user.google_id) {
+        db.query(
+          `UPDATE users_public SET google_id = $1, last_login = NOW() WHERE id = $2`,
+          [googleId, user.id]
+        ).catch(err => console.error('Background update error:', err));
+      } else {
+        db.query(
+          `UPDATE users_public SET last_login = NOW() WHERE id = $1`,
+          [user.id]
+        ).catch(err => console.error('Background update error:', err));
+      }
+
       const { password, ...userWithoutPassword } = user;
 
       // 🔓 Decrypt sensitive fields for display
       if (userWithoutPassword.address) userWithoutPassword.address = decrypt(userWithoutPassword.address);
       if (userWithoutPassword.contact) userWithoutPassword.contact = decrypt(userWithoutPassword.contact);
 
+      console.log(`✅ [Google Login] Success for ${email} in ${Date.now() - startTime}ms`);
       return res.status(200).json({
         message: "Login successful",
         user: userWithoutPassword

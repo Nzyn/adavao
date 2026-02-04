@@ -163,14 +163,18 @@ const Login = () => {
 
   const handleGoogleSignIn = async (accessToken: string) => {
     setIsLoading(true);
+    const startTime = Date.now();
     try {
       // Fetch Google user info with shorter timeout
+      console.log('⏱️ [Google] Starting user info fetch...');
       const userInfoPromise = getGoogleUserInfo(accessToken);
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Google user info timeout')), 8000)
       );
       
       const userInfo = await Promise.race([userInfoPromise, timeoutPromise]) as any;
+      console.log(`⏱️ [Google] User info fetch took ${Date.now() - startTime}ms`);
+      
       if (!userInfo || !userInfo.email) {
         Alert.alert('Error', 'Failed to get user information from Google');
         setIsLoading(false);
@@ -181,6 +185,8 @@ const Login = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
+      console.log('⏱️ [Google] Starting backend login request...');
+      const backendStart = Date.now();
       const response = await fetch(`${BACKEND_URL}/google-login`, {
         method: 'POST',
         headers: {
@@ -197,6 +203,7 @@ const Login = () => {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+      console.log(`⏱️ [Google] Backend response took ${Date.now() - backendStart}ms, total: ${Date.now() - startTime}ms`);
 
       const data = await response.json();
 
