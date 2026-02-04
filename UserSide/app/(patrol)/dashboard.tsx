@@ -46,7 +46,7 @@ export default function PatrolDashboard() {
     const router = useRouter();
     const [userName, setUserName] = useState('Officer');
     const [userId, setUserId] = useState<string | null>(null);
-    const [stationId, setStationId] = useState<number | null>(null);
+    const [stationId, setStationId] = useState<number>(0);
     const [loading, setLoading] = useState(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -88,7 +88,7 @@ export default function PatrolDashboard() {
     // Refresh data when screen comes into focus
     useFocusEffect(
         useCallback(() => {
-            if (userId && stationId) {
+            if (userId) {
                 loadDispatchCounts();
             }
         }, [userId, stationId])
@@ -96,7 +96,7 @@ export default function PatrolDashboard() {
 
     // Auto-refresh dispatch counts every 2 seconds (silent)
     useEffect(() => {
-        if (!userId || !stationId) return;
+        if (!userId) return;
         
         const interval = setInterval(() => {
             loadDispatchCounts();
@@ -130,7 +130,7 @@ export default function PatrolDashboard() {
             const full = `${first} ${last}`.trim();
             setUserName(full || user?.email || 'Officer');
             setUserId(user?.id?.toString() || user?.userId?.toString());
-            setStationId(user?.assigned_station_id || user?.stationId || null);
+            setStationId(user?.assigned_station_id || user?.stationId || 0);
             setIsOnDuty(user?.is_on_duty || false);
         } catch {
             setUserName('Officer');
@@ -138,9 +138,9 @@ export default function PatrolDashboard() {
     };
 
     const loadDispatchCounts = async () => {
-        if (!userId || !stationId) return;
+        if (!userId) return;
         try {
-            // Load pending dispatches count
+            // Load pending dispatches count (includes dispatches directly assigned to this officer)
             const pendingRes = await fetch(
                 `${API_URL}/dispatch/station/${stationId}/pending?userId=${userId}`,
                 { headers: { 'X-User-Id': userId } }

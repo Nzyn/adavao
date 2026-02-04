@@ -61,7 +61,7 @@ export default function PatrolDispatchesScreen() {
     const [dispatches, setDispatches] = useState<Dispatch[]>([]);
     const [myDispatches, setMyDispatches] = useState<any[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
-    const [stationId, setStationId] = useState<number | null>(null);
+    const [stationId, setStationId] = useState<number>(0);
     const [activeTab, setActiveTab] = useState<'pending' | 'mine'>('pending');
 
     useEffect(() => {
@@ -69,14 +69,14 @@ export default function PatrolDispatchesScreen() {
     }, []);
 
     useEffect(() => {
-        if (userId && stationId) {
+        if (userId) {
             loadDispatches();
         }
     }, [userId, stationId, activeTab]);
 
     // Auto-refresh dispatches every 2 seconds (silent)
     useEffect(() => {
-        if (!userId || !stationId) return;
+        if (!userId) return;
         
         const interval = setInterval(() => {
             loadDispatches(false);
@@ -95,18 +95,18 @@ export default function PatrolDispatchesScreen() {
             const user = JSON.parse(stored);
             const id = user?.id?.toString() || user?.userId?.toString();
             setUserId(id);
-            setStationId(user?.assigned_station_id || user?.stationId || null);
+            setStationId(user?.assigned_station_id || user?.stationId || 0);
         } catch (error) {
             console.error('Error loading user data:', error);
         }
     };
 
     const loadDispatches = async (isInitialLoad = true) => {
-        if (!userId || !stationId) return;
+        if (!userId) return;
 
         try {
             if (activeTab === 'pending') {
-                // Load pending dispatches for the station
+                // Load pending dispatches for the station (also includes dispatches directly assigned to this officer)
                 const response = await fetch(
                     `${API_URL}/dispatch/station/${stationId}/pending?userId=${userId}`,
                     {
