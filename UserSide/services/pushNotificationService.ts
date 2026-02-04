@@ -1,19 +1,47 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 import Constants from 'expo-constants';
 import { API_URL } from '../config/backend';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+        const data = notification.request.content.data;
+        
+        // Check if this is an urgent dispatch notification
+        const isUrgent = data?.type === 'urgent_dispatch' || data?.ring || data?.vibrate;
+        
+        return {
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
+            priority: isUrgent ? Notifications.AndroidNotificationPriority.MAX : Notifications.AndroidNotificationPriority.HIGH,
+        };
+    },
 });
+
+/**
+ * Vibrate device for urgent dispatch - long pattern for urgency
+ */
+function vibrateUrgent() {
+    // Vibrate pattern: [wait, vibrate, wait, vibrate, ...]
+    // Pattern: vibrate 500ms, pause 200ms, vibrate 500ms, pause 200ms, vibrate 500ms
+    const pattern = [0, 500, 200, 500, 200, 500, 200, 500, 200, 500];
+    
+    if (Platform.OS === 'android') {
+        Vibration.vibrate(pattern, false); // false = don't repeat
+    } else {
+        // iOS has limited vibration support, do multiple short vibrations
+        Vibration.vibrate();
+        setTimeout(() => Vibration.vibrate(), 500);
+        setTimeout(() => Vibration.vibrate(), 1000);
+        setTimeout(() => Vibration.vibrate(), 1500);
+        setTimeout(() => Vibration.vibrate(), 2000);
+    }
+}
 
 /**
  * Register for push notifications and get Expo push token
@@ -22,12 +50,26 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     let token = null;
 
     if (Platform.OS === 'android') {
+        // Regular dispatch channel
         await Notifications.setNotificationChannelAsync('dispatch', {
             name: 'Patrol Dispatches',
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#3b82f6',
             sound: 'default',
+        });
+        
+        // Urgent dispatch channel with maximum priority
+        await Notifications.setNotificationChannelAsync('urgent_dispatch', {
+            name: 'Urgent Dispatches',
+            description: 'High-priority dispatch alerts that require immediate attention',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 500, 200, 500, 200, 500, 200, 500, 200, 500],
+            lightColor: '#dc2626',
+            sound: 'default',
+            enableVibrate: true,
+            enableLights: true,
+            bypassDnd: true, // Bypass Do Not Disturb
         });
     }
 
@@ -114,7 +156,14 @@ export function setupDispatchNotificationListeners(
         console.log('🔔 Dispatch notification received:', notification);
 
         const data = notification.request.content.data;
-        if (data?.type === 'dispatch' && onDispatchReceived) {
+        
+        // Handle urgent dispatch notifications with vibration
+        if (data?.type === 'urgent_dispatch' || data?.vibrate) {
+            console.log('🚨 URGENT DISPATCH - Activating vibration alert!');
+            vibrateUrgent();
+        }
+        
+        if ((data?.type === 'dispatch' || data?.type === 'urgent_dispatch') && onDispatchReceived) {
             onDispatchReceived(data);
         }
     });
@@ -124,7 +173,7 @@ export function setupDispatchNotificationListeners(
         console.log('👆 Dispatch notification tapped:', response);
 
         const data = response.notification.request.content.data;
-        if (data?.type === 'dispatch' && onDispatchTapped) {
+        if ((data?.type === 'dispatch' || data?.type === 'urgent_dispatch') && onDispatchTapped) {
             onDispatchTapped(data);
         }
     });

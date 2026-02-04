@@ -356,6 +356,205 @@ class DispatchController extends Controller
     }
 
     /**
+     * Auto dispatch to nearest patrol officer
+     */
+    public function autoDispatch(Request $request)
+    {
+        try {
+            $request->validate([
+                'report_id' => 'required|exists:reports,report_id',
+            ]);
+
+            $report = Report::with('location')->findOrFail($request->report_id);
+
+            // Check if report already has an active dispatch
+            $existingDispatch = PatrolDispatch::where('report_id', $report->report_id)
+                ->active()
+                ->first();
+
+            if ($existingDispatch) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This report already has an active dispatch'
+                ], 400);
+            }
+
+            // Get report coordinates
+            $reportLat = $report->location->latitude ?? null;
+            $reportLng = $report->location->longitude ?? null;
+
+            if (!$reportLat || !$reportLng) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Report location coordinates not available'
+                ], 400);
+            }
+
+            // Find all on-duty patrol officers with locations
+            $officers = User::where('user_role', 'patrol_officer')
+                ->where('is_on_duty', true)
+                ->whereNotNull('current_latitude')
+                ->whereNotNull('current_longitude')
+                ->whereNotNull('push_token')
+                ->get();
+
+            if ($officers->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No patrol officers are currently on duty with location tracking enabled'
+                ], 400);
+            }
+
+            // Calculate distance to each officer using Haversine formula
+            $nearestOfficer = null;
+            $minDistance = PHP_FLOAT_MAX;
+
+            foreach ($officers as $officer) {
+                $distance = $this->calculateDistance(
+                    $reportLat,
+                    $reportLng,
+                    $officer->current_latitude,
+                    $officer->current_longitude
+                );
+
+                if ($distance < $minDistance) {
+                    $minDistance = $distance;
+                    $nearestOfficer = $officer;
+                }
+            }
+
+            if (!$nearestOfficer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Could not find a suitable patrol officer'
+                ], 400);
+            }
+
+            // Create dispatch
+            $dispatch = PatrolDispatch::create([
+                'report_id' => $report->report_id,
+                'station_id' => $report->assigned_station_id,
+                'patrol_officer_id' => $nearestOfficer->id,
+                'status' => 'pending',
+                'dispatched_at' => now(),
+                'dispatched_by' => auth()->id(),
+                'notes' => 'Auto-dispatched to nearest patrol officer (' . round($minDistance, 2) . ' km away)',
+            ]);
+
+            // Send urgent notification with ring and vibrate to ONLY the nearest officer
+            $this->sendUrgentDispatchNotification($dispatch, $nearestOfficer, $minDistance);
+
+            Log::info('Auto-dispatch created', [
+                'dispatch_id' => $dispatch->dispatch_id,
+                'report_id' => $report->report_id,
+                'officer_id' => $nearestOfficer->id,
+                'distance_km' => round($minDistance, 2),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Patrol dispatched successfully',
+                'officer_name' => $nearestOfficer->name,
+                'distance_km' => round($minDistance, 2),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to auto-dispatch: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to dispatch: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate distance between two coordinates using Haversine formula
+     */
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371; // Earth's radius in kilometers
+
+        $lat1 = deg2rad($lat1);
+        $lon1 = deg2rad($lon1);
+        $lat2 = deg2rad($lat2);
+        $lon2 = deg2rad($lon2);
+
+        $latDiff = $lat2 - $lat1;
+        $lonDiff = $lon2 - $lon1;
+
+        $a = sin($latDiff / 2) ** 2 + cos($lat1) * cos($lat2) * sin($lonDiff / 2) ** 2;
+        $c = 2 * asin(sqrt($a));
+
+        return $earthRadius * $c;
+    }
+
+    /**
+     * Send urgent dispatch notification with ring and vibrate
+     */
+    private function sendUrgentDispatchNotification($dispatch, $officer, $distanceKm)
+    {
+        try {
+            if (!$officer->push_token) {
+                Log::info('No push token for officer', ['officer_id' => $officer->id]);
+                return;
+            }
+
+            $report = $dispatch->report;
+            $location = $report->location;
+            $barangay = $location ? EncryptionService::decrypt($location->barangay) : 'Unknown';
+            
+            // Prepare Expo push notification with urgent settings
+            $message = [
+                'to' => $officer->push_token,
+                'sound' => [
+                    'critical' => true,
+                    'name' => 'default',
+                    'volume' => 1.0,
+                ],
+                'title' => '🚨 URGENT: New Dispatch Assigned',
+                'body' => "📍 {$report->report_type} reported at {$barangay}. You are {$distanceKm} km away - respond immediately!",
+                'data' => [
+                    'type' => 'urgent_dispatch',
+                    'dispatch_id' => $dispatch->dispatch_id,
+                    'report_id' => $report->report_id,
+                    'crime_type' => $report->report_type,
+                    'location' => $barangay,
+                    'urgency' => $report->urgency_score ?? 10,
+                    'distance_km' => $distanceKm,
+                    'vibrate' => true,
+                    'ring' => true,
+                ],
+                'priority' => 'high',
+                'channelId' => 'urgent_dispatch',
+                'ttl' => 60, // 60 seconds TTL for urgent notifications
+                'expiration' => time() + 60,
+                'badge' => 1,
+                'mutableContent' => true,
+                'categoryId' => 'dispatch_urgent',
+            ];
+
+            // Send to Expo Push Notification service
+            $response = \Http::post('https://exp.host/--/api/v2/push/send', $message);
+
+            if ($response->successful()) {
+                Log::info('Urgent dispatch notification sent', [
+                    'dispatch_id' => $dispatch->dispatch_id,
+                    'officer_id' => $officer->id,
+                    'distance_km' => $distanceKm,
+                ]);
+            } else {
+                Log::error('Failed to send urgent dispatch notification', [
+                    'dispatch_id' => $dispatch->dispatch_id,
+                    'response' => $response->body(),
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error sending urgent dispatch notification: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Private helper methods
      */
     private function sendDispatchNotification($dispatch)

@@ -9,6 +9,8 @@ import {
     Dimensions,
     Pressable,
     Modal,
+    Image,
+    Linking,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -736,29 +738,48 @@ export default function UserDashboard() {
                                             <Text style={styles.attachmentsTitle}>
                                                 <Ionicons name="attach" size={16} color={COLORS.textSecondary} /> Attachments
                                             </Text>
-                                            {selectedAnnouncement.attachments.map((attachment, index) => (
-                                                <TouchableOpacity 
-                                                    key={index} 
-                                                    style={styles.attachmentItem}
-                                                    onPress={() => {
-                                                        // Open attachment URL
-                                                        const Linking = require('react-native').Linking;
-                                                        Linking.openURL(attachment);
-                                                    }}
-                                                >
-                                                    <View style={styles.attachmentIcon}>
-                                                        <Ionicons 
-                                                            name={attachment.match(/\.(jpg|jpeg|png|gif)$/i) ? 'image-outline' : 'document-outline'} 
-                                                            size={20} 
-                                                            color={COLORS.primary} 
-                                                        />
-                                                    </View>
-                                                    <Text style={styles.attachmentName} numberOfLines={1}>
-                                                        {attachment.split('/').pop() || `Attachment ${index + 1}`}
-                                                    </Text>
-                                                    <Ionicons name="open-outline" size={16} color={COLORS.textMuted} />
-                                                </TouchableOpacity>
-                                            ))}
+                                            {selectedAnnouncement.attachments.map((attachment, index) => {
+                                                const isImage = attachment.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                                                
+                                                if (isImage) {
+                                                    return (
+                                                        <TouchableOpacity 
+                                                            key={index}
+                                                            onPress={() => Linking.openURL(attachment)}
+                                                            style={styles.imageAttachmentContainer}
+                                                        >
+                                                            <Image
+                                                                source={{ uri: attachment }}
+                                                                style={styles.attachmentImagePreview}
+                                                                resizeMode="cover"
+                                                            />
+                                                            <View style={styles.imageOverlay}>
+                                                                <Ionicons name="expand-outline" size={20} color={COLORS.white} />
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    );
+                                                }
+                                                
+                                                return (
+                                                    <TouchableOpacity 
+                                                        key={index} 
+                                                        style={styles.attachmentItem}
+                                                        onPress={() => Linking.openURL(attachment)}
+                                                    >
+                                                        <View style={styles.attachmentIcon}>
+                                                            <Ionicons 
+                                                                name="document-outline"
+                                                                size={20} 
+                                                                color={COLORS.primary} 
+                                                            />
+                                                        </View>
+                                                        <Text style={styles.attachmentName} numberOfLines={1}>
+                                                            {attachment.split('/').pop() || `Attachment ${index + 1}`}
+                                                        </Text>
+                                                        <Ionicons name="open-outline" size={16} color={COLORS.textMuted} />
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
                                         </View>
                                     )}
                                 </ScrollView>
@@ -1316,6 +1337,28 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: fontSize.sm,
         color: COLORS.textPrimary,
+    },
+    imageAttachmentContainer: {
+        marginBottom: spacing.sm,
+        borderRadius: borderRadius.md,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    attachmentImagePreview: {
+        width: '100%',
+        height: 200,
+        borderRadius: borderRadius.md,
+    },
+    imageOverlay: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 20,
+        width: 36,
+        height: 36,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     announcementModalClose: {
         backgroundColor: COLORS.primary,

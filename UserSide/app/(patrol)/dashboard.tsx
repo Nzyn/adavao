@@ -427,31 +427,60 @@ export default function PatrolDashboard() {
             >
                 {/* Duty Status Toggle */}
                 <View style={styles.dutyStatusContainer}>
-                    <View style={styles.dutyStatusCard}>
-                        <View style={styles.dutyStatusLeft}>
+                    <View style={[
+                        styles.dutyStatusCard,
+                        isOnDuty && styles.dutyStatusCardActive
+                    ]}>
+                        <View style={styles.dutyStatusHeader}>
                             <View style={[
-                                styles.dutyIndicator,
-                                { backgroundColor: isOnDuty ? COLORS.success : COLORS.textMuted }
-                            ]} />
-                            <View>
-                                <Text style={styles.dutyStatusTitle}>
-                                    {isOnDuty ? 'On Duty' : 'Off Duty'}
+                                styles.dutyStatusIconBg,
+                                { backgroundColor: isOnDuty ? '#DCFCE7' : '#F3F4F6' }
+                            ]}>
+                                <Ionicons 
+                                    name={isOnDuty ? "shield-checkmark" : "shield-outline"} 
+                                    size={28} 
+                                    color={isOnDuty ? COLORS.success : COLORS.textMuted} 
+                                />
+                            </View>
+                            <View style={styles.dutyStatusTextContainer}>
+                                <Text style={[
+                                    styles.dutyStatusTitle,
+                                    isOnDuty && styles.dutyStatusTitleActive
+                                ]}>
+                                    {isOnDuty ? '🟢 On Duty' : '⚪ Off Duty'}
                                 </Text>
                                 <Text style={styles.dutyStatusSubtitle}>
                                     {isOnDuty 
-                                        ? (isLocationTracking ? '📍 Location tracking active' : '⏳ Starting tracking...')
+                                        ? (isLocationTracking ? 'Location tracking active' : 'Starting tracking...')
                                         : 'Toggle to start your shift'
                                     }
                                 </Text>
                             </View>
                         </View>
-                        <Switch
-                            value={isOnDuty}
-                            onValueChange={toggleDutyStatus}
-                            trackColor={{ false: '#E5E7EB', true: '#86EFAC' }}
-                            thumbColor={isOnDuty ? COLORS.success : '#9CA3AF'}
-                        />
+                        <View style={styles.dutyToggleContainer}>
+                            <Text style={[
+                                styles.dutyToggleLabel,
+                                { color: isOnDuty ? COLORS.success : COLORS.textMuted }
+                            ]}>
+                                {isOnDuty ? 'ON' : 'OFF'}
+                            </Text>
+                            <Switch
+                                value={isOnDuty}
+                                onValueChange={toggleDutyStatus}
+                                trackColor={{ false: '#E5E7EB', true: '#86EFAC' }}
+                                thumbColor={isOnDuty ? COLORS.success : '#9CA3AF'}
+                                ios_backgroundColor="#E5E7EB"
+                            />
+                        </View>
                     </View>
+                    {isOnDuty && (
+                        <View style={styles.dutyStatusIndicatorBar}>
+                            <View style={styles.dutyPulseIndicator} />
+                            <Text style={styles.dutyStatusIndicatorText}>
+                                Your location is being shared with dispatch
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Banner */}
@@ -482,37 +511,31 @@ export default function PatrolDashboard() {
                     </View>
                 </View>
 
-                {/* Quick Action Buttons */}
+                {/* Quick Action Button - Dispatches Only */}
                 <View style={styles.quickActionsContainer}>
                     <TouchableOpacity 
-                        style={styles.quickActionButton}
+                        style={styles.quickActionButtonFull}
                         onPress={() => router.push('/(patrol)/dispatches')}
                     >
-                        <View style={[styles.quickActionIconBg, { backgroundColor: '#FEE2E2' }]}>
-                            <Ionicons name="alert-circle-outline" size={24} color="#DC2626" />
+                        <View style={[styles.quickActionIconBgLarge, { backgroundColor: '#FEE2E2' }]}>
+                            <Ionicons name="alert-circle-outline" size={28} color="#DC2626" />
                             {pendingDispatchCount > 0 && (
-                                <View style={styles.quickActionBadge}>
+                                <View style={styles.quickActionBadgeLarge}>
                                     <Text style={styles.quickActionBadgeText}>
                                         {pendingDispatchCount > 9 ? '9+' : pendingDispatchCount}
                                     </Text>
                                 </View>
                             )}
                         </View>
-                        <Text style={styles.quickActionText}>Dispatches</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.quickActionButtonCenter}>
-                        <View style={[styles.quickActionIconBgLarge, { backgroundColor: COLORS.primary }]}>
-                            <Ionicons name="time-outline" size={28} color={COLORS.white} />
+                        <View style={styles.quickActionTextContainer}>
+                            <Text style={styles.quickActionTextMain}>View Dispatches</Text>
+                            <Text style={styles.quickActionTextSub}>
+                                {pendingDispatchCount > 0 
+                                    ? `${pendingDispatchCount} pending dispatch${pendingDispatchCount > 1 ? 'es' : ''}` 
+                                    : 'No pending dispatches'}
+                            </Text>
                         </View>
-                        <Text style={styles.quickActionText}>History</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.quickActionButton}>
-                        <View style={[styles.quickActionIconBg, { backgroundColor: '#FEF3C7' }]}>
-                            <Ionicons name="list-outline" size={24} color="#D97706" />
-                        </View>
-                        <Text style={styles.quickActionText}>Task List</Text>
+                        <Ionicons name="chevron-forward" size={24} color={COLORS.textMuted} />
                     </TouchableOpacity>
                 </View>
 
@@ -607,7 +630,7 @@ export default function PatrolDashboard() {
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Bottom Navigation - 4 items, no center button */}
+            {/* Bottom Navigation - 2 items only */}
             <View style={styles.bottomNav}>
                 <TouchableOpacity 
                     style={styles.navItem}
@@ -615,29 +638,6 @@ export default function PatrolDashboard() {
                 >
                     <Ionicons name={activeTab === 'home' ? 'home' : 'home-outline'} size={24} color={activeTab === 'home' ? COLORS.primary : COLORS.textMuted} />
                     <Text style={[styles.navText, activeTab === 'home' && styles.navTextActive]}>Home</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    style={styles.navItem}
-                    onPress={() => router.push('/(patrol)/dispatches')}
-                >
-                    <View>
-                        <Ionicons name="alert-circle-outline" size={24} color={COLORS.textMuted} />
-                        {(pendingDispatchCount + activeDispatchCount) > 0 && (
-                            <View style={styles.navBadge}>
-                                <Text style={styles.navBadgeText}>
-                                    {(pendingDispatchCount + activeDispatchCount) > 9 ? '9+' : (pendingDispatchCount + activeDispatchCount)}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                    <Text style={styles.navText}>Dispatches</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    style={styles.navItem}
-                    onPress={() => router.push('/(patrol)/history')}
-                >
-                    <Ionicons name="time-outline" size={24} color={COLORS.textMuted} />
-                    <Text style={styles.navText}>History</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.navItem}
@@ -999,19 +999,36 @@ const styles = StyleSheet.create({
         paddingTop: spacing.lg,
     },
     dutyStatusCard: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         backgroundColor: COLORS.white,
         borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        borderWidth: 1,
+        padding: spacing.lg,
+        borderWidth: 2,
         borderColor: COLORS.border,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 4,
+    },
+    dutyStatusCardActive: {
+        borderColor: COLORS.success,
+        backgroundColor: '#F0FDF4',
+    },
+    dutyStatusHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    dutyStatusIconBg: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.md,
+    },
+    dutyStatusTextContainer: {
+        flex: 1,
     },
     dutyStatusLeft: {
         flexDirection: 'row',
@@ -1025,14 +1042,47 @@ const styles = StyleSheet.create({
         marginRight: spacing.md,
     },
     dutyStatusTitle: {
-        fontSize: fontSize.md,
-        fontWeight: '600',
+        fontSize: fontSize.lg,
+        fontWeight: '700',
         color: COLORS.textPrimary,
     },
+    dutyStatusTitleActive: {
+        color: COLORS.success,
+    },
     dutyStatusSubtitle: {
-        fontSize: fontSize.xs,
+        fontSize: fontSize.sm,
         color: COLORS.textSecondary,
-        marginTop: 2,
+        marginTop: 4,
+    },
+    dutyToggleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+    },
+    dutyToggleLabel: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        marginRight: spacing.sm,
+    },
+    dutyStatusIndicatorBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#DCFCE7',
+        borderRadius: borderRadius.md,
+        padding: spacing.sm,
+        marginTop: spacing.sm,
+    },
+    dutyPulseIndicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: COLORS.success,
+        marginRight: spacing.sm,
+    },
+    dutyStatusIndicatorText: {
+        fontSize: fontSize.xs,
+        color: COLORS.success,
+        fontWeight: '500',
     },
 
     // Banner Styles
@@ -1095,12 +1145,22 @@ const styles = StyleSheet.create({
 
     // Quick Actions Styles
     quickActionsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'flex-end',
         paddingHorizontal: containerPadding.horizontal,
-        paddingVertical: spacing.xl,
-        gap: spacing.lg,
+        paddingVertical: spacing.lg,
+    },
+    quickActionButtonFull: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#FEE2E2',
     },
     quickActionButton: {
         alignItems: 'center',
@@ -1124,16 +1184,26 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     quickActionIconBgLarge: {
-        width: isTablet ? 80 : 70,
-        height: isTablet ? 80 : 70,
-        borderRadius: isTablet ? 40 : 35,
+        width: isTablet ? 70 : 60,
+        height: isTablet ? 70 : 60,
+        borderRadius: isTablet ? 35 : 30,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
+        position: 'relative',
+    },
+    quickActionTextContainer: {
+        flex: 1,
+        marginLeft: spacing.md,
+    },
+    quickActionTextMain: {
+        fontSize: fontSize.md,
+        color: COLORS.textPrimary,
+        fontWeight: '700',
+    },
+    quickActionTextSub: {
+        fontSize: fontSize.sm,
+        color: COLORS.textSecondary,
+        marginTop: 2,
     },
     quickActionText: {
         fontSize: fontSize.sm,
@@ -1148,6 +1218,19 @@ const styles = StyleSheet.create({
         minWidth: 20,
         height: 20,
         borderRadius: 10,
+        backgroundColor: COLORS.accent,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: COLORS.white,
+    },
+    quickActionBadgeLarge: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        minWidth: 22,
+        height: 22,
+        borderRadius: 11,
         backgroundColor: COLORS.accent,
         justifyContent: 'center',
         alignItems: 'center',

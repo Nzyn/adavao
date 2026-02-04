@@ -3943,131 +3943,117 @@ function generatePDF(report) {
 
     <!-- Dispatch Modal -->
     <div id="dispatchModal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header">
                 <h2>🚓 Dispatch Patrol Officer</h2>
                 <button class="modal-close" onclick="closeDispatchModal()" type="button">&times;</button>
             </div>
-            <div class="modal-body">
-                <p style="margin-bottom: 16px; color: #666; font-size: 14px;">
-                    Assign a patrol officer to respond to this report. The officer will receive a notification immediately.
-                </p>
-                <form id="dispatchForm" method="POST">
-                    @csrf
-                    <input type="hidden" name="report_id" id="dispatch_report_id">
-                    
-                    <div style="margin-bottom: 16px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Select Patrol Officer:</label>
-                        <select 
-                            name="patrol_officer_id" 
-                            id="dispatch_officer_select"
-                            required
-                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
-                        >
-                            <option value="">-- Loading officers... --</option>
-                        </select>
-                        <small style="color: #666; font-size: 12px;">Only on-duty officers are shown</small>
+            <div class="modal-body" style="text-align: center; padding: 24px;">
+                <div id="dispatch-loading" style="display: none;">
+                    <div style="width: 60px; height: 60px; border: 4px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+                    <p style="color: #666; font-size: 14px;">Finding nearest patrol officer...</p>
+                </div>
+                <div id="dispatch-confirm" style="display: block;">
+                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                        <span style="font-size: 36px;">🚓</span>
                     </div>
-
-                    <div style="margin-bottom: 16px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Notes (Optional):</label>
-                        <textarea 
-                            name="notes"
-                            rows="3"
-                            placeholder="Additional instructions for the patrol officer..."
-                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; resize: vertical; font-size: 14px;"
-                        ></textarea>
-                    </div>
-
-                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                        <button type="button" onclick="closeDispatchModal()" style="padding: 10px 20px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    <h3 style="margin: 0 0 8px; font-size: 18px; color: #1f2937;">Ready to Dispatch</h3>
+                    <p style="margin: 0 0 24px; color: #666; font-size: 14px; line-height: 1.5;">
+                        The system will automatically find and notify the nearest on-duty patrol officer to respond to this report.
+                    </p>
+                    <input type="hidden" id="dispatch_report_id">
+                    <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button type="button" onclick="closeDispatchModal()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;">
                             Cancel
                         </button>
-                        <button type="submit" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        <button type="button" onclick="dispatchToNearestPatrol()" style="padding: 12px 24px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
                             🚓 Dispatch Now
                         </button>
                     </div>
-                </form>
+                </div>
+                <div id="dispatch-success" style="display: none;">
+                    <div style="width: 80px; height: 80px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                        <span style="font-size: 36px;">✅</span>
+                    </div>
+                    <h3 style="margin: 0 0 8px; font-size: 18px; color: #16a34a;">Patrol Dispatched!</h3>
+                    <p style="margin: 0 0 24px; color: #666; font-size: 14px; line-height: 1.5;">
+                        Patrol sent to the nearest dispatch in the reported area. The officer has been notified with an urgent alert.
+                    </p>
+                    <button type="button" onclick="closeDispatchModal(); location.reload();" style="padding: 12px 24px; background: #16a34a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        Done
+                    </button>
+                </div>
+                <div id="dispatch-error" style="display: none;">
+                    <div style="width: 80px; height: 80px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                        <span style="font-size: 36px;">❌</span>
+                    </div>
+                    <h3 style="margin: 0 0 8px; font-size: 18px; color: #dc2626;">Dispatch Failed</h3>
+                    <p id="dispatch-error-message" style="margin: 0 0 24px; color: #666; font-size: 14px; line-height: 1.5;">
+                        No patrol officers are currently on duty or available.
+                    </p>
+                    <button type="button" onclick="closeDispatchModal();" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 14px;">
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
     </div>
+    
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 
     <script>
     // Dispatch Modal Functions
     function openDispatchModal(reportId) {
         document.getElementById('dispatch_report_id').value = reportId;
-        
-        // Load on-duty officers
-        fetch('/api/on-duty-officers')
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('dispatch_officer_select');
-                select.innerHTML = '<option value="">-- Select Officer --</option>';
-                
-                if (data.officers && data.officers.length > 0) {
-                    data.officers.forEach(officer => {
-                        const option = document.createElement('option');
-                        option.value = officer.id;
-                        option.textContent = `${officer.name} - ${officer.station_name || 'No Station'}`;
-                        select.appendChild(option);
-                    });
-                } else {
-                    select.innerHTML = '<option value="">No officers on duty</option>';
-                }
-            })
-            .catch(error => {
-                console.error('Error loading officers:', error);
-                const select = document.getElementById('dispatch_officer_select');
-                select.innerHTML = '<option value="">Error loading officers</option>';
-            });
-        
+        // Reset to confirm state
+        document.getElementById('dispatch-loading').style.display = 'none';
+        document.getElementById('dispatch-confirm').style.display = 'block';
+        document.getElementById('dispatch-success').style.display = 'none';
+        document.getElementById('dispatch-error').style.display = 'none';
         document.getElementById('dispatchModal').style.display = 'flex';
+    }
+    
+    function dispatchToNearestPatrol() {
+        const reportId = document.getElementById('dispatch_report_id').value;
+        
+        // Show loading
+        document.getElementById('dispatch-confirm').style.display = 'none';
+        document.getElementById('dispatch-loading').style.display = 'block';
+        
+        // Auto-dispatch to nearest patrol
+        fetch('/dispatches/auto', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ report_id: reportId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('dispatch-loading').style.display = 'none';
+            if (data.success) {
+                document.getElementById('dispatch-success').style.display = 'block';
+            } else {
+                document.getElementById('dispatch-error-message').textContent = data.message || 'No patrol officers are currently on duty or available.';
+                document.getElementById('dispatch-error').style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('dispatch-loading').style.display = 'none';
+            document.getElementById('dispatch-error-message').textContent = 'Failed to dispatch. Please try again.';
+            document.getElementById('dispatch-error').style.display = 'block';
+        });
     }
 
     function closeDispatchModal() {
         document.getElementById('dispatchModal').style.display = 'none';
-        document.getElementById('dispatchForm').reset();
     }
-
-    // Handle dispatch form submission
-    document.addEventListener('DOMContentLoaded', function() {
-        const dispatchForm = document.getElementById('dispatchForm');
-        if (dispatchForm) {
-            dispatchForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const formData = new FormData(this);
-                const data = {
-                    report_id: formData.get('report_id'),
-                    patrol_officer_id: formData.get('patrol_officer_id'),
-                    notes: formData.get('notes')
-                };
-                
-                fetch('/dispatches', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('✅ Dispatch created successfully! Officer has been notified.');
-                        closeDispatchModal();
-                        location.reload();
-                    } else {
-                        alert('❌ Error: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('❌ Failed to create dispatch');
-                });
-            });
-        }
-    });
     </script>
 @endsection

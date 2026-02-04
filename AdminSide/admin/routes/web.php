@@ -206,6 +206,7 @@ Route::middleware(['auth'])->group(function () {
     // Patrol Dispatch Routes
     Route::get('/dispatches', [DispatchController::class, 'index'])->name('dispatches');
     Route::post('/dispatches', [DispatchController::class, 'store'])->name('dispatches.store');
+    Route::post('/dispatches/auto', [DispatchController::class, 'autoDispatch'])->name('dispatches.autoDispatch');
     Route::put('/dispatches/{id}/status', [DispatchController::class, 'updateStatus'])->name('dispatches.updateStatus');
     Route::put('/dispatches/{id}/assign', [DispatchController::class, 'assign'])->name('dispatches.assign');
     Route::delete('/dispatches/{id}', [DispatchController::class, 'cancel'])->name('dispatches.cancel');
