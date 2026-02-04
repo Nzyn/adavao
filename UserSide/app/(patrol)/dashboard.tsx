@@ -10,6 +10,8 @@ import {
     Alert,
     Switch,
     Modal,
+    Image,
+    Linking,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -51,6 +53,13 @@ export default function PatrolDashboard() {
     const [pendingDispatchCount, setPendingDispatchCount] = useState(0);
     const [activeDispatchCount, setActiveDispatchCount] = useState(0);
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+    const [activeTab, setActiveTab] = useState('home');
+    const [announcements, setAnnouncements] = useState<any[]>([]);
+    const [recentReports, setRecentReports] = useState<any[]>([]);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState<any>(null);
+    const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+    const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
+    const [allAnnouncements, setAllAnnouncements] = useState<any[]>([]);
 
     useEffect(() => {
         loadUserData();
@@ -135,6 +144,95 @@ export default function PatrolDashboard() {
         }
     };
 
+    // Fetch announcements from API
+    const fetchAnnouncements = async () => {
+        try {
+            const response = await fetch(`${API_URL}/announcements?limit=2`);
+            const data = await response.json();
+            if (data.success && data.data) {
+                setAnnouncements(data.data.map((a: any) => ({
+                    id: a.id,
+                    title: a.title,
+                    content: a.content,
+                    message: a.content,
+                    date: a.date,
+                    author: a.author,
+                    attachments: a.attachments || []
+                })));
+            }
+        } catch (error) {
+            console.error('Error fetching announcements:', error);
+        }
+    };
+
+    // Fetch all announcements
+    const fetchAllAnnouncements = async () => {
+        try {
+            const response = await fetch(`${API_URL}/announcements?limit=50`);
+            const data = await response.json();
+            if (data.success && data.data) {
+                setAllAnnouncements(data.data.map((a: any) => ({
+                    id: a.id,
+                    title: a.title,
+                    content: a.content,
+                    message: a.content,
+                    date: a.date,
+                    author: a.author,
+                    attachments: a.attachments || []
+                })));
+            }
+        } catch (error) {
+            console.error('Error fetching all announcements:', error);
+        }
+    };
+
+    // Fetch recent reports for officer's station
+    const fetchRecentReports = async () => {
+        if (!stationId) return;
+        try {
+            const response = await fetch(`${API_URL}/reports?station_id=${stationId}&limit=5`);
+            const data = await response.json();
+            if (data.success && data.data) {
+                setRecentReports(data.data.slice(0, 2).map((r: any) => ({
+                    id: r.report_id || r.id,
+                    type: r.crime_type || r.type || 'Report',
+                    location: r.location?.barangay || r.barangay || 'Unknown location',
+                    time: formatTimeAgo(r.created_at),
+                    status: r.status || 'pending'
+                })));
+            }
+        } catch (error) {
+            console.error('Error fetching reports:', error);
+        }
+    };
+
+    // Format time ago
+    const formatTimeAgo = (dateStr: string) => {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 60) return `${diffMins} min ago`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    };
+
+    // Load data on mount
+    useEffect(() => {
+        fetchAnnouncements();
+        fetchRecentReports();
+        
+        // Auto-refresh every 30 seconds
+        const interval = setInterval(() => {
+            fetchAnnouncements();
+            fetchRecentReports();
+        }, 30000);
+        
+        return () => clearInterval(interval);
+    }, [stationId]);
+
     const toggleDutyStatus = async () => {
         const newStatus = !isOnDuty;
         try {
@@ -165,6 +263,8 @@ export default function PatrolDashboard() {
     const onRefresh = () => {
         setLoading(true);
         loadDispatchCounts();
+        fetchAnnouncements();
+        fetchRecentReports();
         setTimeout(() => setLoading(false), 1000);
     };
 
@@ -221,17 +321,17 @@ export default function PatrolDashboard() {
         }
     };
 
-    // Mock data for recent reports (UI only)
-    const recentReports = [
-        { id: 1, type: 'Theft', location: 'Brgy. Talomo', time: '2 hours ago', status: 'pending' },
-        { id: 2, type: 'Assault', location: 'Brgy. Poblacion', time: '5 hours ago', status: 'responding' },
-    ];
+    // Handle announcement press
+    const handleAnnouncementPress = (announcement: any) => {
+        setSelectedAnnouncement(announcement);
+        setShowAnnouncementModal(true);
+    };
 
-    // Mock data for announcements (UI only)
-    const announcements = [
-        { id: 1, title: 'Patrol Schedule Update', message: 'New patrol schedules have been posted for next week.', date: 'Today' },
-        { id: 2, title: 'Equipment Check', message: 'All officers must complete equipment check by Friday.', date: 'Yesterday' },
-    ];
+    // Handle See All announcements
+    const handleSeeAllAnnouncements = () => {
+        fetchAllAnnouncements();
+        setShowAllAnnouncements(true);
+    };
 
     return (
         <View style={styles.container}>
@@ -425,7 +525,7 @@ export default function PatrolDashboard() {
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Announcements</Text>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={handleSeeAllAnnouncements}>
                             <Text style={styles.seeAllText}>See All</Text>
                         </TouchableOpacity>
                     </View>
@@ -437,7 +537,11 @@ export default function PatrolDashboard() {
                         </View>
                     ) : (
                         announcements.map((announcement) => (
-                            <TouchableOpacity key={announcement.id} style={styles.announcementCard}>
+                            <TouchableOpacity 
+                                key={announcement.id} 
+                                style={styles.announcementCard}
+                                onPress={() => handleAnnouncementPress(announcement)}
+                            >
                                 <View style={styles.announcementIconContainer}>
                                     <Ionicons name="megaphone" size={20} color={COLORS.primary} />
                                 </View>
@@ -459,30 +563,167 @@ export default function PatrolDashboard() {
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Bottom Navigation */}
+            {/* Bottom Navigation - 4 items, no center button */}
             <View style={styles.bottomNav}>
-                <TouchableOpacity style={styles.navItem}>
-                    <Ionicons name="home" size={24} color={COLORS.primary} />
-                    <Text style={[styles.navText, styles.navTextActive]}>Home</Text>
+                <TouchableOpacity 
+                    style={styles.navItem}
+                    onPress={() => setActiveTab('home')}
+                >
+                    <Ionicons name={activeTab === 'home' ? 'home' : 'home-outline'} size={24} color={activeTab === 'home' ? COLORS.primary : COLORS.textMuted} />
+                    <Text style={[styles.navText, activeTab === 'home' && styles.navTextActive]}>Home</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem}>
-                    <Ionicons name="map-outline" size={24} color={COLORS.textMuted} />
-                    <Text style={styles.navText}>Map</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.navItemCenter}>
-                    <View style={styles.navCenterButton}>
-                        <Ionicons name="radio" size={28} color={COLORS.white} />
+                <TouchableOpacity 
+                    style={styles.navItem}
+                    onPress={() => router.push('/(patrol)/dispatches')}
+                >
+                    <View>
+                        <Ionicons name="alert-circle-outline" size={24} color={COLORS.textMuted} />
+                        {(pendingDispatchCount + activeDispatchCount) > 0 && (
+                            <View style={styles.navBadge}>
+                                <Text style={styles.navBadgeText}>
+                                    {(pendingDispatchCount + activeDispatchCount) > 9 ? '9+' : (pendingDispatchCount + activeDispatchCount)}
+                                </Text>
+                            </View>
+                        )}
                     </View>
+                    <Text style={styles.navText}>Dispatches</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem}>
+                <TouchableOpacity 
+                    style={styles.navItem}
+                    onPress={() => Alert.alert('Coming Soon', 'Reports feature coming soon!')}
+                >
                     <Ionicons name="document-text-outline" size={24} color={COLORS.textMuted} />
                     <Text style={styles.navText}>Reports</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem}>
+                <TouchableOpacity 
+                    style={styles.navItem}
+                    onPress={() => Alert.alert('Coming Soon', 'Profile feature coming soon!')}
+                >
                     <Ionicons name="person-outline" size={24} color={COLORS.textMuted} />
                     <Text style={styles.navText}>Profile</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Announcement Details Modal */}
+            <Modal
+                visible={showAnnouncementModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowAnnouncementModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.announcementModalContent}>
+                        <View style={styles.announcementModalHeader}>
+                            <View style={styles.announcementModalIcon}>
+                                <Ionicons name="megaphone" size={24} color={COLORS.primary} />
+                            </View>
+                            <TouchableOpacity onPress={() => setShowAnnouncementModal(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                        {selectedAnnouncement && (
+                            <>
+                                <Text style={styles.announcementModalTitle}>{selectedAnnouncement.title}</Text>
+                                <View style={styles.announcementModalMeta}>
+                                    <Text style={styles.announcementModalDate}>{selectedAnnouncement.date}</Text>
+                                    {selectedAnnouncement.author && (
+                                        <Text style={styles.announcementModalAuthor}>by {selectedAnnouncement.author}</Text>
+                                    )}
+                                </View>
+                                <ScrollView style={styles.announcementModalBody}>
+                                    <Text style={styles.announcementModalText}>{selectedAnnouncement.content}</Text>
+                                    
+                                    {/* Attachments */}
+                                    {selectedAnnouncement.attachments && selectedAnnouncement.attachments.length > 0 && (
+                                        <View style={styles.attachmentsSection}>
+                                            <Text style={styles.attachmentsTitle}>
+                                                <Ionicons name="attach" size={16} color={COLORS.textSecondary} /> Attachments
+                                            </Text>
+                                            {selectedAnnouncement.attachments.map((attachment: string, index: number) => (
+                                                <TouchableOpacity 
+                                                    key={index} 
+                                                    style={styles.attachmentItem}
+                                                    onPress={() => Linking.openURL(attachment)}
+                                                >
+                                                    <View style={styles.attachmentIcon}>
+                                                        <Ionicons 
+                                                            name={attachment.match(/\.(jpg|jpeg|png|gif)$/i) ? 'image-outline' : 'document-outline'} 
+                                                            size={20} 
+                                                            color={COLORS.primary} 
+                                                        />
+                                                    </View>
+                                                    <Text style={styles.attachmentName} numberOfLines={1}>
+                                                        {attachment.split('/').pop() || `Attachment ${index + 1}`}
+                                                    </Text>
+                                                    <Ionicons name="open-outline" size={16} color={COLORS.textMuted} />
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
+                                </ScrollView>
+                            </>
+                        )}
+                        <TouchableOpacity 
+                            style={styles.announcementModalClose}
+                            onPress={() => setShowAnnouncementModal(false)}
+                        >
+                            <Text style={styles.announcementModalCloseText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* All Announcements Modal */}
+            <Modal
+                visible={showAllAnnouncements}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowAllAnnouncements(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.allAnnouncementsModal}>
+                        <View style={styles.allAnnouncementsHeader}>
+                            <Text style={styles.allAnnouncementsTitle}>All Announcements</Text>
+                            <TouchableOpacity onPress={() => setShowAllAnnouncements(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.allAnnouncementsList}>
+                            {allAnnouncements.length === 0 ? (
+                                <View style={styles.emptyCard}>
+                                    <Ionicons name="megaphone-outline" size={48} color={COLORS.textMuted} />
+                                    <Text style={styles.emptyText}>No announcements</Text>
+                                </View>
+                            ) : (
+                                allAnnouncements.map((announcement) => (
+                                    <TouchableOpacity 
+                                        key={announcement.id} 
+                                        style={styles.allAnnouncementItem}
+                                        onPress={() => {
+                                            setShowAllAnnouncements(false);
+                                            setSelectedAnnouncement(announcement);
+                                            setShowAnnouncementModal(true);
+                                        }}
+                                    >
+                                        <View style={styles.announcementIconContainer}>
+                                            <Ionicons name="megaphone" size={20} color={COLORS.primary} />
+                                        </View>
+                                        <View style={styles.announcementContent}>
+                                            <View style={styles.announcementHeader}>
+                                                <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                                                <Text style={styles.announcementDate}>{announcement.date}</Text>
+                                            </View>
+                                            <Text style={styles.announcementMessage} numberOfLines={2}>
+                                                {announcement.message}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Logout Confirmation Dialog */}
             <ConfirmDialog
@@ -944,24 +1185,22 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: spacing.xs,
     },
-    navItemCenter: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: -spacing.xl,
-    },
-    navCenterButton: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        justifyContent: 'center',
-        alignItems: 'center',
+    navBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -8,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
         backgroundColor: COLORS.accent,
-        shadowColor: COLORS.accent,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+    },
+    navBadgeText: {
+        color: COLORS.white,
+        fontSize: 9,
+        fontWeight: 'bold',
     },
     navText: {
         fontSize: fontSize.xs,
@@ -971,5 +1210,141 @@ const styles = StyleSheet.create({
     navTextActive: {
         color: COLORS.primary,
         fontWeight: '600',
+    },
+
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.lg,
+    },
+    announcementModalContent: {
+        backgroundColor: COLORS.white,
+        borderRadius: borderRadius.lg,
+        padding: spacing.lg,
+        width: '100%',
+        maxWidth: 400,
+        maxHeight: '80%',
+    },
+    announcementModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    announcementModalIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#EEF2FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    announcementModalTitle: {
+        fontSize: fontSize.lg,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        marginBottom: spacing.sm,
+    },
+    announcementModalMeta: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginBottom: spacing.md,
+    },
+    announcementModalDate: {
+        fontSize: fontSize.sm,
+        color: COLORS.textMuted,
+    },
+    announcementModalAuthor: {
+        fontSize: fontSize.sm,
+        color: COLORS.textSecondary,
+    },
+    announcementModalBody: {
+        maxHeight: 300,
+        marginBottom: spacing.md,
+    },
+    announcementModalText: {
+        fontSize: fontSize.md,
+        color: COLORS.textPrimary,
+        lineHeight: 24,
+    },
+    attachmentsSection: {
+        marginTop: spacing.lg,
+        paddingTop: spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    attachmentsTitle: {
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+        marginBottom: spacing.sm,
+    },
+    attachmentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.background,
+        padding: spacing.sm,
+        borderRadius: borderRadius.sm,
+        marginBottom: spacing.xs,
+    },
+    attachmentIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        backgroundColor: '#EEF2FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.sm,
+    },
+    attachmentName: {
+        flex: 1,
+        fontSize: fontSize.sm,
+        color: COLORS.textPrimary,
+    },
+    announcementModalClose: {
+        backgroundColor: COLORS.primary,
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.md,
+        alignItems: 'center',
+    },
+    announcementModalCloseText: {
+        color: COLORS.white,
+        fontSize: fontSize.md,
+        fontWeight: '600',
+    },
+    allAnnouncementsModal: {
+        backgroundColor: COLORS.white,
+        borderRadius: borderRadius.lg,
+        width: '100%',
+        maxWidth: 450,
+        maxHeight: '85%',
+    },
+    allAnnouncementsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: spacing.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    allAnnouncementsTitle: {
+        fontSize: fontSize.lg,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+    },
+    allAnnouncementsList: {
+        padding: spacing.md,
+    },
+    allAnnouncementItem: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.cardBg,
+        padding: spacing.md,
+        borderRadius: borderRadius.md,
+        marginBottom: spacing.sm,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
 });

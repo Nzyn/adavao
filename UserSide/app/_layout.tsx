@@ -115,6 +115,7 @@ function AppContent() {
               }}
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="(patrol)" options={{ headerShown: false }} />
               <Stack.Screen
                 name="register"
                 options={{

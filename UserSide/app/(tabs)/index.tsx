@@ -64,11 +64,11 @@ export default function UserDashboard() {
     const [flagStatus, setFlagStatus] = useState<{ totalFlags: number; restrictionLevel: string | null } | null>(null);
     const [flagToastShownThisSession, setFlagToastShownThisSession] = useState(false);
     const [showSideMenu, setShowSideMenu] = useState(false);
-    const [announcements, setAnnouncements] = useState<{ id: number; title: string; content: string; message?: string; date: string; author?: string }[]>([]);
-    const [selectedAnnouncement, setSelectedAnnouncement] = useState<{ id: number; title: string; content: string; date: string; author?: string } | null>(null);
+    const [announcements, setAnnouncements] = useState<{ id: number; title: string; content: string; message?: string; date: string; author?: string; attachments?: string[] }[]>([]);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState<{ id: number; title: string; content: string; date: string; author?: string; attachments?: string[] } | null>(null);
     const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
     const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
-    const [allAnnouncements, setAllAnnouncements] = useState<{ id: number; title: string; content: string; message?: string; date: string; author?: string }[]>([]);
+    const [allAnnouncements, setAllAnnouncements] = useState<{ id: number; title: string; content: string; message?: string; date: string; author?: string; attachments?: string[] }[]>([]);
 
     // Ref to track flagStatus for polling callback
     const flagStatusRef = useRef(flagStatus);
@@ -282,7 +282,8 @@ export default function UserDashboard() {
                     content: a.content,
                     message: a.content, // Alias for display
                     date: a.date,
-                    author: a.author
+                    author: a.author,
+                    attachments: a.attachments || []
                 })));
             }
         } catch (error) {
@@ -303,7 +304,8 @@ export default function UserDashboard() {
                     content: a.content,
                     message: a.content,
                     date: a.date,
-                    author: a.author
+                    author: a.author,
+                    attachments: a.attachments || []
                 })));
             }
         } catch (error) {
@@ -727,6 +729,38 @@ export default function UserDashboard() {
                                 </View>
                                 <ScrollView style={styles.announcementModalBody}>
                                     <Text style={styles.announcementModalText}>{selectedAnnouncement.content}</Text>
+                                    
+                                    {/* Attachments */}
+                                    {selectedAnnouncement.attachments && selectedAnnouncement.attachments.length > 0 && (
+                                        <View style={styles.attachmentsSection}>
+                                            <Text style={styles.attachmentsTitle}>
+                                                <Ionicons name="attach" size={16} color={COLORS.textSecondary} /> Attachments
+                                            </Text>
+                                            {selectedAnnouncement.attachments.map((attachment, index) => (
+                                                <TouchableOpacity 
+                                                    key={index} 
+                                                    style={styles.attachmentItem}
+                                                    onPress={() => {
+                                                        // Open attachment URL
+                                                        const Linking = require('react-native').Linking;
+                                                        Linking.openURL(attachment);
+                                                    }}
+                                                >
+                                                    <View style={styles.attachmentIcon}>
+                                                        <Ionicons 
+                                                            name={attachment.match(/\.(jpg|jpeg|png|gif)$/i) ? 'image-outline' : 'document-outline'} 
+                                                            size={20} 
+                                                            color={COLORS.primary} 
+                                                        />
+                                                    </View>
+                                                    <Text style={styles.attachmentName} numberOfLines={1}>
+                                                        {attachment.split('/').pop() || `Attachment ${index + 1}`}
+                                                    </Text>
+                                                    <Ionicons name="open-outline" size={16} color={COLORS.textMuted} />
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
                                 </ScrollView>
                             </>
                         )}
@@ -1248,6 +1282,40 @@ const styles = StyleSheet.create({
         fontSize: fontSize.md,
         color: COLORS.textPrimary,
         lineHeight: 24,
+    },
+    attachmentsSection: {
+        marginTop: spacing.lg,
+        paddingTop: spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    attachmentsTitle: {
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+        marginBottom: spacing.sm,
+    },
+    attachmentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.background,
+        padding: spacing.sm,
+        borderRadius: borderRadius.sm,
+        marginBottom: spacing.xs,
+    },
+    attachmentIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        backgroundColor: '#EEF2FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.sm,
+    },
+    attachmentName: {
+        flex: 1,
+        fontSize: fontSize.sm,
+        color: COLORS.textPrimary,
     },
     announcementModalClose: {
         backgroundColor: COLORS.primary,
