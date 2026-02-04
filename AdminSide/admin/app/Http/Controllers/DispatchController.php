@@ -15,6 +15,46 @@ use App\Services\EncryptionService;
 class DispatchController extends Controller
 {
     /**
+     * patrol_dispatches.station_id is NOT NULL, but some reports/officers may not have a station.
+     * This resolves a safe station_id for storage/analytics by:
+     * 1) report assigned station
+     * 2) officer assigned station
+     * 3) dispatcher station
+     * 4) nearest police station to report coordinates
+     * 5) first available police station
+     */
+    private function resolveDispatchStationId(?int $reportStationId, ?int $officerStationId, ?int $dispatcherStationId, ?float $reportLat, ?float $reportLng): ?int
+    {
+        $stationId = $reportStationId ?? $officerStationId ?? $dispatcherStationId;
+        if ($stationId) return (int) $stationId;
+
+        // Nearest by coordinates
+        if ($reportLat !== null && $reportLng !== null) {
+            $nearest = DB::selectOne("
+                SELECT station_id
+                FROM police_stations
+                WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+                ORDER BY (
+                    6371 * acos(
+                        cos(radians(?)) * cos(radians(latitude))
+                        * cos(radians(longitude) - radians(?))
+                        + sin(radians(?)) * sin(radians(latitude))
+                    )
+                ) ASC
+                LIMIT 1
+            ", [$reportLat, $reportLng, $reportLat]);
+
+            if ($nearest && isset($nearest->station_id)) {
+                return (int) $nearest->station_id;
+            }
+        }
+
+        // Fallback: any station
+        $any = DB::table('police_stations')->orderBy('station_id')->value('station_id');
+        return $any ? (int) $any : null;
+    }
+
+    /**
      * Display all dispatches
      */
     public function index(Request $request)
@@ -112,7 +152,7 @@ class DispatchController extends Controller
                 'notes' => 'nullable|string',
             ]);
 
-            $report = Report::findOrFail($request->report_id);
+            $report = Report::with('location')->findOrFail($request->report_id);
 
             // Derive station_id (patrol_dispatches.station_id is NOT NULL)
             $officerStationId = null;
@@ -121,14 +161,18 @@ class DispatchController extends Controller
                     ->where('id', $request->patrol_officer_id)
                     ->value('assigned_station_id');
             }
-            $stationId = $report->assigned_station_id
-                ?? $officerStationId
-                ?? (auth()->user()->station_id ?? null);
+            $stationId = $this->resolveDispatchStationId(
+                $report->assigned_station_id,
+                $officerStationId,
+                auth()->user()->station_id ?? null,
+                $report->location->latitude ?? null,
+                $report->location->longitude ?? null
+            );
 
             if (!$stationId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cannot create dispatch: no station is assigned to this report/officer/dispatcher.'
+                    'message' => 'Cannot create dispatch: no police stations exist in the system.'
                 ], 400);
             }
 
@@ -504,14 +548,18 @@ class DispatchController extends Controller
             }
 
             // Derive station_id (patrol_dispatches.station_id is NOT NULL)
-            $stationId = $report->assigned_station_id
-                ?? ($nearestOfficer->assigned_station_id ?? null)
-                ?? (auth()->user()->station_id ?? null);
+            $stationId = $this->resolveDispatchStationId(
+                $report->assigned_station_id,
+                $nearestOfficer->assigned_station_id ?? null,
+                auth()->user()->station_id ?? null,
+                $reportLat,
+                $reportLng
+            );
 
             if (!$stationId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cannot create dispatch: this report has no assigned station and the selected officer/dispatcher has no station.'
+                    'message' => 'Cannot create dispatch: no police stations exist in the system.'
                 ], 400);
             }
 
