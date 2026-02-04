@@ -114,6 +114,24 @@ class DispatchController extends Controller
 
             $report = Report::findOrFail($request->report_id);
 
+            // Derive station_id (patrol_dispatches.station_id is NOT NULL)
+            $officerStationId = null;
+            if ($request->filled('patrol_officer_id')) {
+                $officerStationId = DB::table('users_public')
+                    ->where('id', $request->patrol_officer_id)
+                    ->value('assigned_station_id');
+            }
+            $stationId = $report->assigned_station_id
+                ?? $officerStationId
+                ?? (auth()->user()->station_id ?? null);
+
+            if (!$stationId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot create dispatch: no station is assigned to this report/officer/dispatcher.'
+                ], 400);
+            }
+
             // Check if report already has an active dispatch
             $existingDispatch = PatrolDispatch::where('report_id', $report->report_id)
                 ->active()
@@ -128,7 +146,7 @@ class DispatchController extends Controller
 
             $dispatch = PatrolDispatch::create([
                 'report_id' => $report->report_id,
-                'station_id' => $report->assigned_station_id,
+                'station_id' => $stationId,
                 'patrol_officer_id' => $request->patrol_officer_id,
                 'status' => 'pending',
                 'dispatched_at' => now(),
@@ -485,10 +503,22 @@ class DispatchController extends Controller
                 ], 400);
             }
 
+            // Derive station_id (patrol_dispatches.station_id is NOT NULL)
+            $stationId = $report->assigned_station_id
+                ?? ($nearestOfficer->assigned_station_id ?? null)
+                ?? (auth()->user()->station_id ?? null);
+
+            if (!$stationId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot create dispatch: this report has no assigned station and the selected officer/dispatcher has no station.'
+                ], 400);
+            }
+
             // Create dispatch
             $dispatch = PatrolDispatch::create([
                 'report_id' => $report->report_id,
-                'station_id' => $report->assigned_station_id,
+                'station_id' => $stationId,
                 'patrol_officer_id' => $nearestOfficer->id,
                 'status' => 'pending',
                 'dispatched_at' => now(),
