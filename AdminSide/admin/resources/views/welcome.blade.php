@@ -885,8 +885,10 @@
                     </div>
                 </div>
                 
-                <div id="forecast-error" style="display: none; text-align: center; padding: 1rem; color: #ef4444; background: #fef2f2; border-radius: 8px; margin-top: 1rem;">
-                    Unable to generate forecast. AI Model may be offline.
+                <div id="forecast-error" style="display: none; text-align: center; padding: 1.5rem; background: #fef2f2; border-radius: 8px; margin-top: 1rem; border: 1px solid #fecaca;">
+                    <svg style="width: 48px; height: 48px; color: #f87171; margin: 0 auto 0.75rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    <p style="color: #dc2626; font-weight: 600; margin-bottom: 0.5rem;">AI Forecast Unavailable</p>
+                    <p style="color: #7f1d1d; font-size: 0.875rem;">The SARIMA prediction model is not deployed. Contact administrator to enable this feature.</p>
                 </div>
             </div>
         </div>

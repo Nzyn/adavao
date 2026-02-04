@@ -77,6 +77,19 @@ class InactivityManager {
       return;
     }
 
+    // First check if user is actually logged in before doing anything
+    try {
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        // User is not logged in, don't do inactivity checks
+        console.log('Inactivity check skipped - user not logged in');
+        return;
+      }
+    } catch (e) {
+      // If we can't check, skip this cycle
+      return;
+    }
+
     const now = Date.now();
     const inactiveTime = now - this.lastActivity;
     const minutesInactive = Math.floor(inactiveTime / 60000);

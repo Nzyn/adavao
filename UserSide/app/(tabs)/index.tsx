@@ -64,7 +64,11 @@ export default function UserDashboard() {
     const [flagStatus, setFlagStatus] = useState<{ totalFlags: number; restrictionLevel: string | null } | null>(null);
     const [flagToastShownThisSession, setFlagToastShownThisSession] = useState(false);
     const [showSideMenu, setShowSideMenu] = useState(false);
-    const [announcements, setAnnouncements] = useState<{ id: number; title: string; content: string; message?: string; date: string }[]>([]);
+    const [announcements, setAnnouncements] = useState<{ id: number; title: string; content: string; message?: string; date: string; author?: string }[]>([]);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState<{ id: number; title: string; content: string; date: string; author?: string } | null>(null);
+    const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+    const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
+    const [allAnnouncements, setAllAnnouncements] = useState<{ id: number; title: string; content: string; message?: string; date: string; author?: string }[]>([]);
 
     // Ref to track flagStatus for polling callback
     const flagStatusRef = useRef(flagStatus);
@@ -266,10 +270,10 @@ export default function UserDashboard() {
         setTimeout(() => setLoading(false), 1000);
     };
 
-    // Fetch announcements from backend
+    // Fetch announcements from backend (limit 2 for dashboard, latest first)
     const fetchAnnouncements = async () => {
         try {
-            const response = await fetch(`${API_URL}/announcements?limit=5`);
+            const response = await fetch(`${API_URL}/announcements?limit=2`);
             const data = await response.json();
             if (data.success && data.data) {
                 setAnnouncements(data.data.map((a: any) => ({
@@ -277,13 +281,46 @@ export default function UserDashboard() {
                     title: a.title,
                     content: a.content,
                     message: a.content, // Alias for display
-                    date: a.date
+                    date: a.date,
+                    author: a.author
                 })));
             }
         } catch (error) {
             console.error('Error fetching announcements:', error);
             // Keep any existing announcements or show empty
         }
+    };
+
+    // Fetch all announcements for "See All" modal
+    const fetchAllAnnouncements = async () => {
+        try {
+            const response = await fetch(`${API_URL}/announcements?limit=50`);
+            const data = await response.json();
+            if (data.success && data.data) {
+                setAllAnnouncements(data.data.map((a: any) => ({
+                    id: a.id,
+                    title: a.title,
+                    content: a.content,
+                    message: a.content,
+                    date: a.date,
+                    author: a.author
+                })));
+            }
+        } catch (error) {
+            console.error('Error fetching all announcements:', error);
+        }
+    };
+
+    // Handle announcement press - show details modal
+    const handleAnnouncementPress = (announcement: typeof announcements[0]) => {
+        setSelectedAnnouncement(announcement);
+        setShowAnnouncementModal(true);
+    };
+
+    // Handle "See All" press
+    const handleSeeAllAnnouncements = () => {
+        fetchAllAnnouncements();
+        setShowAllAnnouncements(true);
     };
 
     // Load announcements on mount and auto-refresh every 2 seconds
@@ -509,7 +546,7 @@ export default function UserDashboard() {
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Announcements</Text>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={handleSeeAllAnnouncements}>
                             <Text style={styles.seeAllText}>See All</Text>
                         </TouchableOpacity>
                     </View>
@@ -521,7 +558,11 @@ export default function UserDashboard() {
                         </View>
                     ) : (
                         announcements.map((announcement) => (
-                            <TouchableOpacity key={announcement.id} style={styles.announcementCard}>
+                            <TouchableOpacity 
+                                key={announcement.id} 
+                                style={styles.announcementCard}
+                                onPress={() => handleAnnouncementPress(announcement)}
+                            >
                                 <View style={styles.announcementIconContainer}>
                                     <Ionicons name="megaphone" size={20} color={COLORS.primary} />
                                 </View>
@@ -657,6 +698,99 @@ export default function UserDashboard() {
                 onNotificationPress={handleNotificationPress}
                 onMarkAsRead={markNotificationAsRead}
             />
+
+            {/* Announcement Details Modal */}
+            <Modal
+                visible={showAnnouncementModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowAnnouncementModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.announcementModalContent}>
+                        <View style={styles.announcementModalHeader}>
+                            <View style={styles.announcementModalIcon}>
+                                <Ionicons name="megaphone" size={24} color={COLORS.primary} />
+                            </View>
+                            <TouchableOpacity onPress={() => setShowAnnouncementModal(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                        {selectedAnnouncement && (
+                            <>
+                                <Text style={styles.announcementModalTitle}>{selectedAnnouncement.title}</Text>
+                                <View style={styles.announcementModalMeta}>
+                                    <Text style={styles.announcementModalDate}>{selectedAnnouncement.date}</Text>
+                                    {selectedAnnouncement.author && (
+                                        <Text style={styles.announcementModalAuthor}>by {selectedAnnouncement.author}</Text>
+                                    )}
+                                </View>
+                                <ScrollView style={styles.announcementModalBody}>
+                                    <Text style={styles.announcementModalText}>{selectedAnnouncement.content}</Text>
+                                </ScrollView>
+                            </>
+                        )}
+                        <TouchableOpacity 
+                            style={styles.announcementModalClose}
+                            onPress={() => setShowAnnouncementModal(false)}
+                        >
+                            <Text style={styles.announcementModalCloseText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* All Announcements Modal */}
+            <Modal
+                visible={showAllAnnouncements}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowAllAnnouncements(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.allAnnouncementsModal}>
+                        <View style={styles.allAnnouncementsHeader}>
+                            <Text style={styles.allAnnouncementsTitle}>All Announcements</Text>
+                            <TouchableOpacity onPress={() => setShowAllAnnouncements(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.allAnnouncementsList}>
+                            {allAnnouncements.length === 0 ? (
+                                <View style={styles.emptyCard}>
+                                    <Ionicons name="megaphone-outline" size={48} color={COLORS.textMuted} />
+                                    <Text style={styles.emptyText}>No announcements</Text>
+                                </View>
+                            ) : (
+                                allAnnouncements.map((announcement) => (
+                                    <TouchableOpacity 
+                                        key={announcement.id} 
+                                        style={styles.allAnnouncementItem}
+                                        onPress={() => {
+                                            setShowAllAnnouncements(false);
+                                            setSelectedAnnouncement(announcement);
+                                            setShowAnnouncementModal(true);
+                                        }}
+                                    >
+                                        <View style={styles.announcementIconContainer}>
+                                            <Ionicons name="megaphone" size={20} color={COLORS.primary} />
+                                        </View>
+                                        <View style={styles.announcementContent}>
+                                            <View style={styles.announcementHeader}>
+                                                <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                                                <Text style={styles.announcementDate}>{announcement.date}</Text>
+                                            </View>
+                                            <Text style={styles.announcementMessage} numberOfLines={2}>
+                                                {announcement.content || announcement.message}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -1055,5 +1189,109 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontSize: 9,
         fontWeight: 'bold',
+    },
+
+    // Announcement Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.lg,
+    },
+    announcementModalContent: {
+        backgroundColor: COLORS.white,
+        borderRadius: borderRadius.lg,
+        padding: spacing.lg,
+        width: '100%',
+        maxWidth: 400,
+        maxHeight: '80%',
+    },
+    announcementModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    announcementModalIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#EEF2FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    announcementModalTitle: {
+        fontSize: fontSize.lg,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        marginBottom: spacing.sm,
+    },
+    announcementModalMeta: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginBottom: spacing.md,
+    },
+    announcementModalDate: {
+        fontSize: fontSize.sm,
+        color: COLORS.textMuted,
+    },
+    announcementModalAuthor: {
+        fontSize: fontSize.sm,
+        color: COLORS.textSecondary,
+    },
+    announcementModalBody: {
+        maxHeight: 300,
+        marginBottom: spacing.md,
+    },
+    announcementModalText: {
+        fontSize: fontSize.md,
+        color: COLORS.textPrimary,
+        lineHeight: 24,
+    },
+    announcementModalClose: {
+        backgroundColor: COLORS.primary,
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.md,
+        alignItems: 'center',
+    },
+    announcementModalCloseText: {
+        color: COLORS.white,
+        fontSize: fontSize.md,
+        fontWeight: '600',
+    },
+
+    // All Announcements Modal Styles
+    allAnnouncementsModal: {
+        backgroundColor: COLORS.white,
+        borderRadius: borderRadius.lg,
+        width: '100%',
+        maxWidth: 450,
+        maxHeight: '85%',
+    },
+    allAnnouncementsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: spacing.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    allAnnouncementsTitle: {
+        fontSize: fontSize.lg,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+    },
+    allAnnouncementsList: {
+        padding: spacing.md,
+    },
+    allAnnouncementItem: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.cardBg,
+        padding: spacing.md,
+        borderRadius: borderRadius.md,
+        marginBottom: spacing.sm,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
 });

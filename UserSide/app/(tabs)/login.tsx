@@ -1080,11 +1080,11 @@ const localStyles = StyleSheet.create({
   googleG: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#4285F4',
+    color: '#34A853',
   },
   anonymousButton: {
-    marginTop: 10,
-    marginBottom: 16,
+    marginTop: 4,
+    marginBottom: 10,
     borderWidth: 1.5,
     borderColor: '#1D3557',
     paddingVertical: 12,

@@ -654,23 +654,26 @@ class AuthController extends Controller
     // Handle logout
     public function logout(Request $request)
     {
-        // Update last_logout timestamp before logging out
+        // Get user data before any logout operations
         $user = Auth::guard('admin')->user();
+        
+        // Update last_logout timestamp before logging out
         if ($user) {
-            $user->last_logout = now();
-            $user->is_online = false;
-            $user->save();
+            try {
+                $user->last_logout = now();
+                $user->is_online = false;
+                $user->remember_token = null;
+                $user->save();
+            } catch (\Exception $e) {
+                // Log but don't fail logout if save fails
+                \Log::warning('Failed to update user status on logout: ' . $e->getMessage());
+            }
         }
 
+        // Perform logout and session cleanup
         Auth::guard('admin')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        
-        // Clear any remember tokens
-        if ($user) {
-            $user->remember_token = null;
-            $user->save();
-        }
 
         return redirect()->route('login')->with('success', 'You have been logged out successfully!');
     }
