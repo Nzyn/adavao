@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, Vibration } from 'react-native';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config/backend';
 
 // Configure notification behavior
@@ -253,6 +254,13 @@ export async function initializePushNotifications(userId: number): Promise<boole
         if (!token) {
             console.warn('⚠️ Could not get push token');
             return false;
+        }
+
+        // Store locally for later diagnostics/avoiding repeated registration
+        try {
+            await AsyncStorage.setItem('pushToken', token);
+        } catch (storageError) {
+            console.warn('⚠️ Could not store push token locally:', storageError);
         }
 
         const saved = await savePushTokenToBackend(token, userId);

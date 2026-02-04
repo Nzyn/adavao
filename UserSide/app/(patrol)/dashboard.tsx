@@ -68,6 +68,23 @@ export default function PatrolDashboard() {
         loadUserData();
     }, []);
 
+    // Ensure push token is registered/saved for patrol accounts (needed for AdminSide dispatch)
+    useEffect(() => {
+        if (!userId) return;
+
+        (async () => {
+            try {
+                const { initializePushNotifications } = await import('../../services/pushNotificationService');
+                const numericUserId = parseInt(userId || '0', 10);
+                if (numericUserId > 0) {
+                    await initializePushNotifications(numericUserId);
+                }
+            } catch (error) {
+                console.warn('⚠️ Push notification init skipped/failed:', error);
+            }
+        })();
+    }, [userId]);
+
     // Refresh data when screen comes into focus
     useFocusEffect(
         useCallback(() => {

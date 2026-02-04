@@ -345,6 +345,7 @@ class DispatchController extends Controller
             SELECT 
                 u.id,
                 CONCAT(u.firstname, ' ', u.lastname) as name,
+                u.push_token,
                 ps.station_name,
                 pl.latitude,
                 pl.longitude,
@@ -399,8 +400,8 @@ class DispatchController extends Controller
                 ], 400);
             }
 
-            // Find all on-duty patrol officers with recent locations from patrol_locations table
-            // Only get officers whose location was updated within the last 10 minutes
+                        // Find on-duty patrol officers with recent locations from patrol_locations table
+                        // NOTE: Don't require push_token here; we may still want to dispatch/assign.
             $officers = DB::select("
                 SELECT 
                     u.id,
@@ -415,7 +416,6 @@ class DispatchController extends Controller
                 JOIN patrol_locations pl ON u.id = pl.user_id
                 WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
                   AND u.is_on_duty = true
-                  AND u.push_token IS NOT NULL
                   AND pl.latitude IS NOT NULL
                   AND pl.longitude IS NOT NULL
                   AND pl.updated_at > NOW() - INTERVAL '10 minutes'
@@ -438,7 +438,6 @@ class DispatchController extends Controller
                     LEFT JOIN patrol_locations pl ON u.id = pl.user_id
                     WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
                       AND u.is_on_duty = true
-                      AND u.push_token IS NOT NULL
                     ORDER BY pl.updated_at DESC NULLS LAST
                 ");
                 
@@ -500,7 +499,11 @@ class DispatchController extends Controller
             ]);
 
             // Send urgent notification with ring and vibrate to ONLY the nearest officer
-            $this->sendUrgentDispatchNotification($dispatch, $nearestOfficer, $minDistance);
+            $notificationSent = false;
+            if (!empty($nearestOfficer->push_token)) {
+                $this->sendUrgentDispatchNotification($dispatch, $nearestOfficer, $minDistance);
+                $notificationSent = true;
+            }
 
             Log::info('Auto-dispatch created', [
                 'dispatch_id' => $dispatch->dispatch_id,
@@ -513,9 +516,12 @@ class DispatchController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Patrol dispatched successfully',
+                'message' => $notificationSent
+                    ? 'Patrol dispatched successfully'
+                    : 'Dispatch created, but patrol officer has no push token (ask officer to login and allow notifications)',
                 'officer_name' => trim($officerName) ?: 'Patrol Officer',
                 'distance_km' => round($minDistance, 2),
+                'notification_sent' => $notificationSent,
             ]);
 
         } catch (\Exception $e) {

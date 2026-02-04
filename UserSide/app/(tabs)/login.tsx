@@ -406,8 +406,10 @@ const Login = () => {
       await AsyncStorage.removeItem('rememberedEmail');
     }
 
+    const effectiveRole = String(user.user_role || user.role || '').toLowerCase();
+
     // Role-based redirect (no setTimeout to avoid Promise not resolving)
-    if (user.user_role === 'patrol_officer') {
+    if (effectiveRole === 'patrol_officer') {
       console.log('🚓 Patrol officer detected, redirecting to patrol dashboard');
       // Initialize push notifications for patrol officers
       try {
