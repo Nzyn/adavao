@@ -2162,6 +2162,168 @@ setInterval(updateSLATimers, 1000);
         // Initialize jsPDF
         const { jsPDF } = window.jspdf;
 
+        // ========== DISPATCH (ROBUST WIRING) ==========
+        function ensureDispatchModalStyles() {
+            if (document.getElementById('dispatchModalStyles')) return;
+            const style = document.createElement('style');
+            style.id = 'dispatchModalStyles';
+            style.textContent = `
+                .dispatch-modal {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.6);
+                    display: none;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 99999;
+                }
+                .dispatch-modal-content {
+                    background: #fff;
+                    border-radius: 16px;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                    max-width: 450px;
+                    width: min(450px, 92vw);
+                    overflow: hidden;
+                    animation: dispatchModalSlideIn 0.25s ease;
+                }
+                @keyframes dispatchModalSlideIn {
+                    from { opacity: 0; transform: translateY(-12px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        window.ensureDispatchModalExists = function ensureDispatchModalExists() {
+            ensureDispatchModalStyles();
+            let modal = document.getElementById('dispatchModal');
+            if (modal) return modal;
+
+            modal = document.createElement('div');
+            modal.id = 'dispatchModal';
+            modal.className = 'dispatch-modal';
+            modal.innerHTML = `
+                <div class="dispatch-modal-content">
+                    <div class="modal-header">
+                        <h2>🚓 Dispatch Patrol Officer</h2>
+                        <button class="modal-close" type="button" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="modal-body" style="text-align:center; padding:24px;">
+                        <div id="dispatch-loading" style="display:none;">
+                            <div style="width:60px; height:60px; border:4px solid #e5e7eb; border-top-color:#3b82f6; border-radius:50%; animation: spin 1s linear infinite; margin:0 auto 16px;"></div>
+                            <p style="color:#666; font-size:14px;">Finding nearest patrol officer...</p>
+                        </div>
+                        <div id="dispatch-confirm" style="display:block;">
+                            <div style="width:80px; height:80px; background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+                                <span style="font-size:36px;">🚓</span>
+                            </div>
+                            <h3 style="margin:0 0 8px; font-size:18px; color:#1f2937;">Ready to Dispatch</h3>
+                            <p style="margin:0 0 24px; color:#666; font-size:14px; line-height:1.5;">
+                                The system will automatically find and notify the nearest on-duty patrol officer to respond to this report.
+                            </p>
+                            <input type="hidden" id="dispatch_report_id" />
+                            <div style="display:flex; gap:12px; justify-content:center;">
+                                <button type="button" data-dispatch-cancel style="padding:12px 24px; background:#f3f4f6; border:none; border-radius:8px; cursor:pointer; font-size:14px; font-weight:500;">Cancel</button>
+                                <button type="button" data-dispatch-confirm style="padding:12px 24px; background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:14px; box-shadow:0 4px 12px rgba(59,130,246,0.3);">🚓 Dispatch Now</button>
+                            </div>
+                        </div>
+                        <div id="dispatch-success" style="display:none;">
+                            <div style="width:80px; height:80px; background:#dcfce7; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+                                <span style="font-size:36px;">✅</span>
+                            </div>
+                            <h3 style="margin:0 0 8px; font-size:18px; color:#16a34a;">Patrol Dispatched!</h3>
+                            <p style="margin:0 0 24px; color:#666; font-size:14px; line-height:1.5;">
+                                Patrol sent to the nearest dispatch in the reported area. The officer has been notified with an urgent alert.
+                            </p>
+                            <button type="button" data-dispatch-done style="padding:12px 24px; background:#16a34a; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:14px;">Done</button>
+                        </div>
+                        <div id="dispatch-error" style="display:none;">
+                            <div style="width:80px; height:80px; background:#fee2e2; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+                                <span style="font-size:36px;">❌</span>
+                            </div>
+                            <h3 style="margin:0 0 8px; font-size:18px; color:#dc2626;">Dispatch Failed</h3>
+                            <p id="dispatch-error-message" style="margin:0 0 24px; color:#666; font-size:14px; line-height:1.5;">Failed to dispatch.</p>
+                            <button type="button" data-dispatch-close style="padding:12px 24px; background:#f3f4f6; border:none; border-radius:8px; cursor:pointer; font-weight:500; font-size:14px;">Close</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            // Close on backdrop click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) window.closeDispatchModal();
+            });
+            // Close on X
+            modal.querySelector('.modal-close')?.addEventListener('click', () => window.closeDispatchModal());
+            modal.querySelector('[data-dispatch-cancel]')?.addEventListener('click', () => window.closeDispatchModal());
+            modal.querySelector('[data-dispatch-close]')?.addEventListener('click', () => window.closeDispatchModal());
+            modal.querySelector('[data-dispatch-done]')?.addEventListener('click', () => { window.closeDispatchModal(); location.reload(); });
+            modal.querySelector('[data-dispatch-confirm]')?.addEventListener('click', () => window.dispatchToNearestPatrol());
+
+            return modal;
+        };
+
+        window.openDispatchModal = function openDispatchModal(reportId) {
+            const modal = window.ensureDispatchModalExists();
+            const reportIdInput = modal.querySelector('#dispatch_report_id');
+            if (reportIdInput) reportIdInput.value = String(reportId);
+
+            // Reset states
+            modal.querySelector('#dispatch-loading')?.style && (modal.querySelector('#dispatch-loading').style.display = 'none');
+            modal.querySelector('#dispatch-confirm')?.style && (modal.querySelector('#dispatch-confirm').style.display = 'block');
+            modal.querySelector('#dispatch-success')?.style && (modal.querySelector('#dispatch-success').style.display = 'none');
+            modal.querySelector('#dispatch-error')?.style && (modal.querySelector('#dispatch-error').style.display = 'none');
+
+            modal.style.display = 'flex';
+        };
+
+        window.closeDispatchModal = function closeDispatchModal() {
+            const modal = document.getElementById('dispatchModal');
+            if (modal) modal.style.display = 'none';
+        };
+
+        window.dispatchToNearestPatrol = async function dispatchToNearestPatrol() {
+            const modal = window.ensureDispatchModalExists();
+            const reportId = modal.querySelector('#dispatch_report_id')?.value;
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+
+            modal.querySelector('#dispatch-confirm').style.display = 'none';
+            modal.querySelector('#dispatch-loading').style.display = 'block';
+
+            try {
+                const res = await fetch('/dispatches/auto', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ report_id: reportId })
+                });
+
+                const data = await res.json().catch(() => ({}));
+                modal.querySelector('#dispatch-loading').style.display = 'none';
+
+                if (data && data.success) {
+                    modal.querySelector('#dispatch-success').style.display = 'block';
+                } else {
+                    const msg = (data && data.message) ? data.message : `Dispatch failed (HTTP ${res.status}).`;
+                    const msgEl = modal.querySelector('#dispatch-error-message');
+                    if (msgEl) msgEl.textContent = msg;
+                    modal.querySelector('#dispatch-error').style.display = 'block';
+                }
+            } catch (e) {
+                modal.querySelector('#dispatch-loading').style.display = 'none';
+                const msgEl = modal.querySelector('#dispatch-error-message');
+                if (msgEl) msgEl.textContent = `Failed to dispatch. ${e?.message || ''}`.trim();
+                modal.querySelector('#dispatch-error').style.display = 'block';
+            }
+        };
+
         function checkForNewReports() {
             // Get current URL with all query parameters
             const currentUrl = window.location.href;
@@ -2871,6 +3033,18 @@ setInterval(updateSLATimers, 1000);
 
                         // Combine all sections
                         modalBody.innerHTML = reportInfo + timelineContent + mapContainer + mediaContent;
+
+                        // Wire dynamic action buttons (dispatch) after render
+                        modalBody.querySelectorAll('.dispatch-patrol-btn[data-dispatch-report]').forEach((btn) => {
+                            if (btn.dataset.bound === '1') return;
+                            btn.dataset.bound = '1';
+                            btn.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const rid = btn.getAttribute('data-dispatch-report');
+                                window.openDispatchModal(rid);
+                            });
+                        });
                         
                         // Store current report ID and data globally
                         window.currentReportId = reportId;
