@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
+use App\Services\EncryptionService;
 
 class ProfileController extends Controller
 {
@@ -16,6 +17,15 @@ class ProfileController extends Controller
     public function show()
     {
         $user = Auth::user();
+        
+        // Decrypt sensitive fields for display in form
+        if ($user->address && EncryptionService::isEncrypted($user->address)) {
+            $user->address = EncryptionService::decrypt($user->address);
+        }
+        if ($user->contact && EncryptionService::isEncrypted($user->contact)) {
+            $user->contact = EncryptionService::decrypt($user->contact);
+        }
+        
         return view('profile', compact('user'));
     }
 

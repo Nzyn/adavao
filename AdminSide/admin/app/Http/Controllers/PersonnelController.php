@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use App\Models\PoliceOfficer;
 use App\Models\PoliceStation;
+use App\Services\EncryptionService;
 
 class PersonnelController extends Controller
 {
@@ -22,6 +23,14 @@ class PersonnelController extends Controller
             $officer->rank = 'Officer'; // Default rank
             $officer->status = $user->is_verified ? 'Active' : 'Inactive';
             $officer->assigned_since = $user->created_at; 
+            
+            // Decrypt sensitive fields for display
+            if ($user->contact && EncryptionService::isEncrypted($user->contact)) {
+                $user->contact = EncryptionService::decrypt($user->contact);
+            }
+            if ($user->address && EncryptionService::isEncrypted($user->address)) {
+                $user->address = EncryptionService::decrypt($user->address);
+            }
             
             // Attach 'role' attribute for view compatibility
             $roles = $user->adminRoles->pluck('role_name')->toArray();

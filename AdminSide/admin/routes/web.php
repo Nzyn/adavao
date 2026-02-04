@@ -218,6 +218,17 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/users', function () {
         $users = \App\Models\User::with('roles')->orderBy('created_at', 'desc')->get();
+        
+        // Decrypt sensitive fields for display
+        foreach ($users as $user) {
+            if ($user->address && \App\Services\EncryptionService::isEncrypted($user->address)) {
+                $user->address = \App\Services\EncryptionService::decrypt($user->address);
+            }
+            if ($user->contact && \App\Services\EncryptionService::isEncrypted($user->contact)) {
+                $user->contact = \App\Services\EncryptionService::decrypt($user->contact);
+            }
+        }
+        
         return view('users', compact('users'));
     })->name('users');
     
@@ -230,6 +241,17 @@ Route::middleware(['auth'])->group(function () {
             ->orderBy('total_flags', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
+        
+        // Decrypt sensitive fields for display
+        foreach ($users as $user) {
+            if ($user->address && \App\Services\EncryptionService::isEncrypted($user->address)) {
+                $user->address = \App\Services\EncryptionService::decrypt($user->address);
+            }
+            if ($user->contact && \App\Services\EncryptionService::isEncrypted($user->contact)) {
+                $user->contact = \App\Services\EncryptionService::decrypt($user->contact);
+            }
+        }
+        
         return view('flagged-users', compact('users'));
     })->name('flagged-users');
     

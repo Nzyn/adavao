@@ -31,6 +31,10 @@ const handleGoogleLogin = async (req, res) => {
       const user = existingUsers[0];
       const { password, ...userWithoutPassword } = user;
 
+      // 🔓 Decrypt sensitive fields for display
+      if (userWithoutPassword.address) userWithoutPassword.address = decrypt(userWithoutPassword.address);
+      if (userWithoutPassword.contact) userWithoutPassword.contact = decrypt(userWithoutPassword.contact);
+
       return res.status(200).json({
         message: "Login successful",
         user: userWithoutPassword
@@ -266,6 +270,11 @@ const handleGoogleCompleteRegistration = async (req, res) => {
       // User already exists, just log them in
       const user = existingUsers[0];
       const { password, ...userWithoutPassword } = user;
+      
+      // 🔓 Decrypt sensitive fields for display
+      if (userWithoutPassword.address) userWithoutPassword.address = decrypt(userWithoutPassword.address);
+      if (userWithoutPassword.contact) userWithoutPassword.contact = decrypt(userWithoutPassword.contact);
+      
       return res.status(200).json({
         message: "Login successful",
         user: userWithoutPassword
