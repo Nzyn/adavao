@@ -69,6 +69,88 @@ async function updatePatrolLocation(req, res) {
 }
 
 /**
+ * Calculate distance between two coordinates using Haversine formula
+ * @returns Distance in kilometers
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+/**
+ * Find the nearest on-duty patrol officer to a given location
+ * @param {number} reportLat - Report latitude
+ * @param {number} reportLon - Report longitude
+ * @param {number} stationId - Police station ID
+ * @returns {Object|null} - Nearest patrol officer or null
+ */
+async function findNearestPatrolOfficer(reportLat, reportLon, stationId) {
+    try {
+        // Get all on-duty patrol officers with their current locations
+        const [officers] = await db.query(
+            `SELECT 
+                u.id AS user_id,
+                u.firstname,
+                u.lastname,
+                u.push_token,
+                pl.latitude,
+                pl.longitude,
+                pl.updated_at
+             FROM users_public u
+             JOIN patrol_locations pl ON u.id = pl.user_id
+             WHERE u.user_role = 'patrol_officer'
+               AND u.assigned_station_id = $1
+               AND u.is_on_duty = true
+               AND pl.updated_at > NOW() - INTERVAL '5 minutes'`,
+            [stationId]
+        );
+
+        if (!officers || officers.length === 0) {
+            return null;
+        }
+
+        // Calculate distance for each officer and find the nearest
+        let nearestOfficer = null;
+        let minDistance = Infinity;
+
+        for (const officer of officers) {
+            if (officer.latitude && officer.longitude) {
+                const distance = calculateDistance(
+                    reportLat,
+                    reportLon,
+                    parseFloat(officer.latitude),
+                    parseFloat(officer.longitude)
+                );
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestOfficer = {
+                        ...officer,
+                        distance: distance.toFixed(2)
+                    };
+                }
+            }
+        }
+
+        if (nearestOfficer) {
+            console.log(`📍 Found nearest patrol officer: ${nearestOfficer.firstname} ${nearestOfficer.lastname} (${nearestOfficer.distance}km away)`);
+        }
+
+        return nearestOfficer;
+    } catch (error) {
+        console.error('Error finding nearest patrol officer:', error);
+        return null;
+    }
+}
+
+/**
  * Get all patrol officer locations (for admin/police tracking view)
  */
 async function getAllPatrolLocations(req, res) {
@@ -220,13 +302,38 @@ async function sendToDispatch(req, res) {
             console.log(`⚠️ No on-duty patrol officers at station ${report.assigned_station_id}`);
         }
 
-        // Create dispatch record (without specific officer assignment initially - broadcast style)
+        // Try to find the nearest on-duty patrol officer for auto-assignment
+        let assignedOfficerId = null;
+        let assignedOfficerName = null;
+        
+        if (report.latitude && report.longitude) {
+            const nearestOfficer = await findNearestPatrolOfficer(
+                parseFloat(report.latitude),
+                parseFloat(report.longitude),
+                report.assigned_station_id
+            );
+            
+            if (nearestOfficer) {
+                assignedOfficerId = nearestOfficer.user_id;
+                assignedOfficerName = `${nearestOfficer.firstname} ${nearestOfficer.lastname}`;
+                console.log(`📍 Auto-assigning dispatch to nearest officer: ${assignedOfficerName} (${nearestOfficer.distance}km away)`);
+            }
+        }
+
+        // Create dispatch record with optional auto-assignment
         const [dispatchResult] = await db.query(
             `INSERT INTO patrol_dispatches 
-             (report_id, station_id, status, dispatched_at, dispatched_by, notes, created_at, updated_at)
-             VALUES ($1, $2, 'pending', NOW(), $3, $4, NOW(), NOW())
+             (report_id, station_id, patrol_officer_id, status, dispatched_at, dispatched_by, notes, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, NOW(), $5, $6, NOW(), NOW())
              RETURNING dispatch_id`,
-            [reportId, report.assigned_station_id, dispatcherId || null, notes || null]
+            [
+                reportId, 
+                report.assigned_station_id, 
+                assignedOfficerId, 
+                assignedOfficerId ? 'assigned' : 'pending', 
+                dispatcherId || null, 
+                notes || null
+            ]
         );
 
         const dispatchId = dispatchResult[0].dispatch_id;
@@ -249,17 +356,24 @@ async function sendToDispatch(req, res) {
                 crimeType: report.report_type,
                 barangay: report.barangay,
                 stationId: report.assigned_station_id,
+                assignedTo: assignedOfficerName,
             });
         }
 
-        console.log(`✅ Dispatch created: #${dispatchId} for report #${reportId}, notified ${pushTokens.length} officers`);
+        const assignmentMsg = assignedOfficerId 
+            ? ` Auto-assigned to ${assignedOfficerName}.`
+            : '';
+
+        console.log(`✅ Dispatch created: #${dispatchId} for report #${reportId}, notified ${pushTokens.length} officers${assignmentMsg}`);
 
         return res.json({
             success: true,
-            message: `Report dispatched successfully. ${pushTokens.length} officer(s) notified.`,
+            message: `Report dispatched successfully.${assignmentMsg} ${pushTokens.length} officer(s) notified.`,
             data: {
                 dispatch_id: dispatchId,
-                officers_notified: pushTokens.length
+                officers_notified: pushTokens.length,
+                assigned_officer_id: assignedOfficerId,
+                assigned_officer_name: assignedOfficerName
             }
         });
 
@@ -278,11 +392,15 @@ async function sendToDispatch(req, res) {
  */
 async function sendDispatchNotifications(pushTokens, dispatchInfo) {
     try {
+        const assignedText = dispatchInfo.assignedTo 
+            ? ` (Assigned to ${dispatchInfo.assignedTo})` 
+            : '';
+        
         const messages = pushTokens.map(token => ({
             to: token,
             sound: 'default',
             title: '🚨 New Dispatch Alert',
-            body: `${dispatchInfo.crimeType || 'Report'} at ${dispatchInfo.barangay || 'Unknown location'}`,
+            body: `${dispatchInfo.crimeType || 'Report'} at ${dispatchInfo.barangay || 'Unknown location'}${assignedText}`,
             data: {
                 type: 'dispatch',
                 dispatch_id: dispatchInfo.dispatchId,
@@ -290,6 +408,7 @@ async function sendDispatchNotifications(pushTokens, dispatchInfo) {
                 crime_type: dispatchInfo.crimeType,
                 barangay: dispatchInfo.barangay,
                 station_id: dispatchInfo.stationId,
+                assigned_to: dispatchInfo.assignedTo,
             },
             priority: 'high',
             channelId: 'dispatch',

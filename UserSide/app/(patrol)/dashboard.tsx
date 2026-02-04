@@ -21,6 +21,7 @@ import { startLocationTracking, stopLocationTracking, isLocationTrackingActive }
 import { API_URL, BACKEND_URL } from '../../config/backend';
 import { stopServerWarmup } from '../../utils/serverWarmup';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { notificationService, Notification } from '../../services/notificationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -48,6 +49,8 @@ export default function PatrolDashboard() {
     const [stationId, setStationId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [showNotificationsModal, setShowNotificationsModal] = useState(false);
     const [isOnDuty, setIsOnDuty] = useState(false);
     const [isLocationTracking, setIsLocationTracking] = useState(false);
     const [pendingDispatchCount, setPendingDispatchCount] = useState(0);
@@ -206,6 +209,34 @@ export default function PatrolDashboard() {
         }
     };
 
+    // Fetch notifications
+    const fetchNotifications = async () => {
+        if (!userId) return;
+        try {
+            const notifs = await notificationService.getUserNotifications(userId);
+            setNotifications(notifs);
+            const unread = notifs.filter((n: Notification) => !n.read).length;
+            setUnreadNotifications(unread);
+        } catch (error) {
+            console.error('Error fetching notifications:', error);
+        }
+    };
+
+    // Mark notification as read
+    const markNotificationAsRead = async (notificationId: number) => {
+        if (!userId) return;
+        try {
+            await notificationService.markAsRead(notificationId, userId);
+            // Update local state
+            setNotifications(prev => 
+                prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+            );
+            setUnreadNotifications(prev => Math.max(0, prev - 1));
+        } catch (error) {
+            console.error('Error marking notification as read:', error);
+        }
+    };
+
     // Format time ago
     const formatTimeAgo = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -232,6 +263,16 @@ export default function PatrolDashboard() {
         
         return () => clearInterval(interval);
     }, [stationId]);
+
+    // Fetch notifications when userId is available
+    useEffect(() => {
+        if (userId) {
+            fetchNotifications();
+            // Auto-refresh notifications every 15 seconds
+            const notifInterval = setInterval(fetchNotifications, 15000);
+            return () => clearInterval(notifInterval);
+        }
+    }, [userId]);
 
     const toggleDutyStatus = async () => {
         const newStatus = !isOnDuty;
@@ -350,7 +391,10 @@ export default function PatrolDashboard() {
                     </View>
                 </View>
                 <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.notificationButton}>
+                    <TouchableOpacity 
+                        style={styles.notificationButton}
+                        onPress={() => setShowNotificationsModal(true)}
+                    >
                         <Ionicons name="notifications-outline" size={26} color={COLORS.primary} />
                         {unreadNotifications > 0 && (
                             <View style={styles.notificationBadge}>
@@ -590,14 +634,14 @@ export default function PatrolDashboard() {
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.navItem}
-                    onPress={() => Alert.alert('Coming Soon', 'Reports feature coming soon!')}
+                    onPress={() => router.push('/(patrol)/history')}
                 >
-                    <Ionicons name="document-text-outline" size={24} color={COLORS.textMuted} />
-                    <Text style={styles.navText}>Reports</Text>
+                    <Ionicons name="time-outline" size={24} color={COLORS.textMuted} />
+                    <Text style={styles.navText}>History</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.navItem}
-                    onPress={() => Alert.alert('Coming Soon', 'Profile feature coming soon!')}
+                    onPress={() => router.push('/(patrol)/profile')}
                 >
                     <Ionicons name="person-outline" size={24} color={COLORS.textMuted} />
                     <Text style={styles.navText}>Profile</Text>
@@ -639,25 +683,48 @@ export default function PatrolDashboard() {
                                             <Text style={styles.attachmentsTitle}>
                                                 <Ionicons name="attach" size={16} color={COLORS.textSecondary} /> Attachments
                                             </Text>
-                                            {selectedAnnouncement.attachments.map((attachment: string, index: number) => (
-                                                <TouchableOpacity 
-                                                    key={index} 
-                                                    style={styles.attachmentItem}
-                                                    onPress={() => Linking.openURL(attachment)}
-                                                >
-                                                    <View style={styles.attachmentIcon}>
-                                                        <Ionicons 
-                                                            name={attachment.match(/\.(jpg|jpeg|png|gif)$/i) ? 'image-outline' : 'document-outline'} 
-                                                            size={20} 
-                                                            color={COLORS.primary} 
-                                                        />
-                                                    </View>
-                                                    <Text style={styles.attachmentName} numberOfLines={1}>
-                                                        {attachment.split('/').pop() || `Attachment ${index + 1}`}
-                                                    </Text>
-                                                    <Ionicons name="open-outline" size={16} color={COLORS.textMuted} />
-                                                </TouchableOpacity>
-                                            ))}
+                                            {selectedAnnouncement.attachments.map((attachment: string, index: number) => {
+                                                const isImage = attachment.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                                                
+                                                if (isImage) {
+                                                    return (
+                                                        <TouchableOpacity 
+                                                            key={index}
+                                                            onPress={() => Linking.openURL(attachment)}
+                                                            style={styles.imageAttachmentContainer}
+                                                        >
+                                                            <Image
+                                                                source={{ uri: attachment }}
+                                                                style={styles.attachmentImagePreview}
+                                                                resizeMode="cover"
+                                                            />
+                                                            <View style={styles.imageOverlay}>
+                                                                <Ionicons name="expand-outline" size={20} color={COLORS.white} />
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    );
+                                                }
+                                                
+                                                return (
+                                                    <TouchableOpacity 
+                                                        key={index} 
+                                                        style={styles.attachmentItem}
+                                                        onPress={() => Linking.openURL(attachment)}
+                                                    >
+                                                        <View style={styles.attachmentIcon}>
+                                                            <Ionicons 
+                                                                name="document-outline"
+                                                                size={20} 
+                                                                color={COLORS.primary} 
+                                                            />
+                                                        </View>
+                                                        <Text style={styles.attachmentName} numberOfLines={1}>
+                                                            {attachment.split('/').pop() || `Attachment ${index + 1}`}
+                                                        </Text>
+                                                        <Ionicons name="open-outline" size={16} color={COLORS.textMuted} />
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
                                         </View>
                                     )}
                                 </ScrollView>
@@ -717,6 +784,86 @@ export default function PatrolDashboard() {
                                                 {announcement.message}
                                             </Text>
                                         </View>
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Notifications Modal */}
+            <Modal
+                visible={showNotificationsModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowNotificationsModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.notificationsModal}>
+                        <View style={styles.notificationsHeader}>
+                            <Text style={styles.notificationsTitle}>Notifications</Text>
+                            <TouchableOpacity onPress={() => setShowNotificationsModal(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.notificationsList}>
+                            {notifications.length === 0 ? (
+                                <View style={styles.emptyNotifications}>
+                                    <Ionicons name="notifications-off-outline" size={48} color={COLORS.textMuted} />
+                                    <Text style={styles.emptyNotificationsText}>No notifications yet</Text>
+                                </View>
+                            ) : (
+                                notifications.map((notification) => (
+                                    <TouchableOpacity 
+                                        key={notification.id} 
+                                        style={[
+                                            styles.notificationItem,
+                                            !notification.read && styles.notificationItemUnread
+                                        ]}
+                                        onPress={() => {
+                                            if (!notification.read) {
+                                                markNotificationAsRead(notification.id);
+                                            }
+                                            // Navigate to dispatch if it's a dispatch notification
+                                            if (notification.relatedId && notification.type === 'report') {
+                                                setShowNotificationsModal(false);
+                                                router.push(`/(patrol)/dispatch-details?id=${notification.relatedId}`);
+                                            }
+                                        }}
+                                    >
+                                        <View style={[
+                                            styles.notificationIcon,
+                                            { backgroundColor: notification.read ? COLORS.border : `${COLORS.primary}20` }
+                                        ]}>
+                                            <Ionicons 
+                                                name={
+                                                    notification.type === 'report' ? 'alert-circle' :
+                                                    notification.type === 'verification' ? 'checkmark-circle' :
+                                                    notification.type === 'user_flagged' ? 'warning' :
+                                                    'notifications'
+                                                } 
+                                                size={20} 
+                                                color={notification.read ? COLORS.textMuted : COLORS.primary} 
+                                            />
+                                        </View>
+                                        <View style={styles.notificationContent}>
+                                            <Text style={[
+                                                styles.notificationTitle,
+                                                !notification.read && styles.notificationTitleUnread
+                                            ]}>
+                                                {notification.title}
+                                            </Text>
+                                            <Text style={styles.notificationMessage} numberOfLines={2}>
+                                                {notification.message}
+                                            </Text>
+                                            <Text style={styles.notificationTime}>
+                                                {formatTimeAgo(notification.timestamp)}
+                                            </Text>
+                                        </View>
+                                        {!notification.read && (
+                                            <View style={styles.unreadDot} />
+                                        )}
                                     </TouchableOpacity>
                                 ))
                             )}
@@ -1304,6 +1451,25 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         color: COLORS.textPrimary,
     },
+    imageAttachmentContainer: {
+        position: 'relative',
+        marginBottom: spacing.sm,
+        borderRadius: borderRadius.md,
+        overflow: 'hidden',
+    },
+    attachmentImagePreview: {
+        width: '100%',
+        height: 180,
+        borderRadius: borderRadius.md,
+    },
+    imageOverlay: {
+        position: 'absolute',
+        bottom: spacing.sm,
+        right: spacing.sm,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: borderRadius.sm,
+        padding: spacing.xs,
+    },
     announcementModalClose: {
         backgroundColor: COLORS.primary,
         paddingVertical: spacing.md,
@@ -1346,5 +1512,92 @@ const styles = StyleSheet.create({
         marginBottom: spacing.sm,
         borderWidth: 1,
         borderColor: COLORS.border,
+    },
+    // Notifications Modal Styles
+    notificationsModal: {
+        backgroundColor: COLORS.white,
+        borderTopLeftRadius: borderRadius.xl,
+        borderTopRightRadius: borderRadius.xl,
+        width: '100%',
+        maxHeight: '80%',
+        position: 'absolute',
+        bottom: 0,
+    },
+    notificationsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: spacing.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    notificationsTitle: {
+        fontSize: fontSize.lg,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+    },
+    notificationsList: {
+        padding: spacing.md,
+        maxHeight: 500,
+    },
+    emptyNotifications: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.xxl,
+    },
+    emptyNotificationsText: {
+        fontSize: fontSize.md,
+        color: COLORS.textMuted,
+        marginTop: spacing.md,
+    },
+    notificationItem: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        padding: spacing.md,
+        borderRadius: borderRadius.md,
+        marginBottom: spacing.sm,
+        backgroundColor: COLORS.white,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    notificationItemUnread: {
+        backgroundColor: `${COLORS.primary}05`,
+        borderColor: `${COLORS.primary}20`,
+    },
+    notificationIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.md,
+    },
+    notificationContent: {
+        flex: 1,
+    },
+    notificationTitle: {
+        fontSize: fontSize.md,
+        color: COLORS.textPrimary,
+        marginBottom: 2,
+    },
+    notificationTitleUnread: {
+        fontWeight: '600',
+    },
+    notificationMessage: {
+        fontSize: fontSize.sm,
+        color: COLORS.textSecondary,
+        marginBottom: spacing.xs,
+    },
+    notificationTime: {
+        fontSize: fontSize.xs,
+        color: COLORS.textMuted,
+    },
+    unreadDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: COLORS.primary,
+        marginLeft: spacing.sm,
+        marginTop: 6,
     },
 });

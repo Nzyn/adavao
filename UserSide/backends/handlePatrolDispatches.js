@@ -365,9 +365,70 @@ async function declineDispatch(req, res) {
   }
 }
 
+/**
+ * Get dispatch history for patrol officer (completed, cancelled, declined)
+ */
+async function getMyHistory(req, res) {
+  try {
+    const userId = req.query.userId || req.headers['x-user-id'] || req.body?.userId;
+    if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
+
+    await assertPatrolOfficer(userId);
+
+    const [rows] = await db.query(
+      `SELECT
+        d.dispatch_id,
+        d.report_id,
+        d.status,
+        d.dispatched_at,
+        d.accepted_at,
+        d.arrived_at,
+        d.completed_at,
+        d.cancelled_at,
+        d.is_valid,
+        d.validation_notes,
+        r.report_type::text AS report_type,
+        l.barangay
+      FROM patrol_dispatches d
+      JOIN reports r ON d.report_id = r.report_id
+      LEFT JOIN locations l ON r.location_id = l.location_id
+      WHERE d.patrol_officer_id = $1
+        AND d.status IN ('completed', 'cancelled', 'declined')
+      ORDER BY COALESCE(d.completed_at, d.cancelled_at, d.declined_at) DESC
+      LIMIT 50`,
+      [userId]
+    );
+
+    const formatted = rows.map((row) => {
+      const reportType = parseJsonMaybe(row.report_type, [row.report_type]);
+      const crimeTypes = Array.isArray(reportType) ? reportType : [reportType];
+
+      return {
+        dispatch_id: row.dispatch_id,
+        report_id: row.report_id,
+        crime_type: crimeTypes.join(', '),
+        barangay: row.barangay || 'Unknown location',
+        status: row.status,
+        dispatched_at: row.dispatched_at,
+        responded_at: row.accepted_at,
+        arrived_at: row.arrived_at,
+        completed_at: row.completed_at || row.cancelled_at,
+        verification_status: row.is_valid === true ? 'verified' : (row.is_valid === false ? 'false_report' : null),
+        verification_notes: row.validation_notes,
+      };
+    });
+
+    return res.json({ success: true, data: formatted });
+  } catch (e) {
+    const statusCode = typeof e?.statusCode === 'number' ? e.statusCode : 500;
+    return res.status(statusCode).json({ success: false, message: e?.message || 'Failed to fetch history' });
+  }
+}
+
 module.exports = {
   getMyDispatches,
   getDispatchDetails,
   acceptDispatch,
   declineDispatch,
+  getMyHistory,
 };

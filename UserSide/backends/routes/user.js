@@ -62,12 +62,13 @@ router.post('/duty-status', async (req, res) => {
       SET is_on_duty = $1, 
           updated_at = NOW() 
       WHERE id = $2 AND user_role = 'patrol_officer'
-            RETURNING id, firstname, lastname, is_on_duty
+      RETURNING id, firstname, lastname, is_on_duty
     `;
 
-        const result = await db.query(query, [is_on_duty, user_id]);
+        // db.query returns [rows, fields] - destructure properly
+        const [rows] = await db.query(query, [is_on_duty, user_id]);
 
-        if (result.rows.length === 0) {
+        if (!rows || rows.length === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'Patrol officer not found'
@@ -79,7 +80,7 @@ router.post('/duty-status', async (req, res) => {
         res.json({
             success: true,
             message: 'Duty status updated successfully',
-            data: result.rows[0]
+            data: rows[0]
         });
 
     } catch (error) {

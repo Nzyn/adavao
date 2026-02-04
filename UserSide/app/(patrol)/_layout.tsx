@@ -11,6 +11,8 @@ export default function PatrolLayout() {
             <Stack.Screen name="dashboard" />
             <Stack.Screen name="dispatches" />
             <Stack.Screen name="dispatch-details" />
+            <Stack.Screen name="history" />
+            <Stack.Screen name="profile" />
         </Stack>
     );
 }

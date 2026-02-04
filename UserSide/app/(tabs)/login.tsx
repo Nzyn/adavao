@@ -379,7 +379,7 @@ const Login = () => {
     }
   };
 
-  const processLoginSuccess = async (user: any) => {
+  const processLoginSuccess = async (user: any): Promise<void> => {
     console.log('✅ Login successful for:', user.email);
     console.log('📦 Full user data received:', user);
 
@@ -406,23 +406,21 @@ const Login = () => {
       await AsyncStorage.removeItem('rememberedEmail');
     }
 
-    setTimeout(async () => {
-      // Role-based redirect
-      if (user.user_role === 'patrol_officer') {
-        console.log('🚓 Patrol officer detected, redirecting to patrol dashboard');
-        // Initialize push notifications for patrol officers
-        try {
-          const { initializePushNotifications } = await import('../../services/pushNotificationService');
-          await initializePushNotifications(user.id);
-        } catch (error) {
-          console.error('Failed to initialize push notifications:', error);
-        }
-        router.replace('/(patrol)/dashboard' as any);
-      } else {
-        console.log('🚀 Navigating to /(tabs) (home)...');
-        router.replace('/(tabs)');
+    // Role-based redirect (no setTimeout to avoid Promise not resolving)
+    if (user.user_role === 'patrol_officer') {
+      console.log('🚓 Patrol officer detected, redirecting to patrol dashboard');
+      // Initialize push notifications for patrol officers
+      try {
+        const { initializePushNotifications } = await import('../../services/pushNotificationService');
+        await initializePushNotifications(user.id);
+      } catch (error) {
+        console.error('Failed to initialize push notifications:', error);
       }
-    }, 100);
+      router.replace('/(patrol)/dashboard' as any);
+    } else {
+      console.log('🚀 Navigating to /(tabs) (home)...');
+      router.replace('/(tabs)');
+    }
   };
 
   const handleLogin = async () => {

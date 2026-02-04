@@ -251,6 +251,7 @@ const {
   getDispatchDetails,
   acceptDispatch,
   declineDispatch,
+  getMyHistory,
 } = require('./handlePatrolDispatches');
 
 // Dispatch management handlers (location tracking, send to dispatch, verification)
@@ -292,6 +293,7 @@ app.get('/api/patrol/dispatches', verifyUserRole, requireAuthorizedRole, getMyDi
 app.get('/api/patrol/dispatches/:dispatchId', verifyUserRole, requireAuthorizedRole, getDispatchDetails);
 app.post('/api/patrol/dispatches/:dispatchId/accept', verifyUserRole, requireAuthorizedRole, acceptDispatch);
 app.post('/api/patrol/dispatches/:dispatchId/decline', verifyUserRole, requireAuthorizedRole, declineDispatch);
+app.get('/api/patrol/history', verifyUserRole, requireAuthorizedRole, getMyHistory);
 
 const fs = require('fs');
 
