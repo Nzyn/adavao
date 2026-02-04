@@ -324,7 +324,26 @@ class ReportController extends Controller
             ]);
         }
 
-        return view('reports', compact('reports', 'csvReports'));
+        // Calculate status counts for tabs
+        $countQuery = Report::join('locations', 'reports.location_id', '=', 'locations.location_id')
+            ->whereNotNull('locations.latitude')
+            ->whereNotNull('locations.longitude')
+            ->where('locations.latitude', '!=', 0)
+            ->where('locations.longitude', '!=', 0);
+
+        // Apply same role-based filtering for counts
+        if ($isPolice && isset($userStationId) && $userStationId) {
+            $countQuery->where('reports.assigned_station_id', $userStationId);
+        } elseif ($isAdmin && isset($userStationId) && $userStationId) {
+            $countQuery->where('reports.assigned_station_id', $userStationId);
+        }
+
+        $allCount = (clone $countQuery)->count();
+        $pendingCount = (clone $countQuery)->where('reports.status', 'pending')->count();
+        $investigatingCount = (clone $countQuery)->where('reports.status', 'investigating')->count();
+        $resolvedCount = (clone $countQuery)->where('reports.status', 'resolved')->count();
+
+        return view('reports', compact('reports', 'csvReports', 'allCount', 'pendingCount', 'investigatingCount', 'resolvedCount'));
     }
 
     /**
@@ -1078,6 +1097,107 @@ class ReportController extends Controller
         } catch (\Exception $e) {
             \Log::error('Urgency recalculation error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Failed to recalculate urgency scores. Please check logs.');
+        }
+    }
+
+    /**
+     * Get report updates for auto-refresh (AJAX endpoint)
+     * Returns reports with their current status for real-time updates
+     */
+    public function getReportUpdates(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            
+            $query = Report::with(['user', 'location', 'policeStation'])
+                ->join('locations', 'reports.location_id', '=', 'locations.location_id')
+                ->whereNotNull('locations.latitude')
+                ->whereNotNull('locations.longitude')
+                ->where('locations.latitude', '!=', 0)
+                ->where('locations.longitude', '!=', 0);
+
+            // Apply role-based filtering
+            if ($user && method_exists($user, 'hasRole')) {
+                $isPolice = $user->hasRole('police');
+                $isAdmin = !$isPolice && ($user->hasRole('admin') || $user->hasRole('super_admin'));
+                
+                if ($isPolice && $user->station_id) {
+                    $query->where('reports.assigned_station_id', $user->station_id);
+                }
+            }
+
+            // Filter by status if provided
+            $statusFilter = $request->get('status');
+            if ($statusFilter && in_array($statusFilter, ['pending', 'investigating', 'resolved'])) {
+                $query->where('reports.status', $statusFilter);
+            }
+
+            // Get since timestamp for incremental updates
+            $since = $request->get('since');
+            if ($since) {
+                $query->where('reports.updated_at', '>', Carbon::parse($since));
+            }
+
+            $reports = $query->select('reports.*')
+                ->orderBy('reports.updated_at', 'desc')
+                ->limit(100)
+                ->get();
+
+            // Get counts for all statuses
+            $baseQuery = Report::join('locations', 'reports.location_id', '=', 'locations.location_id')
+                ->whereNotNull('locations.latitude')
+                ->whereNotNull('locations.longitude')
+                ->where('locations.latitude', '!=', 0)
+                ->where('locations.longitude', '!=', 0);
+
+            // Apply same role filtering for counts
+            if ($user && method_exists($user, 'hasRole')) {
+                $isPolice = $user->hasRole('police');
+                if ($isPolice && $user->station_id) {
+                    $baseQuery->where('reports.assigned_station_id', $user->station_id);
+                }
+            }
+
+            $counts = [
+                'all' => (clone $baseQuery)->count(),
+                'pending' => (clone $baseQuery)->where('reports.status', 'pending')->count(),
+                'investigating' => (clone $baseQuery)->where('reports.status', 'investigating')->count(),
+                'resolved' => (clone $baseQuery)->where('reports.status', 'resolved')->count(),
+            ];
+
+            // Format reports for response
+            $formattedReports = $reports->map(function($report) {
+                return [
+                    'report_id' => $report->report_id,
+                    'status' => $report->status,
+                    'report_type' => $report->report_type,
+                    'description' => $report->description,
+                    'urgency_score' => $report->urgency_score,
+                    'updated_at' => $report->updated_at->toIso8601String(),
+                    'created_at' => $report->created_at->toIso8601String(),
+                    'user_name' => $report->user ? ($report->user->first_name . ' ' . $report->user->last_name) : 'Anonymous',
+                    'location_address' => $report->location ? $report->location->address : 'Unknown',
+                    'station_name' => $report->policeStation ? $report->policeStation->station_name : 'Unassigned',
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'reports' => $formattedReports,
+                'counts' => $counts,
+                'timestamp' => now()->toIso8601String()
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching report updates', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch report updates'
+            ], 500);
         }
     }
 }

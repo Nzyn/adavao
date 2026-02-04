@@ -210,4 +210,48 @@ class EncryptionService
         $authorizedRoles = ['police', 'admin', 'super_admin'];
         return in_array($userRole, $authorizedRoles);
     }
+
+    /**
+     * Check if a string appears to be encrypted
+     * Checks for Laravel encryption format (JSON with iv, value, mac)
+     * or Node.js format (base64 encoded with specific length)
+     * 
+     * @param string|null $text
+     * @return bool
+     */
+    public static function isEncrypted($text)
+    {
+        if (empty($text) || !is_string($text)) {
+            return false;
+        }
+
+        // Check for Laravel encryption format (base64 JSON with iv, value, mac)
+        try {
+            $decoded = base64_decode($text, true);
+            if ($decoded !== false) {
+                $json = json_decode($decoded, true);
+                if (is_array($json) && isset($json['iv']) && isset($json['value']) && isset($json['mac'])) {
+                    return true;
+                }
+            }
+        } catch (\Exception $e) {
+            // Not Laravel format
+        }
+
+        // Check for Node.js simple format (base64 with minimum length for IV + data)
+        // Minimum: 16 bytes IV + 16 bytes encrypted data (AES block size) = 32 bytes
+        // Base64 of 32 bytes = at least 44 characters
+        if (strlen($text) >= 44) {
+            $decoded = base64_decode($text, true);
+            if ($decoded !== false && strlen($decoded) >= 32) {
+                // Check if it looks like binary data (has non-printable characters)
+                $nonPrintable = preg_match('/[^\x20-\x7E]/', $decoded);
+                if ($nonPrintable) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }

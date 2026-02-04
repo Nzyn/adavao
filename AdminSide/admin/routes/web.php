@@ -213,6 +213,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dispatches/analytics', [DispatchController::class, 'analytics'])->name('dispatches.analytics');
     Route::get('/api/on-duty-officers', [DispatchController::class, 'getOnDutyOfficers'])->name('api.onDutyOfficers');
 
+    // Reports Auto-Refresh API
+    Route::get('/api/reports/updates', [ReportController::class, 'getReportUpdates'])->name('api.reportUpdates');
+
     // Barangay management routes (commented out - controller missing)
     // Route::get('/barangays', [BarangayController::class, 'index'])->name('barangays.index');
     // Route::get('/barangays/{barangayId}', [BarangayController::class, 'show'])->name('barangays.show');

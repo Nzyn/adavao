@@ -140,6 +140,140 @@
             margin-bottom: 10px;
             font-size: 0.875rem;
         }
+
+        /* Status Tabs Styles */
+        .status-tabs-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 0 0.5rem;
+        }
+
+        .status-tabs {
+            display: flex;
+            gap: 0.75rem;
+            background: #f8fafc;
+            padding: 0.5rem;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .status-tab {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background: white;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .status-tab:hover {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .status-tab.active {
+            background: white;
+            color: #1e293b;
+            border-color: #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .status-tab.pending-tab.active {
+            background: linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%);
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+
+        .status-tab.investigating-tab.active {
+            background: linear-gradient(135deg, #fefce8 0%, #fff7ed 100%);
+            border-color: #fde68a;
+            color: #d97706;
+        }
+
+        .status-tab.resolved-tab.active {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            border-color: #bbf7d0;
+            color: #16a34a;
+        }
+
+        .tab-icon {
+            font-size: 1rem;
+        }
+
+        .tab-label {
+            font-weight: 600;
+        }
+
+        .tab-count {
+            background: #e2e8f0;
+            color: #64748b;
+            padding: 0.125rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            min-width: 1.5rem;
+            text-align: center;
+        }
+
+        .status-tab.active .tab-count {
+            background: rgba(0,0,0,0.1);
+            color: inherit;
+        }
+
+        .status-tab.pending-tab .tab-count.pending-count {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .tab-pulse {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .auto-refresh-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            color: #16a34a;
+        }
+
+        .refresh-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .refresh-text {
+            font-weight: 500;
+        }
         
         .station-list {
             display: flex;
@@ -1443,6 +1577,46 @@
             </svg>
             <input type="text" class="search-input" placeholder="Search reports..." id="searchInput"
                 onkeyup="searchReports()">
+        </div>
+    </div>
+
+    <!-- Status Tabs for Report Filtering -->
+    @php
+        $currentStatus = request('status', 'all');
+    @endphp
+    <div class="status-tabs-container">
+        <div class="status-tabs">
+            <a href="{{ route('reports', array_merge(request()->except('status', 'page'), ['status' => 'all'])) }}" 
+               class="status-tab {{ $currentStatus === 'all' ? 'active' : '' }}">
+                <span class="tab-icon">📋</span>
+                <span class="tab-label">All Reports</span>
+                <span class="tab-count" id="allCount">{{ $allCount ?? 0 }}</span>
+            </a>
+            <a href="{{ route('reports', array_merge(request()->except('status', 'page'), ['status' => 'pending'])) }}" 
+               class="status-tab {{ $currentStatus === 'pending' ? 'active' : '' }} pending-tab">
+                <span class="tab-icon">🔴</span>
+                <span class="tab-label">Pending</span>
+                <span class="tab-count pending-count" id="pendingCount">{{ $pendingCount ?? 0 }}</span>
+                @if(($pendingCount ?? 0) > 0)
+                <span class="tab-pulse"></span>
+                @endif
+            </a>
+            <a href="{{ route('reports', array_merge(request()->except('status', 'page'), ['status' => 'investigating'])) }}" 
+               class="status-tab {{ $currentStatus === 'investigating' ? 'active' : '' }} investigating-tab">
+                <span class="tab-icon">🟡</span>
+                <span class="tab-label">Investigating</span>
+                <span class="tab-count" id="investigatingCount">{{ $investigatingCount ?? 0 }}</span>
+            </a>
+            <a href="{{ route('reports', array_merge(request()->except('status', 'page'), ['status' => 'resolved'])) }}" 
+               class="status-tab {{ $currentStatus === 'resolved' ? 'active' : '' }} resolved-tab">
+                <span class="tab-icon">🟢</span>
+                <span class="tab-label">Resolved</span>
+                <span class="tab-count" id="resolvedCount">{{ $resolvedCount ?? 0 }}</span>
+            </a>
+        </div>
+        <div class="auto-refresh-indicator" id="autoRefreshIndicator">
+            <span class="refresh-dot"></span>
+            <span class="refresh-text">Auto-refresh active</span>
         </div>
     </div>
 
@@ -4055,5 +4229,188 @@ function generatePDF(report) {
     function closeDispatchModal() {
         document.getElementById('dispatchModal').style.display = 'none';
     }
+
+    // ========== AUTO-REFRESH FUNCTIONALITY ==========
+    // Auto-refresh reports every 5 seconds to get real-time updates from patrol
+    let autoRefreshInterval = null;
+    let lastReportData = {};
+
+    function initAutoRefresh() {
+        // Store current report data for comparison
+        document.querySelectorAll('tr[data-report-id]').forEach(row => {
+            const reportId = row.dataset.reportId;
+            const statusSelect = row.querySelector('.status-select');
+            if (statusSelect) {
+                lastReportData[reportId] = statusSelect.value;
+            }
+        });
+
+        // Start auto-refresh interval (5 seconds)
+        autoRefreshInterval = setInterval(fetchReportUpdates, 5000);
+        console.log('📡 Auto-refresh initialized');
+    }
+
+    async function fetchReportUpdates() {
+        try {
+            const response = await fetch('/api/reports/updates', {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                }
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch updates');
+
+            const data = await response.json();
+
+            if (data.success && data.reports) {
+                updateReportRows(data.reports);
+                updateTabCounts(data.counts);
+            }
+        } catch (error) {
+            console.warn('Auto-refresh error:', error.message);
+        }
+    }
+
+    function updateReportRows(reports) {
+        reports.forEach(report => {
+            const row = document.querySelector(`tr[data-report-id="${report.report_id}"]`);
+            if (!row) return;
+
+            // Check if status changed
+            const statusSelect = row.querySelector('.status-select');
+            if (statusSelect && statusSelect.value !== report.status) {
+                // Status was updated by patrol - animate and update
+                statusSelect.value = report.status;
+                statusSelect.dataset.originalStatus = report.status;
+                
+                // Highlight the row briefly
+                row.style.transition = 'background-color 0.5s ease';
+                row.style.backgroundColor = '#fef3c7';
+                setTimeout(() => {
+                    row.style.backgroundColor = '';
+                }, 2000);
+
+                // Show notification
+                showUpdateNotification(report);
+            }
+
+            // Update validity if changed
+            const validitySelect = row.querySelector('.validity-select');
+            if (validitySelect && validitySelect.value !== report.is_valid) {
+                validitySelect.value = report.is_valid;
+                validitySelect.dataset.originalValidity = report.is_valid;
+            }
+        });
+    }
+
+    function updateTabCounts(counts) {
+        if (!counts) return;
+
+        // Update all count
+        const allCountEl = document.getElementById('allCount');
+        if (allCountEl && counts.all !== undefined) {
+            allCountEl.textContent = counts.all;
+        }
+
+        // Update pending count
+        const pendingCountEl = document.getElementById('pendingCount');
+        if (pendingCountEl && counts.pending !== undefined) {
+            pendingCountEl.textContent = counts.pending;
+            
+            // Show/hide pulse indicator
+            const pulseEl = document.querySelector('.tab-pulse');
+            if (pulseEl) {
+                pulseEl.style.display = counts.pending > 0 ? 'block' : 'none';
+            }
+        }
+
+        // Update investigating count
+        const investigatingCountEl = document.getElementById('investigatingCount');
+        if (investigatingCountEl && counts.investigating !== undefined) {
+            investigatingCountEl.textContent = counts.investigating;
+        }
+
+        // Update resolved count
+        const resolvedCountEl = document.getElementById('resolvedCount');
+        if (resolvedCountEl && counts.resolved !== undefined) {
+            resolvedCountEl.textContent = counts.resolved;
+        }
+    }
+
+    function showUpdateNotification(report) {
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.className = 'update-toast';
+        toast.innerHTML = `
+            <div class="toast-icon">🔔</div>
+            <div class="toast-content">
+                <div class="toast-title">Report #${String(report.report_id).padStart(5, '0')} Updated</div>
+                <div class="toast-message">Status changed to: ${report.status}</div>
+            </div>
+        `;
+        document.body.appendChild(toast);
+
+        // Animate in
+        setTimeout(() => toast.classList.add('show'), 10);
+
+        // Remove after 4 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    // Initialize auto-refresh when page loads
+    document.addEventListener('DOMContentLoaded', initAutoRefresh);
+
+    // Pause auto-refresh when user is interacting with modals
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                // Modal closed, resume refresh
+            }
+        });
+    });
     </script>
+
+    <!-- Toast Notification Styles -->
+    <style>
+        .update-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            border-left: 4px solid #3b82f6;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            z-index: 9999;
+        }
+
+        .update-toast.show {
+            transform: translateX(0);
+        }
+
+        .toast-icon {
+            font-size: 24px;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 14px;
+        }
+
+        .toast-message {
+            color: #6b7280;
+            font-size: 13px;
+            margin-top: 2px;
+        }
+    </style>
 @endsection
