@@ -2956,7 +2956,7 @@ function getVerificationBadge(report) {
                      </svg>
                      ${buttonText}
                  </button>
-                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="window.openDispatchModal(${report.report_id})">
+                 <button class="btn btn-sm dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
                      <span style="font-size: 18px; margin-right: 8px;">🚓</span>
                      Dispatch Patrol
                  </button>
@@ -2973,7 +2973,7 @@ function getVerificationBadge(report) {
                      </svg>
                      Request Reassignment
                  </button>
-                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="window.openDispatchModal(${report.report_id})">
+                 <button class="btn btn-sm dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
                      <span style="font-size: 18px; margin-right: 8px;">🚓</span>
                      Dispatch Patrol
                  </button>
@@ -2984,7 +2984,7 @@ function getVerificationBadge(report) {
      else {
          buttons = `
              <div style="display: flex; flex-direction: column; gap: 8px;">
-                 <button class="btn btn-sm" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);" onclick="window.openDispatchModal(${report.report_id})">
+                 <button class="btn btn-sm dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
                      <span style="font-size: 18px; margin-right: 8px;">🚓</span>
                      Dispatch Patrol
                  </button>
@@ -4126,12 +4126,12 @@ function generatePDF(report) {
         </div>
     </div>
 
-    <!-- Dispatch Modal -->
-    <div id="dispatchModal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 450px;">
+    <!-- Dispatch Modal - uses dispatch-modal class to avoid CSS conflicts -->
+    <div id="dispatchModal" class="dispatch-modal" style="display: none;">
+        <div class="dispatch-modal-content">
             <div class="modal-header">
                 <h2>🚓 Dispatch Patrol Officer</h2>
-                <button class="modal-close" onclick="closeDispatchModal()" type="button">&times;</button>
+                <button class="modal-close" onclick="window.closeDispatchModal()" type="button">&times;</button>
             </div>
             <div class="modal-body" style="text-align: center; padding: 24px;">
                 <div id="dispatch-loading" style="display: none;">
@@ -4148,10 +4148,10 @@ function generatePDF(report) {
                     </p>
                     <input type="hidden" id="dispatch_report_id">
                     <div style="display: flex; gap: 12px; justify-content: center;">
-                        <button type="button" onclick="closeDispatchModal()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                        <button type="button" onclick="window.closeDispatchModal()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;">
                             Cancel
                         </button>
-                        <button type="button" onclick="dispatchToNearestPatrol()" style="padding: 12px 24px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                        <button type="button" onclick="window.dispatchToNearestPatrol()" style="padding: 12px 24px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
                             🚓 Dispatch Now
                         </button>
                     </div>
@@ -4164,7 +4164,7 @@ function generatePDF(report) {
                     <p style="margin: 0 0 24px; color: #666; font-size: 14px; line-height: 1.5;">
                         Patrol sent to the nearest dispatch in the reported area. The officer has been notified with an urgent alert.
                     </p>
-                    <button type="button" onclick="closeDispatchModal(); location.reload();" style="padding: 12px 24px; background: #16a34a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                    <button type="button" onclick="window.closeDispatchModal(); location.reload();" style="padding: 12px 24px; background: #16a34a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">
                         Done
                     </button>
                 </div>
@@ -4176,7 +4176,7 @@ function generatePDF(report) {
                     <p id="dispatch-error-message" style="margin: 0 0 24px; color: #666; font-size: 14px; line-height: 1.5;">
                         No patrol officers are currently on duty or available.
                     </p>
-                    <button type="button" onclick="closeDispatchModal();" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 14px;">
+                    <button type="button" onclick="window.closeDispatchModal();" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 14px;">
                         Close
                     </button>
                 </div>
@@ -4187,6 +4187,40 @@ function generatePDF(report) {
     <style>
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+        
+        /* Dispatch Modal - separate from main modal-overlay to avoid CSS conflicts */
+        .dispatch-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999; /* Higher than report detail modal */
+        }
+        
+        .dispatch-modal-content {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            max-width: 450px;
+            width: 90%;
+            animation: modalSlideIn 0.3s ease;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 
@@ -4202,6 +4236,18 @@ function generatePDF(report) {
         document.getElementById('dispatch-error').style.display = 'none';
         document.getElementById('dispatchModal').style.display = 'flex';
     }
+    
+    // Event delegation for dispatch buttons - handles dynamically created buttons
+    document.addEventListener('click', function(e) {
+        const dispatchBtn = e.target.closest('[data-dispatch-report]');
+        if (dispatchBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const reportId = dispatchBtn.getAttribute('data-dispatch-report');
+            console.log('🚓 Dispatch button clicked via delegation for report:', reportId);
+            window.openDispatchModal(reportId);
+        }
+    });
     
     window.dispatchToNearestPatrol = function() {
         const reportId = document.getElementById('dispatch_report_id').value;
