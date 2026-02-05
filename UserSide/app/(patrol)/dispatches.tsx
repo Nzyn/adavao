@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { API_URL } from '../../config/backend';
 import { spacing, fontSize, containerPadding, borderRadius, isTablet } from '../../utils/responsive';
 
@@ -40,6 +41,7 @@ interface Dispatch {
     dispatch_id: number;
     report_id: number;
     station_id: number;
+    patrol_officer_id?: number | null;
     status: string;
     dispatched_at: string;
     notes: string | null;
@@ -63,9 +65,29 @@ export default function PatrolDispatchesScreen() {
     const [userId, setUserId] = useState<string | null>(null);
     const [stationId, setStationId] = useState<number>(0);
     const [activeTab, setActiveTab] = useState<'pending' | 'mine'>('pending');
+    const notifiedDispatchesRef = useRef<Set<number>>(new Set());
+    const notifiedLoadedRef = useRef(false);
 
     useEffect(() => {
         loadUserData();
+    }, []);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const stored = await AsyncStorage.getItem('notifiedDispatchIds');
+                if (stored) {
+                    const ids = JSON.parse(stored);
+                    if (Array.isArray(ids)) {
+                        notifiedDispatchesRef.current = new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id)));
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to load notified dispatch IDs:', error);
+            } finally {
+                notifiedLoadedRef.current = true;
+            }
+        })();
     }, []);
 
     useEffect(() => {
@@ -101,6 +123,62 @@ export default function PatrolDispatchesScreen() {
         }
     };
 
+    const persistNotifiedDispatches = async () => {
+        try {
+            const ids = Array.from(notifiedDispatchesRef.current).slice(-200);
+            await AsyncStorage.setItem('notifiedDispatchIds', JSON.stringify(ids));
+        } catch (error) {
+            console.warn('⚠️ Failed to persist notified dispatch IDs:', error);
+        }
+    };
+
+    const notifyNewAssignedDispatches = async (list: Dispatch[]) => {
+        if (!userId) return;
+        if (!notifiedLoadedRef.current) return;
+
+        const userIdStr = String(userId);
+        const pendingAssigned = list.filter((dispatch) =>
+            dispatch?.status === 'pending' &&
+            dispatch?.patrol_officer_id != null &&
+            String(dispatch.patrol_officer_id) === userIdStr
+        );
+
+        let hasNew = false;
+        for (const dispatch of pendingAssigned) {
+            if (notifiedDispatchesRef.current.has(dispatch.dispatch_id)) continue;
+
+            const crimeLabel = Array.isArray(dispatch.report_type)
+                ? dispatch.report_type.join(', ')
+                : String(dispatch.report_type || 'Incident');
+            const locationLabel = dispatch.barangay || dispatch.reporters_address || 'Unknown location';
+
+            try {
+                await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: '🚓 New Dispatch Assigned',
+                        body: `${crimeLabel} at ${locationLabel}`,
+                        data: {
+                            type: 'dispatch',
+                            dispatch_id: dispatch.dispatch_id,
+                            report_id: dispatch.report_id,
+                        },
+                        sound: true,
+                    },
+                    trigger: null,
+                });
+            } catch (error) {
+                console.warn('⚠️ Failed to show local dispatch notification:', error);
+            }
+
+            notifiedDispatchesRef.current.add(dispatch.dispatch_id);
+            hasNew = true;
+        }
+
+        if (hasNew) {
+            await persistNotifiedDispatches();
+        }
+    };
+
     const loadDispatches = async (isInitialLoad = true) => {
         if (!userId) return;
 
@@ -115,6 +193,7 @@ export default function PatrolDispatchesScreen() {
                 );
                 const data = await response.json();
                 if (data.success) {
+                    await notifyNewAssignedDispatches(data.data || []);
                     // Only update if data changed to prevent flickering
                     setDispatches(prev => {
                         const newIds = (data.data || []).map((d: any) => `${d.dispatch_id}-${d.status}`);

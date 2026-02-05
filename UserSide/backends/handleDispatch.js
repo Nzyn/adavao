@@ -103,9 +103,9 @@ async function findNearestPatrolOfficer(reportLat, reportLon, stationId) {
                 pl.latitude,
                 pl.longitude,
                 pl.updated_at
-             FROM users_public u
-             JOIN patrol_locations pl ON u.id = pl.user_id
-             WHERE u.user_role = 'patrol_officer'
+                         FROM users_public u
+                         JOIN patrol_locations pl ON u.id = pl.user_id
+                         WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
                AND u.assigned_station_id = $1
                AND u.is_on_duty = true
                AND pl.updated_at > NOW() - INTERVAL '5 minutes'`,
@@ -169,10 +169,10 @@ async function getAllPatrolLocations(req, res) {
                 pl.speed,
                 pl.accuracy,
                 pl.updated_at
-             FROM patrol_locations pl
-             JOIN users_public u ON pl.user_id = u.id
+               FROM patrol_locations pl
+               JOIN users_public u ON pl.user_id = u.id
              LEFT JOIN police_stations ps ON u.assigned_station_id = ps.station_id
-             WHERE u.user_role = 'patrol_officer'
+               WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
              ORDER BY pl.updated_at DESC`
         );
 
@@ -208,9 +208,9 @@ async function getPatrolOfficersByStation(req, res) {
                 pl.latitude,
                 pl.longitude,
                 pl.updated_at AS location_updated_at
-             FROM users_public u
+                         FROM users_public u
              LEFT JOIN patrol_locations pl ON u.id = pl.user_id
-             WHERE u.user_role = 'patrol_officer'
+                         WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
                AND u.assigned_station_id = $1
              ORDER BY u.is_on_duty DESC, u.firstname`,
             [stationId]
@@ -287,14 +287,14 @@ async function sendToDispatch(req, res) {
         }
 
         // Get all on-duty patrol officers from the assigned station
-        const [patrolOfficers] = await db.query(
-            `SELECT id, firstname, lastname, push_token
-             FROM users_public
-             WHERE user_role = 'patrol_officer'
-               AND assigned_station_id = $1
-               AND is_on_duty = true`,
-            [report.assigned_station_id]
-        );
+                const [patrolOfficers] = await db.query(
+                        `SELECT id, firstname, lastname, push_token
+                         FROM users_public
+                         WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer'
+                             AND assigned_station_id = $1
+                             AND is_on_duty = true`,
+                        [report.assigned_station_id]
+                );
 
         if (!patrolOfficers || patrolOfficers.length === 0) {
             // If no on-duty officers at the station, still create dispatch without assignment

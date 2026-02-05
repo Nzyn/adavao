@@ -7,6 +7,32 @@ const crypto = require('crypto');
 const { encrypt, decrypt, canDecrypt, encryptFields, decryptFields } = require("./encryptionService");
 const { getClientIp, normalizeIp, getUserAgent } = require("./ipUtils");
 
+let cachedUsersPublicColumns = null;
+
+async function getUsersPublicColumns(connection) {
+  if (cachedUsersPublicColumns) return cachedUsersPublicColumns;
+  const [rows] = await connection.query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'users_public'`
+  );
+  cachedUsersPublicColumns = new Set((rows || []).map((row) => row.column_name));
+  return cachedUsersPublicColumns;
+}
+
+function resolveGuestPasswordHash() {
+  const fallbackHash = '$2a$10$ChB2BiLVrI.NQwozAvx60OMCPgizVc.AMJXWNcqTbonCcLwTrmktS';
+  if (process.env.GUEST_REPORTER_PASSWORD_HASH) return process.env.GUEST_REPORTER_PASSWORD_HASH;
+  try {
+    const bcrypt = require('bcryptjs');
+    return bcrypt.hashSync(`guest_no_login_${Date.now()}`, 10);
+  } catch (error) {
+    console.warn('⚠️ bcryptjs unavailable, using fallback guest password hash');
+    return fallbackHash;
+  }
+}
+
 function sha256Hex(text) {
   return crypto.createHash('sha256').update(String(text || ''), 'utf8').digest('hex');
 }
@@ -322,11 +348,49 @@ async function submitReport(req, res) {
       if (existingGuest.length > 0) {
         effectiveUserId = existingGuest[0].id;
       } else {
+        const availableColumns = await getUsersPublicColumns(connection);
+        const guestPassword = resolveGuestPasswordHash();
+        const guestContact = process.env.GUEST_REPORTER_CONTACT || '+639000000000';
+
+        const columns = [];
+        const placeholders = [];
+        const values = [];
+
+        const addValue = (column, value) => {
+          if (!availableColumns.has(column)) return;
+          columns.push(column);
+          values.push(value);
+          placeholders.push(`$${values.length}`);
+        };
+
+        const addNow = (column) => {
+          if (!availableColumns.has(column)) return;
+          columns.push(column);
+          placeholders.push('NOW()');
+        };
+
+        addValue('email', guestEmail);
+        addValue('firstname', 'Guest');
+        addValue('lastname', 'Reporter');
+        addValue('contact', guestContact);
+        addValue('password', guestPassword);
+        addValue('is_verified', false);
+        addValue('email_verified', false);
+        addValue('user_role', 'user');
+        addValue('role', 'user');
+        addValue('email_verified_at', null);
+        addNow('created_at');
+        addNow('updated_at');
+
+        if (columns.length === 0) {
+          throw new Error('users_public schema not detected - cannot create guest user');
+        }
+
         const [guestInsert] = await connection.query(
-          `INSERT INTO users_public (email, firstname, lastname, is_verified, email_verified, created_at)
-           VALUES ($1, 'Guest', 'Reporter', false, false, NOW())
+          `INSERT INTO users_public (${columns.join(', ')})
+           VALUES (${placeholders.join(', ')})
            RETURNING id`,
-          [guestEmail]
+          values
         );
         effectiveUserId = guestInsert[0].id;
       }

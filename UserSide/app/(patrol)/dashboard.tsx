@@ -289,6 +289,23 @@ export default function PatrolDashboard() {
                     user.is_on_duty = newStatus;
                     await AsyncStorage.setItem('userData', JSON.stringify(user));
                 }
+                
+                // CRITICAL: Re-register push notifications when turning ON duty
+                // This ensures the push token is saved/refreshed for receiving dispatch notifications
+                if (newStatus && userId) {
+                    const numericUserId = parseInt(userId);
+                    if (!isNaN(numericUserId)) {
+                        try {
+                            console.log('🔔 Re-registering push notifications for duty ON');
+                            const { initializePushNotifications } = await import('../../services/pushNotificationService');
+                            await initializePushNotifications(numericUserId);
+                            console.log('✅ Push notifications refreshed for duty status');
+                        } catch (pushError) {
+                            console.warn('⚠️ Failed to refresh push notifications:', pushError);
+                        }
+                    }
+                }
+                
                 Alert.alert('Status Updated', `You are now ${newStatus ? 'ON DUTY' : 'OFF DUTY'}`);
             } else {
                 Alert.alert('Error', data.message || 'Failed to update duty status');
