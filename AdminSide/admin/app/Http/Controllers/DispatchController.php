@@ -580,23 +580,31 @@ class DispatchController extends Controller
         try {
             if (!$officer->push_token) {
                 Log::info('No push token for officer', ['officer_id' => $officer->id]);
-                return;
+                return false;
             }
 
             $report = $dispatch->report;
+            if (!$report) {
+                Log::error('No report found for dispatch', ['dispatch_id' => $dispatch->dispatch_id]);
+                return false;
+            }
+            
             $location = $report->location;
             $barangay = $location ? EncryptionService::decrypt($location->barangay) : 'Unknown';
+            
+            Log::info('Sending push notification', [
+                'officer_id' => $officer->id,
+                'push_token' => substr($officer->push_token, 0, 30) . '...',
+                'report_type' => $report->report_type,
+                'barangay' => $barangay,
+            ]);
             
             // Prepare Expo push notification with urgent settings
             $message = [
                 'to' => $officer->push_token,
-                'sound' => [
-                    'critical' => true,
-                    'name' => 'default',
-                    'volume' => 1.0,
-                ],
+                'sound' => 'default',
                 'title' => '🚨 URGENT: New Dispatch Assigned',
-                'body' => "📍 {$report->report_type} reported at {$barangay}. You are {$distanceKm} km away - respond immediately!",
+                'body' => "📍 {$report->report_type} reported at {$barangay}. You are " . round($distanceKm, 2) . " km away - respond immediately!",
                 'data' => [
                     'type' => 'urgent_dispatch',
                     'dispatch_id' => $dispatch->dispatch_id,
@@ -604,37 +612,56 @@ class DispatchController extends Controller
                     'crime_type' => $report->report_type,
                     'location' => $barangay,
                     'urgency' => $report->urgency_score ?? 10,
-                    'distance_km' => $distanceKm,
+                    'distance_km' => round($distanceKm, 2),
                     'vibrate' => true,
                     'ring' => true,
                 ],
                 'priority' => 'high',
                 'channelId' => 'urgent_dispatch',
-                'ttl' => 60, // 60 seconds TTL for urgent notifications
-                'expiration' => time() + 60,
-                'badge' => 1,
-                'mutableContent' => true,
-                'categoryId' => 'dispatch_urgent',
             ];
 
-            // Send to Expo Push Notification service
-            $response = \Http::post('https://exp.host/--/api/v2/push/send', $message);
+            // Send to Expo Push Notification service with proper headers
+            $response = \Http::withHeaders([
+                'Accept' => 'application/json',
+                'Accept-Encoding' => 'gzip, deflate',
+                'Content-Type' => 'application/json',
+            ])->post('https://exp.host/--/api/v2/push/send', $message);
+
+            $responseBody = $response->json();
+            
+            Log::info('Expo push response', [
+                'status' => $response->status(),
+                'body' => $responseBody,
+            ]);
 
             if ($response->successful()) {
-                Log::info('Urgent dispatch notification sent', [
+                // Check if Expo returned any errors in the response
+                if (isset($responseBody['data']['status']) && $responseBody['data']['status'] === 'error') {
+                    Log::error('Expo push notification error', [
+                        'dispatch_id' => $dispatch->dispatch_id,
+                        'error' => $responseBody['data']['message'] ?? 'Unknown error',
+                        'details' => $responseBody['data']['details'] ?? null,
+                    ]);
+                    return false;
+                }
+                
+                Log::info('Urgent dispatch notification sent successfully', [
                     'dispatch_id' => $dispatch->dispatch_id,
                     'officer_id' => $officer->id,
-                    'distance_km' => $distanceKm,
+                    'distance_km' => round($distanceKm, 2),
                 ]);
+                return true;
             } else {
                 Log::error('Failed to send urgent dispatch notification', [
                     'dispatch_id' => $dispatch->dispatch_id,
                     'response' => $response->body(),
                 ]);
+                return false;
             }
 
         } catch (\Exception $e) {
             Log::error('Error sending urgent dispatch notification: ' . $e->getMessage());
+            return false;
         }
     }
 
@@ -648,46 +675,63 @@ class DispatchController extends Controller
             
             if (!$officer || !$officer->push_token) {
                 Log::info('No push token for officer', ['officer_id' => $dispatch->patrol_officer_id]);
-                return;
+                return false;
             }
 
             $report = $dispatch->report;
+            $barangay = ($report->location && $report->location->barangay) 
+                ? EncryptionService::decrypt($report->location->barangay) 
+                : 'Unknown location';
             
             // Prepare Expo push notification
             $message = [
                 'to' => $officer->push_token,
                 'sound' => 'default',
                 'title' => '🚓 New Dispatch',
-                'body' => $report->report_type . ' at ' . ($report->location->barangay ?? 'Unknown location'),
+                'body' => $report->report_type . ' at ' . $barangay,
                 'data' => [
                     'type' => 'dispatch',
                     'dispatch_id' => $dispatch->dispatch_id,
                     'report_id' => $report->report_id,
                     'crime_type' => $report->report_type,
-                    'location' => $report->location->barangay ?? 'Unknown',
+                    'location' => $barangay,
                     'urgency' => $report->urgency_score ?? 0,
                 ],
                 'priority' => 'high',
                 'channelId' => 'dispatch',
             ];
 
-            // Send to Expo Push Notification service
-            $response = \Http::post('https://exp.host/--/api/v2/push/send', $message);
+            // Send to Expo Push Notification service with proper headers
+            $response = \Http::withHeaders([
+                'Accept' => 'application/json',
+                'Accept-Encoding' => 'gzip, deflate',
+                'Content-Type' => 'application/json',
+            ])->post('https://exp.host/--/api/v2/push/send', $message);
+
+            $responseBody = $response->json();
+            
+            Log::info('Regular dispatch push response', [
+                'status' => $response->status(),
+                'body' => $responseBody,
+            ]);
 
             if ($response->successful()) {
                 Log::info('Push notification sent successfully', [
                     'dispatch_id' => $dispatch->dispatch_id,
                     'officer_id' => $officer->id,
                 ]);
+                return true;
             } else {
                 Log::error('Failed to send push notification', [
                     'dispatch_id' => $dispatch->dispatch_id,
                     'response' => $response->body(),
                 ]);
+                return false;
             }
 
         } catch (\Exception $e) {
             Log::error('Error sending push notification: ' . $e->getMessage());
+            return false;
         }
     }
 
