@@ -498,11 +498,27 @@ class DispatchController extends Controller
                     : 'Auto-dispatched to available patrol officer',
             ]);
 
+            // Load the dispatch with its relationships for notification
+            $dispatch->load(['report.location']);
+
             // Send urgent notification with ring and vibrate to ONLY the nearest officer
             $notificationSent = false;
             if (!empty($nearestOfficer->push_token)) {
-                $this->sendUrgentDispatchNotification($dispatch, $nearestOfficer, $minDistance);
-                $notificationSent = true;
+                try {
+                    $this->sendUrgentDispatchNotification($dispatch, $nearestOfficer, $minDistance);
+                    $notificationSent = true;
+                    Log::info('Push notification sent to officer', [
+                        'officer_id' => $nearestOfficer->id,
+                        'push_token' => substr($nearestOfficer->push_token, 0, 20) . '...',
+                    ]);
+                } catch (\Exception $notifError) {
+                    Log::error('Failed to send push notification', [
+                        'error' => $notifError->getMessage(),
+                        'officer_id' => $nearestOfficer->id,
+                    ]);
+                }
+            } else {
+                Log::warning('Officer has no push token', ['officer_id' => $nearestOfficer->id]);
             }
 
             Log::info('Auto-dispatch created', [

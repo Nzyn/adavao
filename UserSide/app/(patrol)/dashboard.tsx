@@ -58,7 +58,7 @@ export default function PatrolDashboard() {
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [activeTab, setActiveTab] = useState('home');
     const [announcements, setAnnouncements] = useState<any[]>([]);
-    const [recentReports, setRecentReports] = useState<any[]>([]);
+
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<any>(null);
     const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
     const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
@@ -206,25 +206,7 @@ export default function PatrolDashboard() {
         }
     };
 
-    // Fetch recent reports for officer's station
-    const fetchRecentReports = async () => {
-        if (!stationId) return;
-        try {
-            const response = await fetch(`${API_URL}/reports?station_id=${stationId}&limit=5`);
-            const data = await response.json();
-            if (data.success && data.data) {
-                setRecentReports(data.data.slice(0, 2).map((r: any) => ({
-                    id: r.report_id || r.id,
-                    type: r.crime_type || r.type || 'Report',
-                    location: r.location?.barangay || r.barangay || 'Unknown location',
-                    time: formatTimeAgo(r.created_at),
-                    status: r.status || 'pending'
-                })));
-            }
-        } catch (error) {
-            console.error('Error fetching reports:', error);
-        }
-    };
+
 
     // Fetch notifications
     const fetchNotifications = async () => {
@@ -270,12 +252,10 @@ export default function PatrolDashboard() {
     // Load data on mount
     useEffect(() => {
         fetchAnnouncements();
-        fetchRecentReports();
         
         // Auto-refresh every 30 seconds
         const interval = setInterval(() => {
             fetchAnnouncements();
-            fetchRecentReports();
         }, 30000);
         
         return () => clearInterval(interval);
@@ -322,7 +302,6 @@ export default function PatrolDashboard() {
         setLoading(true);
         loadDispatchCounts();
         fetchAnnouncements();
-        fetchRecentReports();
         setTimeout(() => setLoading(false), 1000);
     };
 
@@ -554,55 +533,6 @@ export default function PatrolDashboard() {
                         </View>
                         <Ionicons name="chevron-forward" size={24} color={COLORS.textMuted} />
                     </TouchableOpacity>
-                </View>
-
-                {/* Recent Reports Section */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Reports</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.seeAllText}>See All</Text>
-                        </TouchableOpacity>
-                    </View>
-                    
-                    {recentReports.length === 0 ? (
-                        <View style={styles.emptyCard}>
-                            <Ionicons name="document-text-outline" size={48} color={COLORS.textMuted} />
-                            <Text style={styles.emptyText}>No recent reports</Text>
-                        </View>
-                    ) : (
-                        recentReports.map((report) => (
-                            <TouchableOpacity key={report.id} style={styles.reportCard}>
-                                <View style={styles.reportCardLeft}>
-                                    <View style={[
-                                        styles.reportStatusIndicator,
-                                        { backgroundColor: report.status === 'responding' ? COLORS.success : COLORS.warning }
-                                    ]} />
-                                    <View style={styles.reportInfo}>
-                                        <Text style={styles.reportType}>{report.type}</Text>
-                                        <View style={styles.reportLocationRow}>
-                                            <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-                                            <Text style={styles.reportLocation}>{report.location}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                                <View style={styles.reportCardRight}>
-                                    <Text style={styles.reportTime}>{report.time}</Text>
-                                    <View style={[
-                                        styles.statusBadge,
-                                        { backgroundColor: report.status === 'responding' ? '#D1FAE5' : '#FEF3C7' }
-                                    ]}>
-                                        <Text style={[
-                                            styles.statusBadgeText,
-                                            { color: report.status === 'responding' ? '#059669' : '#D97706' }
-                                        ]}>
-                                            {report.status === 'responding' ? 'Responding' : 'Pending'}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))
-                    )}
                 </View>
 
                 {/* Announcements Section */}
