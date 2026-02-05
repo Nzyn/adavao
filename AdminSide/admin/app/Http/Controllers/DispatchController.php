@@ -136,6 +136,9 @@ class DispatchController extends Controller
                 'notes' => $request->notes,
             ]);
 
+            // Load relationships BEFORE sending notification (required for notification content)
+            $dispatch->load(['report.location', 'patrolOfficer']);
+
             // Send notification to patrol officer
             if ($dispatch->patrol_officer_id) {
                 $this->sendDispatchNotification($dispatch);
@@ -147,8 +150,7 @@ class DispatchController extends Controller
                 'officer_id' => $dispatch->patrol_officer_id,
             ]);
 
-            // Load relationships and decrypt for response
-            $dispatch->load(['report.location', 'patrolOfficer']);
+            // Decrypt for response
             $this->decryptDispatchReport($dispatch);
 
             return response()->json([
