@@ -334,8 +334,10 @@ async function submitReport(req, res) {
 
     // If anonymous and no real user_id provided, use a dedicated guest user record.
     // This enables true unregistered complaints while keeping DB foreign keys intact.
-    let effectiveUserId = incomingUserId;
-    const needsGuestUser = isAnon && (!effectiveUserId || effectiveUserId === '0' || effectiveUserId === 0);
+    // Always use guest user for anonymous submissions to avoid FK issues
+    // and prevent tying anonymous reports to a real user id.
+    let effectiveUserId = isAnon ? null : incomingUserId;
+    const needsGuestUser = isAnon || (!effectiveUserId || effectiveUserId === '0' || effectiveUserId === 0);
 
     if (needsGuestUser) {
       const guestEmail = (process.env.GUEST_REPORTER_EMAIL || 'guest@alertdavao.local').toLowerCase();
