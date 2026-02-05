@@ -1,7 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
@@ -17,6 +17,7 @@ import { UserProvider } from '../contexts/UserContext';
 import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
 import { inactivityManager } from '../services/inactivityManager';
 import { startServerWarmup, stopServerWarmup, pingServer } from '../utils/serverWarmup';
+import { createSseConnection } from '../services/sseService';
 
 // Prevent auto-hiding splash screen
 SplashScreen.preventAutoHideAsync();
@@ -80,6 +81,14 @@ export default function RootLayout() {
 function AppContent() {
   const colorScheme = useColorScheme();
   const { isLoading, loadingMessage } = useLoading();
+  const router = useRouter();
+  const pathname = usePathname();
+  const lastRefreshRef = useRef(0);
+  const pathnameRef = useRef(pathname);
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
   // Start inactivity manager when app loads
   useEffect(() => {
@@ -93,6 +102,21 @@ function AppContent() {
       stopServerWarmup();
     };
   }, []);
+
+  // SSE auto-refresh: re-mount current screen on backend updates
+  useEffect(() => {
+    const connection = createSseConnection(() => {
+      const now = Date.now();
+      if (now - lastRefreshRef.current < 2000) return;
+      lastRefreshRef.current = now;
+      const currentPath = pathnameRef.current;
+      if (currentPath) {
+        router.replace(currentPath);
+      }
+    });
+
+    return () => connection.close();
+  }, [router]);
 
   // Reset inactivity timer on any touch - using onStartShouldSetResponder to capture all touches
   const handleUserActivity = () => {

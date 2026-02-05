@@ -5,6 +5,7 @@ const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 require("dotenv").config();
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 8081;
@@ -43,7 +44,7 @@ const generalLimiter = rateLimit({
   },
   skip: (req) => {
     // Skip rate limiting for health checks
-    return req.path === '/health' || req.path === '/api/health';
+    return req.path === '/health' || req.path === '/api/health' || req.path === '/api/stream';
   },
   message: {
     success: false,
@@ -683,6 +684,67 @@ app.get('/api/version', (req, res) => {
   })();
 });
 
+// SSE stream for live updates across apps
+let cachedVersion = null;
+
+async function getLiveDataVersion() {
+  try {
+    const [rows] = await db.query(
+      `SELECT GREATEST(
+         COALESCE((SELECT MAX(updated_at) FROM reports), '1970-01-01'::timestamp),
+         COALESCE((SELECT MAX(updated_at) FROM patrol_dispatches), '1970-01-01'::timestamp),
+         COALESCE((SELECT MAX(updated_at) FROM announcements), '1970-01-01'::timestamp),
+         COALESCE((SELECT MAX(updated_at) FROM messages), '1970-01-01'::timestamp),
+         COALESCE((SELECT MAX(updated_at) FROM users_public), '1970-01-01'::timestamp),
+         COALESCE((SELECT MAX(updated_at) FROM locations), '1970-01-01'::timestamp),
+         COALESCE((SELECT MAX(updated_at) FROM report_media), '1970-01-01'::timestamp)
+       ) AS latest`
+    );
+    const latest = rows?.[0]?.latest;
+    return latest ? new Date(latest).toISOString() : new Date(0).toISOString();
+  } catch (err) {
+    return new Date().toISOString();
+  }
+}
+
+app.get('/api/stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  let closed = false;
+  let lastSentVersion = null;
+
+  const sendEvent = (event, data) => {
+    if (closed) return;
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  sendEvent('tick', { ts: Date.now() });
+
+  const interval = setInterval(async () => {
+    if (closed) return;
+    const currentVersion = await getLiveDataVersion();
+    if (cachedVersion == null) cachedVersion = currentVersion;
+
+    if (currentVersion !== cachedVersion || currentVersion !== lastSentVersion) {
+      cachedVersion = currentVersion;
+      lastSentVersion = currentVersion;
+      sendEvent('update', { version: currentVersion });
+    } else {
+      res.write(`: ping ${Date.now()}\n\n`);
+    }
+  }, 5000);
+
+  req.on('close', () => {
+    closed = true;
+    clearInterval(interval);
+  });
+});
+
 // Debug endpoints (disabled by default). Enable by setting ENABLE_DEBUG_ENDPOINTS=true on Render.
 // Guarded by x-debug-key header matching DEBUG_KEY env var.
 if (String(process.env.ENABLE_DEBUG_ENDPOINTS || '').toLowerCase() === 'true') {
@@ -749,7 +811,6 @@ if (String(process.env.ENABLE_DEBUG_ENDPOINTS || '').toLowerCase() === 'true') {
 }
 
 // === HEALTH CHECK & MONITORING ENDPOINTS ===
-const db = require('./db');
 
 // Basic health check (for load balancers, uptime monitors)
 app.get('/health', (req, res) => {

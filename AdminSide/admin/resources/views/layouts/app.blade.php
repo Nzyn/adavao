@@ -851,6 +851,40 @@
                     userMenu.classList.remove('active');
                 }
             });
+
+            // SSE auto-refresh for live updates
+            (function initSseAutoRefresh() {
+                if (!('EventSource' in window)) return;
+
+                const sseUrl = "{{ env('SSE_URL', 'https://node-server-gk1u.onrender.com/api/stream') }}";
+                let lastRefresh = 0;
+                let source = null;
+
+                const connect = () => {
+                    if (source) {
+                        try { source.close(); } catch (e) {}
+                    }
+
+                    source = new EventSource(sseUrl);
+
+                    const handleUpdate = () => {
+                        const now = Date.now();
+                        if (document.visibilityState !== 'visible') return;
+                        if (now - lastRefresh < 2000) return;
+                        lastRefresh = now;
+                        window.location.reload();
+                    };
+
+                    source.addEventListener('update', handleUpdate);
+                    source.addEventListener('tick', handleUpdate);
+                    source.onerror = () => {
+                        try { source.close(); } catch (e) {}
+                        setTimeout(connect, 5000);
+                    };
+                };
+
+                connect();
+            })();
         </script>
     </body>
 </html>
