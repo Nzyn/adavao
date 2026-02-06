@@ -4601,8 +4601,43 @@ function generatePDF(report) {
         }, 4000);
     }
 
+    function initSseReportUpdates() {
+        if (!('EventSource' in window)) return;
+
+        const sseUrl = "{{ env('SSE_URL', 'https://node-server-gk1u.onrender.com/api/stream') }}";
+        let source = null;
+        let lastSseUpdate = 0;
+
+        const connect = () => {
+            if (source) {
+                try { source.close(); } catch (e) {}
+            }
+
+            source = new EventSource(sseUrl);
+
+            const handleUpdate = () => {
+                const now = Date.now();
+                if (now - lastSseUpdate < 2000) return;
+                lastSseUpdate = now;
+                fetchReportUpdates();
+            };
+
+            source.addEventListener('update', handleUpdate);
+            source.addEventListener('tick', handleUpdate);
+            source.onerror = () => {
+                try { source.close(); } catch (e) {}
+                setTimeout(connect, 5000);
+            };
+        };
+
+        connect();
+    }
+
     // Initialize auto-refresh when page loads
-    document.addEventListener('DOMContentLoaded', initAutoRefresh);
+    document.addEventListener('DOMContentLoaded', () => {
+        initAutoRefresh();
+        initSseReportUpdates();
+    });
 
     // Pause auto-refresh when user is interacting with modals
     document.querySelectorAll('.modal-overlay').forEach(modal => {

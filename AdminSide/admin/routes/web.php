@@ -221,7 +221,11 @@ Route::middleware(['auth'])->group(function () {
     // Route::get('/barangays/{barangayId}', [BarangayController::class, 'show'])->name('barangays.show');
 
     Route::get('/users', function () {
-        $users = \App\Models\User::with('roles')->orderBy('created_at', 'desc')->get();
+        $guestEmail = strtolower((string) env('GUEST_REPORTER_EMAIL', 'guest@alertdavao.local'));
+        $users = \App\Models\User::with('roles')
+            ->whereRaw('LOWER(email) <> ?', [$guestEmail])
+            ->orderBy('created_at', 'desc')
+            ->get();
         
         // Decrypt sensitive fields for display
         foreach ($users as $user) {
@@ -237,7 +241,9 @@ Route::middleware(['auth'])->group(function () {
     })->name('users');
     
     Route::get('/flagged-users', function () {
+        $guestEmail = strtolower((string) env('GUEST_REPORTER_EMAIL', 'guest@alertdavao.local'));
         $users = \App\Models\User::with('roles')
+            ->whereRaw('LOWER(email) <> ?', [$guestEmail])
             ->where(function($query) {
                 $query->where('total_flags', '>', 0)
                       ->orWhere('restriction_level', '!=', 'none');
