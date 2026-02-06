@@ -581,6 +581,23 @@ class DispatchController extends Controller
     {
         try {
             if (!$officer->push_token) {
+                $officer->push_token = $this->fetchPushTokenFromBackend($officer->id);
+                if ($officer->push_token) {
+                    try {
+                        \DB::table('users_public')->where('id', $officer->id)->update([
+                            'push_token' => $officer->push_token,
+                            'updated_at' => now(),
+                        ]);
+                    } catch (\Throwable $e) {
+                        Log::warning('Failed to persist fetched push token', [
+                            'officer_id' => $officer->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            if (!$officer->push_token) {
                 Log::info('No push token for officer', ['officer_id' => $officer->id]);
                 return false;
             }
@@ -664,6 +681,41 @@ class DispatchController extends Controller
         } catch (\Exception $e) {
             Log::error('Error sending urgent dispatch notification: ' . $e->getMessage());
             return false;
+        }
+    }
+
+    private function fetchPushTokenFromBackend($officerId)
+    {
+        try {
+            $baseUrl = rtrim(env('NODE_BACKEND_URL', 'https://node-server-gk1u.onrender.com'), '/');
+            $url = $baseUrl . '/api/user/push-token/' . $officerId;
+
+            $headers = [
+                'Accept' => 'application/json',
+            ];
+
+            if (env('DISPATCH_SYNC_KEY')) {
+                $headers['x-dispatch-key'] = env('DISPATCH_SYNC_KEY');
+            }
+
+            $response = \Http::withHeaders($headers)->get($url);
+            if (!$response->successful()) {
+                Log::warning('Failed to fetch push token from backend', [
+                    'officer_id' => $officerId,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            $data = $response->json();
+            return $data['push_token'] ?? null;
+        } catch (\Throwable $e) {
+            Log::warning('Error fetching push token from backend', [
+                'officer_id' => $officerId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
         }
     }
 

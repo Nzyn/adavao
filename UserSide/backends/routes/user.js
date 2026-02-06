@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+function requireDispatchKey(req, res, next) {
+    const expected = process.env.DISPATCH_SYNC_KEY;
+    if (!expected) return next();
+    const provided = req.headers['x-dispatch-key'];
+    if (!provided || String(provided) !== String(expected)) {
+        return res.status(401).json({
+            success: false,
+            message: 'Unauthorized'
+        });
+    }
+    next();
+}
+
 /**
  * Save user's push notification token
  */
@@ -38,6 +51,36 @@ router.post('/push-token', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to save push token',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Get user's push notification token (AdminSide fallback)
+ */
+router.get('/push-token/:userId', requireDispatchKey, async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'userId is required' });
+        }
+
+        const [rows] = await db.query(
+            'SELECT push_token FROM users_public WHERE id = $1',
+            [userId]
+        );
+
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        return res.json({ success: true, push_token: rows[0].push_token || null });
+    } catch (error) {
+        console.error('Error fetching push token:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch push token',
             error: error.message
         });
     }
