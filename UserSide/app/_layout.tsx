@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, usePathname, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect, useRef } from 'react';
 import 'react-native-reanimated';
@@ -83,12 +83,18 @@ function AppContent() {
   const { isLoading, loadingMessage } = useLoading();
   const router = useRouter();
   const pathname = usePathname();
+  const params = useLocalSearchParams();
   const lastRefreshRef = useRef(0);
   const pathnameRef = useRef(pathname);
+  const paramsRef = useRef<Record<string, any>>({});
 
   useEffect(() => {
     pathnameRef.current = pathname;
   }, [pathname]);
+
+  useEffect(() => {
+    paramsRef.current = params || {};
+  }, [params]);
 
   // Start inactivity manager when app loads
   useEffect(() => {
@@ -105,14 +111,35 @@ function AppContent() {
 
   // SSE auto-refresh: re-mount current screen on backend updates
   useEffect(() => {
+    const buildQuery = (data: Record<string, any>) => {
+      const parts: string[] = [];
+      Object.entries(data || {}).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        if (Array.isArray(value)) {
+          value.forEach((item) => {
+            if (item !== undefined && item !== null) {
+              parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(item))}`);
+            }
+          });
+        } else {
+          parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+        }
+      });
+      return parts.join('&');
+    };
+
     const connection = createSseConnection(() => {
       const now = Date.now();
       if (now - lastRefreshRef.current < 2000) return;
       lastRefreshRef.current = now;
+
       const currentPath = pathnameRef.current;
-      if (currentPath) {
-        router.replace(currentPath);
-      }
+      if (!currentPath) return;
+
+      const currentParams = { ...paramsRef.current, _sse: String(Date.now()) };
+      const query = buildQuery(currentParams);
+      const nextPath = query ? `${currentPath}?${query}` : currentPath;
+      router.replace(nextPath);
     });
 
     return () => connection.close();

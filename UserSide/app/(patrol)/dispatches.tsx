@@ -138,7 +138,7 @@ export default function PatrolDispatchesScreen() {
 
         const userIdStr = String(userId);
         const pendingAssigned = list.filter((dispatch) =>
-            dispatch?.status === 'pending' &&
+            (dispatch?.status === 'pending' || dispatch?.status === 'assigned') &&
             dispatch?.patrol_officer_id != null &&
             String(dispatch.patrol_officer_id) === userIdStr
         );

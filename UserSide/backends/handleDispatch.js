@@ -474,7 +474,7 @@ async function getPendingDispatchesForStation(req, res) {
              JOIN reports r ON d.report_id = r.report_id
              LEFT JOIN locations l ON r.location_id = l.location_id
              LEFT JOIN police_stations ps ON d.station_id = ps.station_id
-             WHERE d.status = 'pending'
+                         WHERE d.status IN ('pending', 'assigned')
                AND (
                    -- Dispatches for this officer's station (not assigned to someone else)
                    (d.station_id = $1 AND (d.patrol_officer_id IS NULL OR d.patrol_officer_id = $2))
