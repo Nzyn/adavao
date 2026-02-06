@@ -283,6 +283,22 @@ app.get('/api/patrol/officers/:stationId', verifyUserRole, requireAuthorizedRole
 
 // Dispatch management API (for police station to send reports to patrol)
 app.post('/api/dispatch/send', verifyUserRole, requireAuthorizedRole, sendToDispatch);
+// AdminSide sync endpoint (protected by shared secret) - ensures dispatch is created in UserSide backend
+app.post('/api/dispatch/admin-sync', async (req, res) => {
+  try {
+    const expected = process.env.DISPATCH_SYNC_KEY;
+    if (expected) {
+      const provided = req.headers['x-dispatch-key'];
+      if (!provided || String(provided) !== String(expected)) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+    }
+
+    return await sendToDispatch(req, res);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to sync dispatch', error: error.message });
+  }
+});
 app.get('/api/dispatch/station/:stationId/pending', verifyUserRole, requireAuthorizedRole, getPendingDispatchesForStation);
 app.post('/api/dispatch/:dispatchId/respond', verifyUserRole, requireAuthorizedRole, respondToDispatch);
 app.post('/api/dispatch/:dispatchId/en-route', verifyUserRole, requireAuthorizedRole, markEnRoute);

@@ -523,6 +523,9 @@ class DispatchController extends Controller
                 Log::warning('Officer has no push token', ['officer_id' => $nearestOfficer->id]);
             }
 
+            // Sync dispatch to UserSide backend (safety for multi-DB deployments)
+            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), $dispatch->notes);
+
             Log::info('Auto-dispatch created', [
                 'dispatch_id' => $dispatch->dispatch_id,
                 'report_id' => $report->report_id,
@@ -716,6 +719,42 @@ class DispatchController extends Controller
                 'error' => $e->getMessage(),
             ]);
             return null;
+        }
+    }
+
+    private function syncDispatchToUserSide($reportId, $dispatcherId = null, $notes = null)
+    {
+        try {
+            $baseUrl = rtrim(env('NODE_BACKEND_URL', 'https://node-server-gk1u.onrender.com'), '/');
+            $url = $baseUrl . '/api/dispatch/admin-sync';
+
+            $headers = [
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ];
+            if (env('DISPATCH_SYNC_KEY')) {
+                $headers['x-dispatch-key'] = env('DISPATCH_SYNC_KEY');
+            }
+
+            $payload = [
+                'reportId' => $reportId,
+                'dispatcherId' => $dispatcherId,
+                'notes' => $notes,
+            ];
+
+            $response = \Http::withHeaders($headers)->post($url, $payload);
+            if (!$response->successful()) {
+                Log::warning('UserSide dispatch sync failed', [
+                    'report_id' => $reportId,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('UserSide dispatch sync error', [
+                'report_id' => $reportId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

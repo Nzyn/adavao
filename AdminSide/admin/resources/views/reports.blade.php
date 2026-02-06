@@ -1781,7 +1781,7 @@
                                 <td>
                                     <?php    $reportId = $report->report_id;
                                 $status = $report->status; ?>
-                                    <select class="status-select" onchange="updateStatus(<?php    echo $reportId; ?>, this.value)"
+                                    <select class="status-select" onchange="updateStatus(<?php    echo $reportId; ?>, this.value, this)"
                                         data-original-status="<?php    echo $status; ?>">
                                         <option value="pending" <?php    echo $status === 'pending' ? 'selected' : ''; ?>>Pending</option>
                                         <option value="investigating" <?php    echo $status === 'investigating' ? 'selected' : ''; ?>>
@@ -1792,7 +1792,7 @@
                                 <td>
                                     <?php    $reportId = $report->report_id;
                                 $isValid = $report->is_valid ?? 'checking_for_report_validity'; ?>
-                                    <select class="validity-select" onchange="updateValidity(<?php    echo $reportId; ?>, this.value)"
+                                    <select class="validity-select" onchange="updateValidity(<?php    echo $reportId; ?>, this.value, this)"
                                         data-original-validity="<?php    echo $isValid; ?>">
                                         <option value="checking_for_report_validity" <?php    echo $isValid === 'checking_for_report_validity' ? 'selected' : ''; ?>></option>
                                         <option value="valid" <?php    echo $isValid === 'valid' ? 'selected' : ''; ?>>Valid</option>
@@ -2635,9 +2635,10 @@ setInterval(updateSLATimers, 1000);
             rows.forEach(row => tbody.appendChild(row));
         }
 
-        window.updateStatus = function(reportId, status) {
-             // Store reference to the select element before the fetch call
-             const selectElement = event.target;
+           window.updateStatus = function(reportId, status, selectElement) {
+               // Store reference to the select element before the fetch call
+               const target = selectElement || (typeof event !== 'undefined' ? event.target : null);
+               if (!target) return;
 
              fetch(`/reports/${reportId}/status`, {
                  method: 'PUT',
@@ -2655,26 +2656,27 @@ setInterval(updateSLATimers, 1000);
                          // Update successful - no need to update UI since we're using a select dropdown
                          // The select already shows the current status
                          // Update the original status attribute
-                         selectElement.setAttribute('data-original-status', status);
+                         target.setAttribute('data-original-status', status);
 
                          alert('Status updated successfully');
                      } else {
                          alert('Failed to update status: ' + (data.message || 'Unknown error'));
                          // Revert to original status
-                         selectElement.value = selectElement.getAttribute('data-original-status');
+                         target.value = target.getAttribute('data-original-status');
                      }
                  })
                  .catch(error => {
                      console.error('Error:', error);
                      alert('An error occurred while updating status: ' + (error.message || 'Unknown error'));
                      // Revert to original status
-                     selectElement.value = selectElement.getAttribute('data-original-status');
+                     target.value = target.getAttribute('data-original-status');
                  });
          }
 
-         window.updateValidity = function(reportId, isValid) {
+         window.updateValidity = function(reportId, isValid, selectElement) {
              // Store reference to the select element before the fetch call
-             const selectElement = event.target;
+             const target = selectElement || (typeof event !== 'undefined' ? event.target : null);
+             if (!target) return;
 
              fetch(`/reports/${reportId}/validity`, {
                  method: 'PUT',
@@ -2692,20 +2694,20 @@ setInterval(updateSLATimers, 1000);
                          // Update successful - no need to update UI since we're using a select dropdown
                          // The select already shows the current validity status
                          // Update the original validity attribute
-                         selectElement.setAttribute('data-original-validity', isValid);
+                         target.setAttribute('data-original-validity', isValid);
 
                          alert('Report validity status updated successfully');
                      } else {
                          alert('Failed to update validity status: ' + (data.message || 'Unknown error'));
                          // Revert to original validity status
-                         selectElement.value = selectElement.getAttribute('data-original-validity');
+                         target.value = target.getAttribute('data-original-validity');
                      }
                  })
                  .catch(error => {
                      console.error('Error:', error);
                      alert('An error occurred while updating validity status: ' + (error.message || 'Unknown error'));
                      // Revert to original validity status
-                     selectElement.value = selectElement.getAttribute('data-original-validity');
+                     target.value = target.getAttribute('data-original-validity');
                  });
          }
 
@@ -4513,9 +4515,15 @@ function generatePDF(report) {
     }
 
     function updateReportRows(reports) {
+        const statusFilter = new URLSearchParams(window.location.search).get('status');
         reports.forEach(report => {
             const row = document.querySelector(`tr[data-report-id="${report.report_id}"]`);
             if (!row) return;
+
+            if (statusFilter && report.status !== statusFilter) {
+                row.remove();
+                return;
+            }
 
             // Check if status changed
             const statusSelect = row.querySelector('.status-select');
