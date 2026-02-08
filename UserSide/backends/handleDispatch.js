@@ -745,28 +745,32 @@ async function verifyReport(req, res) {
         );
 
         // Create notification for admin side about the verification
-        await db.query(
-            `INSERT INTO notifications (user_id, type, title, message, data, created_at)
-             SELECT ua.id, 'report_verified', 
-                    $1,
-                    $2,
-                    $3,
-                    NOW()
-             FROM user_admin ua
-             WHERE ua.station_id = (SELECT assigned_station_id FROM reports WHERE report_id = $4)
-                OR ua.user_role IN ('admin', 'super_admin')`,
-            [
-                isValid ? 'Report Verified as Valid' : 'Report Verified as Invalid',
-                `Report #${dispatch.report_id} has been ${isValid ? 'verified as valid' : 'marked as invalid'} by patrol officer.`,
-                JSON.stringify({ 
-                    report_id: dispatch.report_id, 
-                    dispatch_id: dispatchId, 
-                    is_valid: isValid,
-                    validation_notes: validationNotes 
-                }),
-                dispatch.report_id
-            ]
-        );
+        try {
+            await db.query(
+                `INSERT INTO notifications (user_id, type, message, data, is_read, created_at, updated_at)
+                 SELECT ua.id, 'report_verified', 
+                        $1,
+                        $2,
+                        false,
+                        NOW(),
+                        NOW()
+                 FROM user_admin ua
+                 WHERE ua.station_id = (SELECT assigned_station_id FROM reports WHERE report_id = $3)
+                    OR ua.user_role IN ('admin', 'super_admin')`,
+                [
+                    `Report #${dispatch.report_id} has been ${isValid ? 'verified as valid' : 'marked as invalid'} by patrol officer.`,
+                    JSON.stringify({ 
+                        report_id: dispatch.report_id, 
+                        dispatch_id: dispatchId, 
+                        is_valid: isValid,
+                        validation_notes: validationNotes 
+                    }),
+                    dispatch.report_id
+                ]
+            );
+        } catch (notifError) {
+            console.error('Non-critical: Failed to create verification notification:', notifError.message);
+        }
 
         console.log(`✅ Report #${dispatch.report_id} verified as ${isValid ? 'VALID' : 'INVALID'} by officer ${userId}`);
 

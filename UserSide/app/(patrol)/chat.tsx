@@ -311,7 +311,7 @@ export default function PatrolChatScreen() {
         return (
             <KeyboardAvoidingView
                 style={{ flex: 1, backgroundColor: COLORS.background }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 {/* Chat Header */}
@@ -359,7 +359,7 @@ export default function PatrolChatScreen() {
                             chatData.length === 0 && styles.messagesContentEmpty,
                         ]}
                         onContentSizeChange={() =>
-                            flatListRef.current?.scrollToEnd({ animated: false })
+                            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50)
                         }
                         onLayout={() =>
                             flatListRef.current?.scrollToEnd({ animated: false })
@@ -367,6 +367,7 @@ export default function PatrolChatScreen() {
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
                         keyboardDismissMode="interactive"
+                        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
                         ListEmptyComponent={
                             <View style={styles.emptyMessages}>
                                 <View style={styles.emptyIconCircle}>
@@ -1000,7 +1001,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: COLORS.borderLight,
         paddingTop: spacing.sm,
-        paddingBottom: Platform.OS === 'ios' ? spacing.lg : spacing.sm,
+        paddingBottom: Platform.OS === 'ios' ? spacing.lg + 10 : spacing.md + 4,
         paddingHorizontal: spacing.md,
     },
     inputContainer: {
