@@ -404,7 +404,7 @@ app.post('/api/admin/clear-reports', async (req, res) => {
   try {
     await db.query('DELETE FROM report_media');
     await db.query('DELETE FROM patrol_dispatches');
-    await db.query('DELETE FROM report_timeline');
+    await db.query('DELETE FROM report_timelines');
     await db.query('DELETE FROM messages');
     await db.query('DELETE FROM reports');
     // Clean orphaned locations
