@@ -84,13 +84,17 @@ function AppContent() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Start inactivity manager when app loads (only if logged in)
+  // Start inactivity manager when app loads (only if logged in, skip patrol officers)
   useEffect(() => {
     const checkAndStartInactivity = async () => {
       const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
       const userData = await AsyncStorage.getItem('userData');
       if (userData) {
-        inactivityManager.start();
+        const user = JSON.parse(userData);
+        const role = String(user?.user_role || user?.role || '').toLowerCase();
+        if (role !== 'patrol_officer') {
+          inactivityManager.start();
+        }
       }
     };
     checkAndStartInactivity();

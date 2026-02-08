@@ -409,11 +409,13 @@ const Login = () => {
       await AsyncStorage.removeItem('rememberedEmail');
     }
 
-    // Start inactivity manager now that user is logged in
-    const { inactivityManager } = await import('../../services/inactivityManager');
-    inactivityManager.start();
-
     const effectiveRole = String(user.user_role || user.role || '').toLowerCase();
+
+    // Start inactivity manager (skip for patrol officers — they need persistent sessions)
+    if (effectiveRole !== 'patrol_officer') {
+      const { inactivityManager } = await import('../../services/inactivityManager');
+      inactivityManager.start();
+    }
 
     // Role-based redirect (no setTimeout to avoid Promise not resolving)
     if (effectiveRole === 'patrol_officer') {
