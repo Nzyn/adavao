@@ -395,30 +395,6 @@ app.post('/api/patrol/dispatches/:dispatchId/accept', verifyUserRole, requireAut
 app.post('/api/patrol/dispatches/:dispatchId/decline', verifyUserRole, requireAuthorizedRole, declineDispatch);
 app.get('/api/patrol/history', verifyUserRole, requireAuthorizedRole, getMyHistory);
 
-// ── TEMPORARY: Clear all test reports (remove after use) ──
-app.post('/api/admin/clear-reports', async (req, res) => {
-  const secret = req.headers['x-clear-secret'];
-  if (secret !== 'clearall2025') {
-    return res.status(403).json({ success: false, message: 'Forbidden' });
-  }
-  try {
-    await db.query('DELETE FROM report_media');
-    await db.query('DELETE FROM patrol_dispatches');
-    await db.query('DELETE FROM report_timelines');
-    await db.query('DELETE FROM messages');
-    await db.query('DELETE FROM reports');
-    // Clean orphaned locations (skip if no reports remain)
-    await db.query(`DELETE FROM locations WHERE location_id NOT IN (
-      SELECT location_id FROM users_public WHERE location_id IS NOT NULL
-    )`);
-    const result = await db.query('SELECT COUNT(*)::int AS cnt FROM reports');
-    res.json({ success: true, message: 'All test reports cleared', remaining: result.rows[0].cnt });
-  } catch (err) {
-    console.error('Clear reports error:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
 const fs = require('fs');
 
 // Decrypt and serve evidence files (Admin/Police only)
