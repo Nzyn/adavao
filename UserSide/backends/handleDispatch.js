@@ -714,13 +714,6 @@ async function verifyReport(req, res) {
 
         const dispatch = dispatchRows[0];
 
-        if (dispatch.patrol_officer_id && dispatch.patrol_officer_id !== parseInt(userId)) {
-            return res.status(403).json({
-                success: false,
-                message: 'You are not assigned to this dispatch'
-            });
-        }
-
         const now = new Date();
         const arrivedAt = dispatch.arrived_at ? new Date(dispatch.arrived_at) : now;
         const completionTimeSeconds = Math.round((now - arrivedAt) / 1000);
