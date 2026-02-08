@@ -11,7 +11,7 @@
     ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "owner": "danserdas",
+    "owner": "seacancer53",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.imiyataox.alertdavao",
@@ -64,7 +64,7 @@
       "apiBaseUrl": "https://node-server-gk1u.onrender.com",
       "router": {},
       "eas": {
-        "projectId": "7e912ea7-65eb-47c1-9c2a-495e3e667caf"
+        "projectId": "1f189fa3-f510-4e0b-b639-983411a2546d"
       }
     }
   }

@@ -17,7 +17,7 @@ async function updatePatrolLocation(req, res) {
 
         // Verify user is a patrol officer
         const [userRows] = await db.query(
-            `SELECT id, COALESCE(user_role, role, 'user') AS role, assigned_station_id 
+            `SELECT id, COALESCE(user_role::text, role::text, 'user') AS role, assigned_station_id 
              FROM users_public WHERE id = $1`,
             [userId]
         );
@@ -540,7 +540,7 @@ async function respondToDispatch(req, res) {
 
         // Verify user is a patrol officer
         const [userRows] = await db.query(
-            `SELECT id, assigned_station_id, COALESCE(user_role, role, 'user') AS role
+            `SELECT id, assigned_station_id, COALESCE(user_role::text, role::text, 'user') AS role
              FROM users_public WHERE id = $1`,
             [userId]
         );

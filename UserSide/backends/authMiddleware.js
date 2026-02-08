@@ -146,7 +146,7 @@ const getVerifiedUserRole = async (userId) => {
 
     // If not in user_admin, check users_public (UserSide app users)
     const [publicUsers] = await db.query(
-      "SELECT COALESCE(user_role, role, 'user') AS role FROM users_public WHERE id = $1",
+      "SELECT COALESCE(user_role::text, role::text, 'user') AS role FROM users_public WHERE id = $1",
       [userId]
     );
 

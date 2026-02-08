@@ -14,7 +14,7 @@ function parseJsonMaybe(value, fallback) {
 
 async function assertPatrolOfficer(userId) {
   const [rows] = await db.query(
-    "SELECT id, COALESCE(user_role, role, 'user') AS role, assigned_station_id, is_on_duty FROM users_public WHERE id = $1",
+    "SELECT id, COALESCE(user_role::text, role::text, 'user') AS role, assigned_station_id, is_on_duty FROM users_public WHERE id = $1",
     [userId]
   );
   if (!rows || rows.length === 0) {
