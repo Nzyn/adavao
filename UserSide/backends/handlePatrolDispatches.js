@@ -175,10 +175,10 @@ async function getDispatchDetails(req, res) {
     if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
     if (!dispatchId) return res.status(400).json({ success: false, message: 'dispatchId is required' });
 
-    // Patrol officers can view their own dispatches AND pending/assigned station dispatches
+    // Patrol officers can view dispatches assigned to them, or pending station dispatches
     await assertPatrolOfficer(userId);
 
-    // Get this officer's station so they can view unassigned station dispatches too
+    // Get this officer's station (may be null/0 if not assigned to any station)
     const [userRows] = await db.query(
       `SELECT assigned_station_id FROM users_public WHERE id = $1`,
       [userId]
@@ -230,11 +230,12 @@ async function getDispatchDetails(req, res) {
       LEFT JOIN report_media rm ON r.report_id = rm.report_id
       WHERE d.dispatch_id = $1
         AND (
-          -- Officer can view dispatches assigned to them
+          -- Officer can view any dispatch assigned to them (regardless of station)
           d.patrol_officer_id = $2
-          -- OR pending/assigned dispatches at their station (not assigned to someone else)
+          -- OR unassigned pending/assigned dispatches at their station (if they have a station)
           OR (
-            d.station_id = $3
+            $3 > 0
+            AND d.station_id = $3
             AND d.status IN ('pending', 'assigned')
             AND (d.patrol_officer_id IS NULL OR d.patrol_officer_id = $2)
           )

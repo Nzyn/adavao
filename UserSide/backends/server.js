@@ -343,12 +343,15 @@ app.post('/api/dispatch/admin-sync', async (req, res) => {
           targetTokens = (assignedOfficer || []).map(o => o.push_token).filter(Boolean);
         }
         
-        // Also notify other on-duty officers at the station
-        const [officers] = await db.query(
-          `SELECT push_token FROM users_public WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer' AND assigned_station_id = $1 AND is_on_duty = true AND push_token IS NOT NULL`,
-          [stationId]
-        );
-        const stationTokens = (officers || []).map(o => o.push_token).filter(Boolean);
+        // Also notify other on-duty officers at the station (if station is set)
+        let stationTokens = [];
+        if (stationId) {
+          const [officers] = await db.query(
+            `SELECT push_token FROM users_public WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer' AND assigned_station_id = $1 AND is_on_duty = true AND push_token IS NOT NULL`,
+            [stationId]
+          );
+          stationTokens = (officers || []).map(o => o.push_token).filter(Boolean);
+        }
         
         // Combine unique tokens (assigned officer + station officers)
         const allTokens = [...new Set([...targetTokens, ...stationTokens])];

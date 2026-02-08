@@ -95,22 +95,22 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 async function findNearestPatrolOfficer(reportLat, reportLon, stationId) {
     try {
         // Get all on-duty patrol officers with their current locations
+        // Search ALL on-duty officers regardless of station assignment
         const [officers] = await db.query(
             `SELECT 
                 u.id AS user_id,
                 u.firstname,
                 u.lastname,
                 u.push_token,
+                u.assigned_station_id,
                 pl.latitude,
                 pl.longitude,
                 pl.updated_at
-                         FROM users_public u
-                         JOIN patrol_locations pl ON u.id = pl.user_id
-                         WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
-               AND u.assigned_station_id = $1
+             FROM users_public u
+             JOIN patrol_locations pl ON u.id = pl.user_id
+             WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
                AND u.is_on_duty = true
-               AND pl.updated_at > NOW() - INTERVAL '5 minutes'`,
-            [stationId]
+               AND pl.updated_at > NOW() - INTERVAL '5 minutes'`
         );
 
         if (!officers || officers.length === 0) {
@@ -265,12 +265,7 @@ async function sendToDispatch(req, res) {
 
         const report = reportRows[0];
 
-        if (!report.assigned_station_id) {
-            return res.status(400).json({
-                success: false,
-                message: 'Report has no assigned police station'
-            });
-        }
+        // Note: assigned_station_id may be null — dispatch still proceeds by finding nearest officer
 
         // Check if there's already an active dispatch for this report
         const [existingDispatch] = await db.query(
@@ -287,20 +282,17 @@ async function sendToDispatch(req, res) {
             });
         }
 
-        // Get all on-duty patrol officers from the assigned station
-                const [patrolOfficers] = await db.query(
-                        `SELECT id, firstname, lastname, push_token
-                         FROM users_public
-                         WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer'
-                             AND assigned_station_id = $1
-                             AND is_on_duty = true`,
-                        [report.assigned_station_id]
-                );
+        // Get all on-duty patrol officers (not filtered by station — dispatch goes to nearest)
+        const [patrolOfficers] = await db.query(
+            `SELECT id, firstname, lastname, push_token, assigned_station_id
+             FROM users_public
+             WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer'
+               AND is_on_duty = true`
+        );
 
         if (!patrolOfficers || patrolOfficers.length === 0) {
-            // If no on-duty officers at the station, still create dispatch without assignment
-            // This allows any patrol officer from that station to pick it up
-            console.log(`⚠️ No on-duty patrol officers at station ${report.assigned_station_id}`);
+            // If no on-duty officers at all, still create dispatch without assignment
+            console.log(`⚠️ No on-duty patrol officers found`);
         }
 
         // Use patrolOfficerId from admin if provided, otherwise try auto-assignment
@@ -464,8 +456,10 @@ async function getPendingDispatchesForStation(req, res) {
         }
 
         // Get pending dispatches:
-        // 1. Dispatches assigned to this officer's station (and not assigned to someone else)
-        // 2. OR dispatches specifically assigned to this officer (regardless of station)
+        // 1. Dispatches specifically assigned to this officer (regardless of station)
+        // 2. Dispatches at this officer's station that are unassigned
+        // 3. If officer has no station (stationId=0), only show dispatches assigned to them
+        const stationIdNum = parseInt(stationId, 10) || 0;
         const [rows] = await db.query(
             `SELECT
                 d.dispatch_id,
@@ -488,15 +482,15 @@ async function getPendingDispatchesForStation(req, res) {
              JOIN reports r ON d.report_id = r.report_id
              LEFT JOIN locations l ON r.location_id = l.location_id
              LEFT JOIN police_stations ps ON d.station_id = ps.station_id
-                         WHERE d.status IN ('pending', 'assigned')
+             WHERE d.status IN ('pending', 'assigned')
                AND (
-                   -- Dispatches for this officer's station (not assigned to someone else)
-                   (d.station_id = $1 AND (d.patrol_officer_id IS NULL OR d.patrol_officer_id = $2))
-                   -- OR dispatches specifically assigned to this officer (regardless of station)
-                   OR d.patrol_officer_id = $2
+                   -- Dispatches specifically assigned to this officer (regardless of station)
+                   d.patrol_officer_id = $1
+                   -- OR unassigned dispatches at this officer's station (if they have a station)
+                   OR ($2 > 0 AND d.station_id = $2 AND (d.patrol_officer_id IS NULL OR d.patrol_officer_id = $1))
                )
              ORDER BY d.dispatched_at DESC`,
-            [stationId, userId || 0]
+            [userId || 0, stationIdNum]
         );
 
         // Decrypt encrypted fields before sending to client
