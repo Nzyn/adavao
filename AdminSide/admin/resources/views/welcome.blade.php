@@ -1050,14 +1050,21 @@
                 if(loadingEl) loadingEl.style.display = 'none';
 
                 if(data.status === 'success' && data.data) {
-                    // Check if data is array and has elements
+                    // SARIMA API returns data as array of ForecastItem objects:
+                    // [{date, forecast, lower_ci, upper_ci}, ...]
                     let rawValue = 0;
                     if (Array.isArray(data.data) && data.data.length > 0) {
-                        rawValue = data.data[0];
-                        // Handle if the API returns an array of arrays [[12.5]]
-                        if (Array.isArray(rawValue)) rawValue = rawValue[0];
+                        const item = data.data[0];
+                        // Extract forecast value from the ForecastItem object
+                        if (typeof item === 'object' && item !== null && item.forecast !== undefined) {
+                            rawValue = item.forecast;
+                        } else if (typeof item === 'number') {
+                            rawValue = item;
+                        } else if (Array.isArray(item)) {
+                            rawValue = item[0];
+                        }
                     } else if (typeof data.data === 'number') {
-                        rawValue = data.data; // Handle single number response
+                        rawValue = data.data;
                     }
 
                     const predictedValue = Math.round(parseFloat(rawValue));

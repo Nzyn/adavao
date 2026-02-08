@@ -768,29 +768,6 @@
         </div>
     </div>
 
-    <!-- Station Deployment -->
-    <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-            <h3 class="card-title">🏢 Station Deployment Overview</h3>
-        </div>
-        <div class="card-body" style="overflow-x: auto;">
-            <table class="data-table" id="stationTable">
-                <thead>
-                    <tr>
-                        <th>Station</th>
-                        <th style="text-align: center;">On Duty</th>
-                        <th style="text-align: center;">Active</th>
-                        <th style="text-align: center;">Overdue</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="stationTableBody">
-                    <tr><td colspan="5" class="loading-spinner"><div class="spinner"></div></td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
     <!-- Monthly Warning -->
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-header">
@@ -1006,9 +983,6 @@ async function loadInsights() {
             
             // Update recommendations
             renderRecommendations(data.data.recommendations || []);
-            
-            // Update station table
-            renderStationTable(data.data.stations || []);
         }
     } catch (error) {
         console.error('Error loading insights:', error);
@@ -1027,30 +1001,6 @@ function renderRecommendations(recommendations) {
         const iconClass = isAlert ? 'alert' : 'info';
         const icon = isAlert ? '⚠' : 'ℹ';
         return `<li><span class="recommendation-icon ${iconClass}">${icon}</span>${escapeHtml(rec)}</li>`;
-    }).join('');
-}
-
-function renderStationTable(stations) {
-    const tbody = document.getElementById('stationTableBody');
-    if (!stations.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--gray-500);">No station data available</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = stations.map(s => {
-        const statusClass = s.overdue_dispatches > 0 ? 'badge-high' : 
-                           (s.patrol_on_duty === 0 && s.active_dispatches > 0) ? 'badge-medium' : 'badge-low';
-        const statusText = s.overdue_dispatches > 0 ? 'ALERT' : 
-                          (s.patrol_on_duty === 0 && s.active_dispatches > 0) ? 'WARNING' : 'OK';
-        return `
-            <tr>
-                <td style="font-weight: 500;">${escapeHtml(s.station_name)}</td>
-                <td style="text-align: center; font-weight: 600;">${s.patrol_on_duty}</td>
-                <td style="text-align: center;">${s.active_dispatches}</td>
-                <td style="text-align: center;">${s.overdue_dispatches}</td>
-                <td><span class="badge ${statusClass}">${statusText}</span></td>
-            </tr>
-        `;
     }).join('');
 }
 
