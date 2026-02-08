@@ -455,11 +455,8 @@ async function getPendingDispatchesForStation(req, res) {
             });
         }
 
-        // Get pending dispatches:
-        // 1. Dispatches specifically assigned to this officer (regardless of station)
-        // 2. Dispatches at this officer's station that are unassigned
-        // 3. If officer has no station (stationId=0), only show dispatches assigned to them
-        const stationIdNum = parseInt(stationId, 10) || 0;
+        // Get pending dispatches assigned to this specific officer only
+        // Officers only see dispatches that are explicitly assigned to them
         const [rows] = await db.query(
             `SELECT
                 d.dispatch_id,
@@ -483,14 +480,9 @@ async function getPendingDispatchesForStation(req, res) {
              LEFT JOIN locations l ON r.location_id = l.location_id
              LEFT JOIN police_stations ps ON d.station_id = ps.station_id
              WHERE d.status IN ('pending', 'assigned')
-               AND (
-                   -- Dispatches specifically assigned to this officer (regardless of station)
-                   d.patrol_officer_id = $1
-                   -- OR unassigned dispatches at this officer's station (if they have a station)
-                   OR ($2 > 0 AND d.station_id = $2 AND (d.patrol_officer_id IS NULL OR d.patrol_officer_id = $1))
-               )
+               AND d.patrol_officer_id = $1
              ORDER BY d.dispatched_at DESC`,
-            [userId || 0, stationIdNum]
+            [userId || 0]
         );
 
         // Decrypt encrypted fields before sending to client
@@ -559,7 +551,7 @@ async function respondToDispatch(req, res) {
 
         // Check if dispatch exists and is pending
         const [dispatchRows] = await db.query(
-            `SELECT dispatch_id, station_id, status, dispatched_at 
+            `SELECT dispatch_id, station_id, patrol_officer_id, status, dispatched_at 
              FROM patrol_dispatches WHERE dispatch_id = $1`,
             [dispatchId]
         );
@@ -570,11 +562,12 @@ async function respondToDispatch(req, res) {
 
         const dispatch = dispatchRows[0];
 
-        // Verify patrol officer is from the same station
-        if (dispatch.station_id !== user.assigned_station_id) {
+        // Verify patrol officer is the one assigned to this dispatch
+        // If dispatch has an assigned officer, only that officer can respond
+        if (dispatch.patrol_officer_id && dispatch.patrol_officer_id !== parseInt(userId)) {
             return res.status(403).json({
                 success: false,
-                message: 'You can only respond to dispatches from your assigned station'
+                message: 'This dispatch is assigned to another officer'
             });
         }
 
