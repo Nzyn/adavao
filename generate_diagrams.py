@@ -12,188 +12,139 @@ os.makedirs(output_dir, exist_ok=True)
 
 # ═══════════════════════════════════════════════════════════════════
 #  1. CONCEPTUAL FRAMEWORK  (Input -> Process -> Output)
-#
-#  ORIGINAL elements kept exactly. NEW additions marked [UPDATED]
+#     Redesigned to match the simpler, cleaner style from the reference image
 # ═══════════════════════════════════════════════════════════════════
 def draw_conceptual_framework():
-    fig, ax = plt.subplots(1, 1, figsize=(22, 15))
-    ax.set_xlim(0, 22)
-    ax.set_ylim(0, 15)
+    fig, ax = plt.subplots(1, 1, figsize=(20, 12))
+    ax.set_xlim(0, 20)
+    ax.set_ylim(0, 12)
     ax.axis('off')
     fig.patch.set_facecolor('#ffffff')
 
     # Title
-    ax.text(11, 14.4, 'AlertDavao System - Conceptual Framework', fontsize=22, fontweight='bold',
+    ax.text(10, 11.4, 'AlertDavao System - Conceptual Framework', fontsize=20, fontweight='bold',
             ha='center', va='center', color='#1a1a2e')
 
-    # ─── Column backgrounds ───
+    # ─── Column backgrounds (INPUT - PROCESS - OUTPUT) ───
     cols = [
-        (0.3, 0.4, 6.4, 13.3, '#dbeafe', 'INPUT', '#1e40af'),
-        (7.6, 0.4, 6.8, 13.3, '#fef9c3', 'PROCESS', '#a16207'),
-        (15.3, 0.4, 6.4, 13.3, '#dcfce7', 'OUTPUT', '#15803d'),
+        (0.5, 1.0, 5.5, 9.5, '#48b9e8', 'INPUT', '#ffffff'),
+        (6.8, 1.0, 6.4, 9.5, '#fdc844', 'PROCESS', '#ffffff'),
+        (14.0, 1.0, 5.5, 9.5, '#f5c868', 'OUTPUT', '#ffffff'),
     ]
     for x, y, w, h, color, label, lcolor in cols:
-        rect = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.15", facecolor=color,
-                               edgecolor=lcolor, linewidth=2.5, alpha=0.5)
+        rect = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.2", facecolor=color,
+                               edgecolor='#333', linewidth=2.0, alpha=0.95)
         ax.add_patch(rect)
-        ax.text(x + w/2, y + h - 0.4, label, fontsize=18, fontweight='bold',
+        ax.text(x + w/2, y + h - 0.5, label, fontsize=16, fontweight='bold',
                 ha='center', va='center', color=lcolor)
 
     # ─── Arrows between columns ───
-    for sx, ex in [(6.7, 7.5), (14.4, 15.2)]:
-        ax.annotate('', xy=(ex, 7.0), xytext=(sx, 7.0),
-                    arrowprops=dict(arrowstyle='->', color='#555', lw=3.5, mutation_scale=22))
+    for sx, ex in [(6.0, 6.7), (13.2, 13.9)]:
+        ax.annotate('', xy=(ex, 5.75), xytext=(sx, 5.75),
+                    arrowprops=dict(arrowstyle='->', color='#333', lw=3, mutation_scale=20))
 
-    # ─── Helper to draw a box ───
-    def draw_item_box(ax, x, y, w, title, bullets, box_color, border_color, is_new=False):
-        line_h = 0.32
-        h = 0.45 + len(bullets) * line_h + 0.15
-        rect = FancyBboxPatch((x, y - h), w, h, boxstyle="round,pad=0.08",
-                               facecolor=box_color, edgecolor=border_color,
-                               linewidth=2.0 if is_new else 1.2, alpha=0.92,
-                               linestyle='--' if is_new else '-')
+    # ─── Helper to draw a content box ───
+    def draw_content_box(ax, x, y, w, h, icon, title, bullets, box_color, text_color='#1e293b'):
+        rect = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.1",
+                               facecolor=box_color, edgecolor='#555',
+                               linewidth=1.5, alpha=0.95)
         ax.add_patch(rect)
-        prefix = '[UPDATED]  ' if is_new else ''
-        title_color = '#c2410c' if is_new else '#1e293b'
-        ax.text(x + 0.2, y - 0.18, prefix + title, fontsize=11, fontweight='bold',
-                va='center', color=title_color)
+        # Icon/emoji
+        ax.text(x + 0.25, y + h - 0.35, icon, fontsize=14, va='center', ha='center')
+        # Title
+        ax.text(x + 0.6, y + h - 0.35, title, fontsize=10, fontweight='bold',
+                va='center', ha='left', color=text_color)
+        # Bullets
+        line_h = 0.28
         for i, b in enumerate(bullets):
-            ax.text(x + 0.35, y - 0.55 - i * line_h, '\u2022  ' + b, fontsize=9.5,
-                    va='center', color='#475569')
-        return h + 0.22
+            ax.text(x + 0.3, y + h - 0.75 - i * line_h, '• ' + b, fontsize=8,
+                    va='center', ha='left', color='#475569')
 
     # ═══ INPUT COLUMN ═══
-    ix = 0.55
-    iw = 5.9
-    iy = 12.8
+    ix = 0.7
+    iw = 5.1
+    iy = 9.3
 
-    # ORIGINAL items
-    gap = draw_item_box(ax, ix, iy, iw, 'User Data',
-                        ['Name, email, contact number',
-                         'ID verification, OTP'],
-                        '#bfdbfe', '#60a5fa')
-    iy -= gap
+    draw_content_box(ax, ix, iy, iw, 2.0, '👥', 'User Data',
+                     ['• Name, email, contact,', '  ID and OTP'],
+                     '#ffffff', '#1e293b')
+    iy -= 2.2
 
-    gap = draw_item_box(ax, ix, iy, iw, 'Incident Reports',
-                        ['Crime category, description',
-                         'Media attachments (photo/video)',
-                         'GPS location'],
-                        '#bbf7d0', '#4ade80')
-    iy -= gap
+    draw_content_box(ax, ix, iy, iw, 2.3, '📋', 'Reports',
+                     ['• Category, media,', '  description,', '  location'],
+                     '#ffffff', '#1e293b')
+    iy -= 2.5
 
-    gap = draw_item_box(ax, ix, iy, iw, 'Law Enforcement Data',
-                        ['Station assignments',
-                         'Admin verification decisions'],
-                        '#fed7aa', '#fb923c')
-    iy -= gap
-
-    gap = draw_item_box(ax, ix, iy, iw, 'Historical Crime Data',
-                        ['Past crime records for SARIMA',
-                         'Barangay-level crime statistics'],
-                        '#fef08a', '#facc15')
-    iy -= gap
-
-    # NEW items
-    gap = draw_item_box(ax, ix, iy, iw, 'Patrol Dispatch Data',
-                        ['Admin dispatch notes & instructions',
-                         'Patrol officer responses'],
-                        '#fff7ed', '#ea580c', is_new=True)
-    iy -= gap
-
-    gap = draw_item_box(ax, ix, iy, iw, 'Chat / Messaging Data',
-                        ['Patrol officer <-> Admin/Police',
-                         'Real-time text messages'],
-                        '#fce7f3', '#ec4899', is_new=True)
+    draw_content_box(ax, ix, iy, iw, 2.6, '👮', 'Law Enforcement',
+                     ['• Verification', '  notes, status', '  updates, actions'],
+                     '#ffffff', '#1e293b')
 
     # ═══ PROCESS COLUMN ═══
-    px = 7.85
-    pw = 6.3
-    py = 12.8
+    px = 7.0
+    pw = 6.0
+    py = 9.3
 
-    # ORIGINAL items (updated names where DB changed)
-    gap = draw_item_box(ax, px, py, pw, 'PostgreSQL Database',
-                        ['Stores all system data',
-                         '(Migrated from MySQL)'],
-                        '#99f6e4', '#2dd4bf')
-    py -= gap
+    # Main tech stack
+    draw_content_box(ax, px, py, pw, 1.6, '💻', 'Visual Studio Code',
+                     ['IDE for development'],
+                     '#ffffff', '#1e293b')
+    py -= 1.75
 
-    gap = draw_item_box(ax, px, py, pw, 'React Native (Expo SDK 52)',
-                        ['Mobile app for Citizens',
-                         'and Patrol Officers'],
-                        '#bbf7d0', '#4ade80')
-    py -= gap
+    draw_content_box(ax, px, py, pw, 1.6, '🗄️', 'PostgreSQL Database',
+                     ['Stores all system data'],
+                     '#ffffff', '#1e293b')
+    py -= 1.75
 
-    gap = draw_item_box(ax, px, py, pw, 'Laravel (Admin Panel)',
-                        ['Admin web portal',
-                         'Route-based access control'],
-                        '#fecaca', '#f87171')
-    py -= gap
+    draw_content_box(ax, px, py, pw, 1.6, '📱', 'React Native + Laravel',
+                     ['Mobile App + Admin Panel'],
+                     '#ffffff', '#1e293b')
+    py -= 1.95
 
-    gap = draw_item_box(ax, px, py, pw, 'SARIMA Forecasting Model',
-                        ['Time-series crime prediction',
-                         'Hotspot analysis'],
-                        '#ddd6fe', '#a78bfa')
-    py -= gap
-
-    # NEW process items
-    gap = draw_item_box(ax, px, py, pw, 'Node.js / Express Backend',
-                        ['Mobile API server',
-                         'Handles all app endpoints',
-                         'SSE for real-time updates'],
-                        '#fff7ed', '#ea580c', is_new=True)
-    py -= gap
-
-    gap = draw_item_box(ax, px, py, pw, 'EAS Cloud Build',
-                        ['Expo Application Services',
-                         'Cloud APK generation'],
-                        '#fef3c7', '#d97706', is_new=True)
+    # Tech stack icons/labels box
+    tech_y = py - 0.1
+    ax.add_patch(FancyBboxPatch((px, tech_y - 2.2), pw, 2.2, boxstyle="round,pad=0.1",
+                 facecolor='#fff', edgecolor='#555', linewidth=1.5, alpha=0.95))
+    ax.text(px + pw/2, tech_y - 0.3, 'AUTHENTICATION & SECURED COMPLAINT AND', fontsize=7,
+            ha='center', va='center', color='#e65100', fontweight='bold')
+    ax.text(px + pw/2, tech_y - 0.55, 'REPORT MANAGEMENT', fontsize=7,
+            ha='center', va='center', color='#e65100', fontweight='bold')
+    
+    # Tech stack labels
+    tech_line_y = tech_y - 1.0
+    ax.text(px + 0.3, tech_line_y, 'HTML, CSS,', fontsize=7, ha='left', color='#d84315', fontweight='bold')
+    ax.text(px + 0.3, tech_line_y - 0.25, 'Bootstrap', fontsize=7, ha='left', color='#d84315', fontweight='bold')
+    
+    ax.text(px + 1.8, tech_line_y, 'SARIMA', fontsize=7, ha='left', color='#7c3aed', fontweight='bold')
+    ax.text(px + 1.8, tech_line_y - 0.25, 'Analysis', fontsize=7, ha='left', color='#7c3aed', fontweight='bold')
+    
+    ax.text(px + 3.2, tech_line_y, 'JS', fontsize=7, ha='left', color='#f59e0b', fontweight='bold')
+    
+    ax.text(px + 4.0, tech_line_y, 'Leaflet JS', fontsize=7, ha='left', color='#10b981', fontweight='bold')
+    ax.text(px + 4.0, tech_line_y - 0.25, '(hotspot mapping)', fontsize=6, ha='left', color='#10b981', style='italic')
 
     # ═══ OUTPUT COLUMN ═══
-    ox = 15.55
-    ow = 5.9
-    oy = 12.8
+    ox = 14.2
+    ow = 5.1
+    oy = 9.3
 
-    # ORIGINAL output items
-    gap = draw_item_box(ax, ox, oy, ow, 'For Citizens',
-                        ['Report confirmations & updates',
-                         'Verification results (valid/invalid)'],
-                        '#bbf7d0', '#4ade80')
-    oy -= gap
+    draw_content_box(ax, ox, oy, ow, 2.0, '👤', 'User',
+                     ['• Confirmations,', '  report updates'],
+                     '#ffffff', '#1e293b')
+    oy -= 2.2
 
-    gap = draw_item_box(ax, ox, oy, ow, 'For Local Enforcers (Police)',
-                        ['Dashboards, crime maps, alerts',
-                         'Dispatch management',
-                         'Response Time metrics'],
-                        '#bfdbfe', '#60a5fa')
-    oy -= gap
+    draw_content_box(ax, ox, oy, ow, 2.6, '👮', 'Police / Law Enforcement',
+                     ['• Dashboards,', '  maps, analytics'],
+                     '#ffffff', '#1e293b')
+    oy -= 2.8
 
-    gap = draw_item_box(ax, ox, oy, ow, 'For Administrator',
-                        ['Analytics, heatmaps, summaries',
-                         'SARIMA forecasts, crime rose',
-                         'System-wide statistics'],
-                        '#ddd6fe', '#a78bfa')
-    oy -= gap
+    draw_content_box(ax, ox, oy, ow, 2.6, '🚓', 'Patrol Officers',
+                     ['• Dispatch alerts,', '  chat, status', '  tracking'],
+                     '#ffffff', '#1e293b')
+    oy -= 2.8
 
-    # NEW output items
-    gap = draw_item_box(ax, ox, oy, ow, 'For Patrol Officers',
-                        ['Dispatch notifications (push)',
-                         'Real-time status updates',
-                         'Chat with admin/police',
-                         'Dispatch history'],
-                        '#fff7ed', '#ea580c', is_new=True)
-
-    # ─── Legend ───
-    ax.add_patch(FancyBboxPatch((0.5, 0.05), 21, 0.6, boxstyle="round,pad=0.08",
-                 facecolor='#f8fafc', edgecolor='#cbd5e1', linewidth=1))
-    ax.add_patch(FancyBboxPatch((1.0, 0.15), 1.8, 0.35, boxstyle="round,pad=0.05",
-                 facecolor='#bfdbfe', edgecolor='#60a5fa', linewidth=1.2))
-    ax.text(1.9, 0.33, 'Original', fontsize=8.5, ha='center', va='center', color='#1e293b')
-    ax.add_patch(FancyBboxPatch((3.3, 0.15), 2.4, 0.35, boxstyle="round,pad=0.05",
-                 facecolor='#fff7ed', edgecolor='#ea580c', linewidth=2, linestyle='--'))
-    ax.text(4.5, 0.33, '[UPDATED]', fontsize=8.5, ha='center', va='center',
-            color='#c2410c', fontweight='bold')
-    ax.text(6.2, 0.33, '= New elements added to the system after dispatch overhaul',
-            fontsize=9, va='center', color='#555')
+    draw_content_box(ax, ox, oy, ow, 1.3, '👨‍💼', 'Administrator',
+                     ['• Analytics, heatmaps, summaries'],
+                     '#ffffff', '#1e293b')
 
     plt.tight_layout(pad=0.4)
     path = os.path.join(output_dir, '1_conceptual_framework_updated.png')
@@ -390,14 +341,12 @@ def draw_erd():
         'coordinates',
     ], '#66bb6a', width=3.6, pk_indices=[0], fk_indices=[1])
 
-    # patrol_officer — REMOVED (merged into users_public)
-    draw_table(ax, 24.1, 17.5, 'patrol_officer  [REMOVED]', [
-        'id',
-        'user_id',
-        'station_id',
-    ], '#bdbdbd', width=3.6, pk_indices=[0], fk_indices=[1, 2])
-    ax.plot([24.1, 27.7], [17.5, 16.35], color='#ef5350', linewidth=2.5, alpha=0.6)
-    ax.plot([24.1, 27.7], [16.35, 17.5], color='#ef5350', linewidth=2.5, alpha=0.6)
+    # NOTE: patrol_officer table was removed - patrol officers are now
+    # regular users_public entries with user_role='patrol_officer'
+    ax.text(24.1, 17.5, '📝 Patrol Officers = users_public', fontsize=8.5, va='center',
+            color='#43a047', fontweight='bold', style='italic')
+    ax.text(24.1, 17.0, '    where user_role = \'patrol_officer\'', fontsize=7.5, va='center',
+            color='#666', style='italic')
 
     # ══════════════════════════════════════════════════════
     #  GROUP 4: DISPATCH  [NEW]
