@@ -336,7 +336,7 @@
                     <th style="width: 80px;">Report ID</th>
                     <th>User</th>
                     <th>Urgency</th>
-                    <th>SLA Status</th>
+                    <th>Response Time</th>
                     <th>Validated At</th>
                     <th>Date</th>
                     <th>Patrol Dispatched</th>
@@ -363,12 +363,19 @@
                                 @php
                                     $diffInSeconds = Carbon\Carbon::parse($dispatch->report->created_at)->diffInSeconds($dispatch->report->validated_at);
                                     $isWithinSLA = $diffInSeconds <= 180;
-                                    $minutes = floor($diffInSeconds / 60);
-                                    $seconds = $diffInSeconds % 60;
-                                    $timeString = sprintf('%02d:%02d', $minutes, $seconds);
+                                    $h = floor($diffInSeconds / 3600);
+                                    $m = floor(($diffInSeconds % 3600) / 60);
+                                    $s = $diffInSeconds % 60;
+                                    if ($h > 0) {
+                                        $timeString = sprintf('%dh %dm %dsec', $h, $m, $s);
+                                    } elseif ($m > 0) {
+                                        $timeString = sprintf('%dm %dsec', $m, $s);
+                                    } else {
+                                        $timeString = sprintf('%dsec', $s);
+                                    }
                                 @endphp
                                 @if($isWithinSLA)
-                                    <span class="badge badge-success">Within SLA</span>
+                                    <span class="badge badge-success">Within 3 Min</span>
                                 @else
                                     <span class="badge badge-danger">Exceeded (+{{ $timeString }})</span>
                                 @endif
@@ -434,7 +441,7 @@
 
 @section('scripts')
 <script>
-    // SLA Timer Logic
+    // Response Time Timer Logic
     function updateSLATimers() {
         const timers = document.querySelectorAll('.sla-timer');
         const now = Math.floor(Date.now() / 1000);
@@ -445,18 +452,23 @@
             
             const elapsedSeconds = now - createdAt;
             const threeMinutes = 180;
+
+            function formatTime(totalSec) {
+                const h = Math.floor(totalSec / 3600);
+                const m = Math.floor((totalSec % 3600) / 60);
+                const s = totalSec % 60;
+                if (h > 0) return `${h}h ${m}m ${s}sec`;
+                if (m > 0) return `${m}m ${s}sec`;
+                return `${s}sec`;
+            }
             
             if (elapsedSeconds < threeMinutes) {
                 const remainingSeconds = threeMinutes - elapsedSeconds;
-                const minutes = Math.floor(remainingSeconds / 60);
-                const seconds = remainingSeconds % 60;
-                timer.textContent = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+                timer.textContent = formatTime(remainingSeconds);
                 timer.className = 'sla-timer countdown';
             } else {
                 const exceededSeconds = elapsedSeconds - threeMinutes;
-                const minutes = Math.floor(exceededSeconds / 60);
-                const seconds = exceededSeconds % 60;
-                timer.textContent = '+' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+                timer.textContent = '+' + formatTime(exceededSeconds);
                 timer.className = 'sla-timer exceeded';
             }
         });

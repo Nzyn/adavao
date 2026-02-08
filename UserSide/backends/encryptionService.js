@@ -77,7 +77,26 @@ function decrypt(encryptedData) {
     // Get the encryption key
     const key = getEncryptionKey();
 
-    // Decode the base64 encrypted data
+    // Try Laravel format first (base64-encoded JSON with iv, value, mac)
+    try {
+      const decoded = Buffer.from(encryptedData, 'base64').toString('utf8');
+      const payload = JSON.parse(decoded);
+      if (payload && payload.iv && payload.value) {
+        const iv = Buffer.from(payload.iv, 'base64');
+        const encrypted = Buffer.from(payload.value, 'base64');
+        const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+        let decrypted = decipher.update(encrypted, undefined, 'utf8');
+        decrypted += decipher.final('utf8');
+        // Laravel serializes strings with PHP's serialize() — strip 's:N:"..."' wrapper
+        const phpMatch = decrypted.match(/^s:\d+:"(.*)";$/s);
+        if (phpMatch) return phpMatch[1];
+        return decrypted;
+      }
+    } catch (laravelError) {
+      // Not Laravel format, try Node format below
+    }
+
+    // Try Node format (IV + encrypted data concatenated in base64)
     let combined;
     try {
       combined = Buffer.from(encryptedData, 'base64');

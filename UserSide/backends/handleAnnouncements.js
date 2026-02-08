@@ -1,5 +1,24 @@
 const db = require('./db');
 
+// Admin site base URL for storage assets (announcements, etc.)
+const ADMIN_BASE_URL = process.env.ADMIN_KEEP_ALIVE_URL || 'https://alertdavao-admin.onrender.com';
+
+/**
+ * Convert relative attachment paths to full URLs
+ * Paths stored as 'announcements/file.ext' → 'https://admin-url/storage/announcements/file.ext'
+ */
+function resolveAttachmentUrls(attachments) {
+    if (!attachments) return [];
+    const parsed = typeof attachments === 'string' ? JSON.parse(attachments) : attachments;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(path => {
+        // If already a full URL, return as-is
+        if (path.startsWith('http://') || path.startsWith('https://')) return path;
+        // Otherwise prepend admin storage URL
+        return `${ADMIN_BASE_URL}/storage/${path}`;
+    });
+}
+
 /**
  * Get all announcements (public, no auth required)
  * Returns latest announcements first
@@ -30,7 +49,7 @@ async function getAnnouncements(req, res) {
             id: row.id,
             title: row.title,
             content: row.content,
-            attachments: row.attachments ? (typeof row.attachments === 'string' ? JSON.parse(row.attachments) : row.attachments) : [],
+            attachments: resolveAttachmentUrls(row.attachments),
             author: row.author_firstname ? `${row.author_firstname} ${row.author_lastname || ''}`.trim() : 'Admin',
             created_at: row.created_at,
             // Format date for display
@@ -88,7 +107,7 @@ async function getAnnouncementById(req, res) {
             id: row.id,
             title: row.title,
             content: row.content,
-            attachments: row.attachments ? (typeof row.attachments === 'string' ? JSON.parse(row.attachments) : row.attachments) : [],
+            attachments: resolveAttachmentUrls(row.attachments),
             author: row.author_firstname ? `${row.author_firstname} ${row.author_lastname || ''}`.trim() : 'Admin',
             created_at: row.created_at,
             date: formatDate(row.created_at)

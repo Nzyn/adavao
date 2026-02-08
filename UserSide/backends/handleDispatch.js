@@ -733,7 +733,8 @@ async function verifyReport(req, res) {
         );
 
         // Update report status based on validation
-        const newReportStatus = isValid ? 'verified' : 'invalid';
+        // Valid = keep investigating (patrol verified it's real), Invalid = resolved (case closed)
+        const newReportStatus = isValid ? 'investigating' : 'resolved';
         await db.query(
             `UPDATE reports 
              SET status = $1, 

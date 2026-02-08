@@ -73,6 +73,74 @@ const LocationScreen = () => {
     fetchBarangays();
   }, []);
 
+  // Auto-grab current location on mount
+  useEffect(() => {
+    const autoGrabLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+
+        setIsGeocoding(true);
+        const locationPromise = Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 1000,
+          distanceInterval: 0,
+        });
+        const timeoutPromise = new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 10000)
+        );
+
+        let location: any;
+        try {
+          location = await Promise.race([locationPromise, timeoutPromise]);
+        } catch {
+          location = await Promise.race([
+            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low }),
+            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+          ]);
+        }
+
+        const coords = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        };
+        setUserCoordinates(coords);
+        fetchNearestStations(coords.latitude, coords.longitude);
+
+        // Reverse geocode
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          const response = await fetch(
+            `${BACKEND_URL}/api/location/reverse?lat=${coords.latitude}&lon=${coords.longitude}`,
+            { signal: controller.signal, headers: { 'Accept': 'application/json' } }
+          );
+          clearTimeout(timeoutId);
+          if (response.ok) {
+            const data = await response.json();
+            if (data?.address) {
+              setSearchAddress(data.address);
+              setCurrentLocationName(data.address);
+            }
+          } else {
+            const addr = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+            setSearchAddress(addr);
+            setCurrentLocationName(addr);
+          }
+        } catch {
+          const addr = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+          setSearchAddress(addr);
+          setCurrentLocationName(addr);
+        }
+      } catch (err) {
+        console.warn('Auto-location grab failed:', err);
+      } finally {
+        setIsGeocoding(false);
+      }
+    };
+    autoGrabLocation();
+  }, []);
+
   const fetchBarangays = async () => {
     try {
       setLoadingBarangays(true);
@@ -668,24 +736,6 @@ const LocationScreen = () => {
           </View>
         )}
       </View>
-
-      {/* Use Current Location Button */}
-      <TouchableOpacity
-        style={[localStyles.useLocationButton, isGeocoding && localStyles.useLocationButtonDisabled]}
-        onPress={handleUseCurrentLocation}
-        disabled={isGeocoding}
-      >
-        <Ionicons
-          name="navigate"
-          size={20}
-          color={COLORS.white}
-          style={{ marginRight: 10 }}
-        />
-        <Text style={localStyles.useLocationButtonText}>
-          {isGeocoding ? 'Getting location...' : 'Use My Current Location'}
-        </Text>
-        {isGeocoding && <ActivityIndicator size="small" color={COLORS.white} style={{ marginLeft: 10 }} />}
-      </TouchableOpacity>
 
       {/* Loading Indicator */}
       {isGeocoding && (

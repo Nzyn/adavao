@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderWidth: 2,
     borderColor: '#1D3557',
-    marginRight: 12,
+    marginLeft: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },

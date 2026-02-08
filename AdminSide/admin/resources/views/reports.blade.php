@@ -2341,21 +2341,24 @@ setInterval(updateSLATimers, 1000);
                     const newRowCount = newTableBody.querySelectorAll('tr').length;
                     const currentRowCount = currentTableBody.querySelectorAll('tr').length;
                     
-                    // Check if there are new reports
-                    if (newRowCount !== currentRowCount) {
-                        console.log('New reports detected! Updating table...');
-                        
-                        // Get the first new report ID for the notification
+                    // Compare full content — detect new reports AND status/validity changes from patrol officers
+                    const newContent = newTableBody.innerHTML.trim();
+                    const currentContent = currentTableBody.innerHTML.trim();
+                    
+                    if (newContent !== currentContent) {
+                        // Detect if there are truly new reports (row count increased)
                         const newRows = newTableBody.querySelectorAll('tr[data-report-id]');
                         const currentIds = new Set(Array.from(currentTableBody.querySelectorAll('tr[data-report-id]')).map(r => r.dataset.reportId));
                         let firstNewReportId = null;
+                        let newReportCount = 0;
                         newRows.forEach(row => {
-                            if (!currentIds.has(row.dataset.reportId) && !firstNewReportId) {
-                                firstNewReportId = row.dataset.reportId;
+                            if (!currentIds.has(row.dataset.reportId)) {
+                                newReportCount++;
+                                if (!firstNewReportId) firstNewReportId = row.dataset.reportId;
                             }
                         });
                         
-                        // Update the table
+                        // Update the table content
                         currentTableBody.innerHTML = newTableBody.innerHTML;
                         
                         // Update pagination if exists
@@ -2364,12 +2367,24 @@ setInterval(updateSLATimers, 1000);
                         if (newPagination && currentPagination) {
                             currentPagination.innerHTML = newPagination.innerHTML;
                         }
+
+                        // Update status tab counts
+                        const newDoc = doc;
+                        ['allCount', 'pendingCount', 'investigatingCount', 'resolvedCount'].forEach(id => {
+                            const newEl = newDoc.getElementById(id);
+                            const curEl = document.getElementById(id);
+                            if (newEl && curEl) curEl.textContent = newEl.textContent;
+                        });
                         
                         // Auto-sort by urgency after update
                         sortTableByUrgency();
                         
-                        // Show notification with click to view
-                        showNewReportNotification(newRowCount - currentRowCount, firstNewReportId);
+                        // Only show notification for genuinely new reports (not status updates)
+                        if (newReportCount > 0) {
+                            showNewReportNotification(newReportCount, firstNewReportId);
+                        } else {
+                            console.log('📋 Reports table updated (status/validity changed by patrol officer)');
+                        }
                     }
                 }
             })
@@ -4061,136 +4076,6 @@ function generatePDF(report) {
                 }
             }
         });
-
-        // ========== NEW REPORT NOTIFICATION SYSTEM ==========
-        // lastReportCount already declared above, just reset if needed
-        lastReportCount = lastReportCount || 0;
-        let lastUnassignedCount = 0;
-        
-        // Function to check for new reports
-        async function checkForNewReports() {
-            try {
-                const response = await fetch('/api/reports/count', {
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) return;
-                
-                const data = await response.json();
-                
-                // Check for new unassigned reports
-                if (data.unassigned > lastUnassignedCount && lastUnassignedCount > 0) {
-                    const newCount = data.unassigned - lastUnassignedCount;
-                    showNewReportNotification(newCount, true);
-                    
-                    // Play notification sound (optional)
-                    // playNotificationSound();
-                }
-                
-                // Update counts
-                lastUnassignedCount = data.unassigned;
-                lastReportCount = data.total;
-                
-            } catch (error) {
-                console.error('Error checking for new reports:', error);
-            }
-        }
-        
-        // Function to show notification
-        function showNewReportNotification(count, isUnassigned = false) {
-            const message = isUnassigned 
-                ? `${count} new unassigned report${count > 1 ? 's' : ''} submitted!`
-                : `${count} new report${count > 1 ? 's' : ''} submitted!`;
-            
-            // Create notification element
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #1D3557;
-                color: white;
-                padding: 16px 24px;
-                border-radius: 8px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
-                z-index: 10000;
-                font-size: 14px;
-                font-weight: 600;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                cursor: pointer;
-                animation: slideInRight 0.3s ease-out;
-            `;
-            
-            notification.innerHTML = `
-                <svg width="24" height="24" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
-                </svg>
-                <span>${message}</span>
-                <button style="background: transparent; border: none; color: white; cursor: pointer; font-size: 18px; padding: 0; margin-left: 8px;">×</button>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // Click notification to go to reports
-            notification.onclick = function() {
-                window.location.reload(); // Reload to show new reports
-            };
-            
-            // Close button
-            notification.querySelector('button').onclick = function(e) {
-                e.stopPropagation();
-                notification.remove();
-            };
-            
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.style.animation = 'slideOutRight 0.3s ease-out';
-                    setTimeout(() => notification.remove(), 300);
-                }
-            }, 5000);
-        }
-        
-        // Add CSS animations
-        if (!document.getElementById('report-animations-style')) {
-            const style = document.createElement('style');
-            style.id = 'report-animations-style';
-            style.textContent = `
-            @keyframes slideInRight {
-                from {
-                    transform: translateX(400px);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-            }
-            @keyframes slideOutRight {
-                from {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-                to {
-                    transform: translateX(400px);
-                    opacity: 0;
-                }
-            }
-        `;
-            document.head.appendChild(style);
-        }
-        
-        // Initialize polling (check every 3 seconds)
-        setInterval(checkForNewReports, 3000);
-        
-        // Initial check to set baseline
-        checkForNewReports();
-        // ========== END NEW REPORT NOTIFICATION SYSTEM ==========
 
         // ========== VALIDITY UPDATE FUNCTION ==========
         function updateValidity(reportId, newValidity) {

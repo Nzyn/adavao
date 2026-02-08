@@ -16,8 +16,18 @@ class MessageController extends Controller
      */
     public function index()
     {
-        // Get all users (excluding the current admin)
+        // Get all registered users with valid names (exclude guest/anonymous users)
         $users = User::where('id', '!=', Auth::id())
+            ->whereNotNull('firstname')
+            ->where('firstname', '!=', '')
+            ->whereNotNull('lastname')
+            ->where('lastname', '!=', '')
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->where(function ($query) {
+                $query->whereNull('role')
+                      ->orWhere('role', '!=', 'guest');
+            })
             ->orderBy('firstname', 'asc')
             ->orderBy('lastname', 'asc')
             ->get();

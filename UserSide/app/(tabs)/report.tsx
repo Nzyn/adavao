@@ -300,10 +300,10 @@ type CheckRowProps = {
 function CheckRow({ label, checked, onToggle }: CheckRowProps) {
     return (
         <Pressable onPress={onToggle} style={styles.checkboxRow} android_ripple={{ color: '#e5e5e5' }}>
+            <Text style={[styles.checkboxText, { flex: 1 }]}>{label}</Text>
             <View style={[styles.checkboxBox, checked && styles.checkboxBoxChecked]}>
                 {checked && <Text style={styles.checkboxTick}>✓</Text>}
             </View>
-            <Text style={styles.checkboxText}>{label}</Text>
         </Pressable>
     );
 }
@@ -1189,9 +1189,6 @@ export default function ReportCrime() {
                                                 style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
                                                 onPress={() => toggleCrimeType(subcategory)}
                                             >
-                                                <View style={[styles.checkboxBox, selectedCrimes.includes(subcategory) && styles.checkboxBoxChecked]}>
-                                                    {selectedCrimes.includes(subcategory) && <Text style={styles.checkboxTick}>✓</Text>}
-                                                </View>
                                                 <Text style={{
                                                     flex: 1,
                                                     fontSize: 15,
@@ -1200,6 +1197,9 @@ export default function ReportCrime() {
                                                 }}>
                                                     {subcategory}
                                                 </Text>
+                                                <View style={[styles.checkboxBox, selectedCrimes.includes(subcategory) && styles.checkboxBoxChecked]}>
+                                                    {selectedCrimes.includes(subcategory) && <Text style={styles.checkboxTick}>✓</Text>}
+                                                </View>
                                             </TouchableOpacity>
                                             {/* Info button for guidelines (especially useful in anonymous mode) */}
                                             {isAnonymous && (

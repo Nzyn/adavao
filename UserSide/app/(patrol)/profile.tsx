@@ -144,10 +144,14 @@ export default function PatrolProfile() {
                 'inactivityLogout'
             ]);
 
-            router.replace('/(tabs)/login');
+            // 4. Navigate to login — dismiss all screens first, then navigate
+            while (router.canGoBack()) {
+                router.back();
+            }
+            router.replace('/login');
         } catch (error) {
             console.error('Error logging out:', error);
-            router.replace('/(tabs)/login');
+            router.replace('/login');
         }
     };
 
