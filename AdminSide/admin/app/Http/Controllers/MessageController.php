@@ -17,6 +17,7 @@ class MessageController extends Controller
     public function index()
     {
         // Get all registered users with valid names (exclude guest/anonymous users)
+        $guestEmail = strtolower((string) env('GUEST_REPORTER_EMAIL', 'guest@alertdavao.local'));
         $users = User::where('id', '!=', Auth::id())
             ->whereNotNull('firstname')
             ->where('firstname', '!=', '')
@@ -24,10 +25,7 @@ class MessageController extends Controller
             ->where('lastname', '!=', '')
             ->whereNotNull('email')
             ->where('email', '!=', '')
-            ->where(function ($query) {
-                $query->whereNull('role')
-                      ->orWhere('role', '!=', 'guest');
-            })
+            ->whereRaw('LOWER(email) <> ?', [$guestEmail])
             ->orderBy('firstname', 'asc')
             ->orderBy('lastname', 'asc')
             ->get();

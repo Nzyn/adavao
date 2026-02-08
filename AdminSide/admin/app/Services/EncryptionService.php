@@ -100,19 +100,14 @@ class EncryptionService
                 );
                 
                 if ($decrypted !== false) {
-                    Log::debug('Decrypted using Node.js fallback key');
                     return $decrypted;
                 }
             }
             
-            while ($msg = openssl_error_string()) {
-                Log::debug('OpenSSL Error: ' . $msg);
-            }
+            // Clear any OpenSSL error queue silently
+            while (openssl_error_string()) {}
             return null;
         } catch (\Exception $e) {
-            Log::debug('Node.js format decryption failed', [
-                'error' => $e->getMessage()
-            ]);
             return null;
         }
     }
@@ -133,27 +128,17 @@ class EncryptionService
         try {
             // First, try Laravel's default decryption (JSON format with MAC)
             try {
-                $decrypted = Crypt::decryptString($encryptedText);
-                Log::debug('Successfully decrypted using Laravel format');
-                return $decrypted;
+                return Crypt::decryptString($encryptedText);
             } catch (\Exception $e) {
                 // Laravel format failed, try Node.js simple format
-                Log::debug('Laravel decryption failed, trying Node.js format', [
-                    'error' => $e->getMessage()
-                ]);
             }
             
             $decrypted = self::decryptNodeJsFormat($encryptedText);
             if ($decrypted !== null) {
-                Log::debug('Successfully decrypted using Node.js format');
                 return $decrypted;
             }
             
-            // Both formats failed, return original data
-            // This is expected for legacy plaintext data
-            Log::debug('Decryption failed for both formats - returning original data (likely plaintext)', [
-                'data_preview' => substr($encryptedText, 0, 50)
-            ]);
+            // Both formats failed — likely plaintext, return as-is
             return $encryptedText;
         } catch (\Exception $e) {
             Log::error('Unexpected error during decryption', [
