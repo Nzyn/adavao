@@ -154,7 +154,7 @@ class ReportController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Report::with(['user.verification', 'location', 'media', 'policeStation'])
+        $query = Report::with(['user.verification', 'location', 'media', 'policeStation', 'dispatch'])
             ->join('locations', 'reports.location_id', '=', 'locations.location_id');
         
         // Exclude reports without valid coordinates

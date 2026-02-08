@@ -84,6 +84,14 @@ class Report extends Model
     }
 
     /**
+     * Get the patrol dispatch for this report
+     */
+    public function dispatch()
+    {
+        return $this->hasOne(PatrolDispatch::class, 'report_id', 'report_id');
+    }
+
+    /**
      * Auto-assign police station based on report location coordinates
      * 
      * @param float $latitude

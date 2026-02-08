@@ -372,7 +372,7 @@ export default function DispatchDetails() {
                         {dispatch.three_minute_rule_met !== null && (
                             <View style={[styles.ruleIndicator, { backgroundColor: dispatch.three_minute_rule_met ? COLORS.success : COLORS.danger }]}>
                                 <Ionicons name={dispatch.three_minute_rule_met ? 'checkmark' : 'close'} size={16} color={COLORS.white} />
-                                <Text style={styles.ruleText}>3-min rule {dispatch.three_minute_rule_met ? 'met' : 'exceeded'}</Text>
+                                <Text style={styles.ruleText}>Response time {dispatch.three_minute_rule_met ? 'met' : 'exceeded'}</Text>
                             </View>
                         )}
                     </View>

@@ -1628,7 +1628,7 @@
                     <th class="sortable" data-column="1" style="width: 70px;" onclick="sortTable(1)">User</th>
                     <th class="sortable" data-column="2" style="width: 80px;" onclick="sortTable(2)">Type</th>
                     <th class="sortable" data-column="3" style="width: 85px;" onclick="sortTable(3)">Urgency</th>
-                    <th class="sortable" data-column="4" style="width: 80px;" onclick="sortTable(4)">SLA</th>
+                    <th class="sortable" data-column="4" style="width: 80px;" onclick="sortTable(4)">Response Time</th>
                     <th class="sortable" data-column="5" style="width: 90px;" onclick="sortTable(5)">Rule Status</th>
                     <th class="sortable" data-column="6" style="width: 75px;" onclick="sortTable(6)">User Status</th>
                      <th class="sortable" data-column="7" style="width: 100px;" onclick="sortTable(7)">Date</th>
@@ -1702,19 +1702,23 @@
                                 <td>
                                     @php
                                         $createdAt = $report->created_at;
-                                        $now = \Carbon\Carbon::now();
-                                        $elapsedSeconds = $createdAt->diffInSeconds($now);
+                                        $arrivedAt = optional($report->dispatch)->arrived_at;
                                         $threeMinutes = 180; // 3 minutes in seconds
-                                        
+
+                                        if ($arrivedAt) {
+                                            // Officer arrived — freeze timer at arrival time
+                                            $elapsedSeconds = $createdAt->diffInSeconds($arrivedAt);
+                                        } else {
+                                            $elapsedSeconds = $createdAt->diffInSeconds(\Carbon\Carbon::now());
+                                        }
+
                                         if ($elapsedSeconds < $threeMinutes) {
-                                            // Countdown mode
                                             $remainingSeconds = $threeMinutes - $elapsedSeconds;
                                             $minutes = floor($remainingSeconds / 60);
                                             $seconds = $remainingSeconds % 60;
                                             $timerClass = 'countdown';
                                             $timerDisplay = sprintf('%02d:%02d', $minutes, $seconds);
                                         } else {
-                                            // Count-up mode (exceeded)
                                             $exceededSeconds = $elapsedSeconds - $threeMinutes;
                                             $minutes = floor($exceededSeconds / 60);
                                             $seconds = $exceededSeconds % 60;
@@ -1724,6 +1728,7 @@
                                     @endphp
                                     <span class="sla-timer {{ $timerClass }}" 
                                           data-created-at="{{ $createdAt->timestamp }}"
+                                          data-arrived-at="{{ $arrivedAt ? \Carbon\Carbon::parse($arrivedAt)->timestamp : '' }}"
                                           data-report-id="{{ $report->report_id }}">
                                         {{ $timerDisplay }}
                                     </span>
@@ -1741,7 +1746,7 @@
                                             // Validated - check if within 3 minutes
                                             $validationTime = $createdAt->diffInSeconds($validatedAt);
                                             if ($validationTime <= 180) {
-                                                $ruleStatus = 'Within SLA';
+                                                $ruleStatus = 'Within 3 Min';
                                                 $ruleClass = 'within-sla';
                                             } else {
                                                 $ruleStatus = 'Exceeded';
@@ -2085,27 +2090,28 @@ window.updateValidity = function(reportId, isValid) {};
 window.closeModal = function() {};
 window.downloadModalAsPDF = function() {};
 
-// Update SLA timers in real-time
+// Update Response Time timers in real-time
 function updateSLATimers() {
     const timers = document.querySelectorAll('.sla-timer');
-    const now = Math.floor(Date.now() / 1000); // Current time in seconds
+    const now = Math.floor(Date.now() / 1000);
     
     timers.forEach(timer => {
         const createdAt = parseInt(timer.getAttribute('data-created-at'));
         if (!createdAt) return;
-        
-        const elapsedSeconds = now - createdAt;
-        const threeMinutes = 180; // 3 minutes in seconds
+
+        const arrivedAt = timer.getAttribute('data-arrived-at');
+        // If officer has arrived, freeze the timer at arrival time
+        const endTime = arrivedAt ? parseInt(arrivedAt) : now;
+        const elapsedSeconds = endTime - createdAt;
+        const threeMinutes = 180;
         
         if (elapsedSeconds < threeMinutes) {
-            // Countdown mode
             const remainingSeconds = threeMinutes - elapsedSeconds;
             const minutes = Math.floor(remainingSeconds / 60);
             const seconds = remainingSeconds % 60;
             timer.textContent = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
             timer.className = 'sla-timer countdown';
         } else {
-            // Count-up mode (exceeded)
             const exceededSeconds = elapsedSeconds - threeMinutes;
             const minutes = Math.floor(exceededSeconds / 60);
             const seconds = exceededSeconds % 60;
@@ -2115,7 +2121,6 @@ function updateSLATimers() {
     });
 }
 
-// Update timers immediately and then every second
 updateSLATimers();
 setInterval(updateSLATimers, 1000);
 
