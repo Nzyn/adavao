@@ -76,6 +76,8 @@ async function getMyDispatches(req, res) {
         l.longitude,
         l.barangay,
         l.reporters_address,
+        u.firstname AS officer_firstname,
+        u.lastname AS officer_lastname,
         COALESCE(
           json_agg(
             json_build_object(
@@ -91,8 +93,8 @@ async function getMyDispatches(req, res) {
       JOIN reports r ON d.report_id = r.report_id
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN report_media rm ON r.report_id = rm.report_id
-      WHERE d.patrol_officer_id = $1
-        AND d.status NOT IN ('completed', 'cancelled')
+      LEFT JOIN users_public u ON d.patrol_officer_id = u.id
+      WHERE d.status NOT IN ('completed', 'cancelled', 'declined')
       GROUP BY
         d.dispatch_id,
         d.report_id,
@@ -119,9 +121,10 @@ async function getMyDispatches(req, res) {
         l.latitude,
         l.longitude,
         l.barangay,
-        l.reporters_address
-      ORDER BY d.dispatched_at DESC`,
-      [userId]
+        l.reporters_address,
+        u.firstname,
+        u.lastname
+      ORDER BY d.dispatched_at DESC`
     );
 
     const formatted = rows.map((row) => {
@@ -206,6 +209,8 @@ async function getDispatchDetails(req, res) {
         l.longitude,
         l.barangay,
         l.reporters_address,
+        u.firstname AS officer_firstname,
+        u.lastname AS officer_lastname,
         COALESCE(
           json_agg(
             json_build_object(
@@ -221,8 +226,8 @@ async function getDispatchDetails(req, res) {
       JOIN reports r ON d.report_id = r.report_id
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN report_media rm ON r.report_id = rm.report_id
+      LEFT JOIN users_public u ON d.patrol_officer_id = u.id
       WHERE d.dispatch_id = $1
-        AND d.patrol_officer_id = $2
       GROUP BY
         d.dispatch_id,
         d.report_id,
@@ -249,8 +254,10 @@ async function getDispatchDetails(req, res) {
         l.latitude,
         l.longitude,
         l.barangay,
-        l.reporters_address`,
-      [dispatchId, userId]
+        l.reporters_address,
+        u.firstname,
+        u.lastname`,
+      [dispatchId]
     );
 
     if (!rows || rows.length === 0) {
@@ -279,6 +286,7 @@ async function getDispatchDetails(req, res) {
         validation_notes: row.validation_notes,
         validated_at: row.validated_at,
         notes: row.notes,
+        officer_name: row.officer_firstname ? `${row.officer_firstname} ${row.officer_lastname}`.trim() : null,
         report: {
           report_id: row.report_id,
           title: row.title,
@@ -310,10 +318,15 @@ async function acceptDispatch(req, res) {
     await assertPatrolOfficer(userId);
 
     const [existing] = await db.query(
-      'SELECT dispatch_id, dispatched_at, status FROM patrol_dispatches WHERE dispatch_id = $1 AND patrol_officer_id = $2',
-      [dispatchId, userId]
+      'SELECT dispatch_id, dispatched_at, status, patrol_officer_id FROM patrol_dispatches WHERE dispatch_id = $1',
+      [dispatchId]
     );
     if (!existing?.length) return res.status(404).json({ success: false, message: 'Dispatch not found' });
+
+    // Check if already accepted by someone else
+    if (existing[0].status !== 'pending' && existing[0].status !== 'assigned') {
+      return res.status(400).json({ success: false, message: `Dispatch already ${existing[0].status} by another officer` });
+    }
 
     const dispatchedAt = existing[0].dispatched_at;
     const now = new Date();
@@ -322,14 +335,15 @@ async function acceptDispatch(req, res) {
 
     await db.query(
       `UPDATE patrol_dispatches
-       SET status = 'accepted',
+       SET patrol_officer_id = $1,
+           status = 'accepted',
            accepted_at = NOW(),
-           acceptance_time = $1,
-           three_minute_rule_time = $1,
-           three_minute_rule_met = $2,
+           acceptance_time = $2,
+           three_minute_rule_time = $2,
+           three_minute_rule_met = $3,
            updated_at = NOW()
-       WHERE dispatch_id = $3 AND patrol_officer_id = $4`,
-      [acceptanceTime, threeMinuteRuleMet, dispatchId, userId]
+       WHERE dispatch_id = $4`,
+      [userId, acceptanceTime, threeMinuteRuleMet, dispatchId]
     );
 
     // Update report status to 'investigating' when dispatch is accepted
@@ -361,8 +375,8 @@ async function declineDispatch(req, res) {
            declined_at = NOW(),
            decline_reason = $1,
            updated_at = NOW()
-       WHERE dispatch_id = $2 AND patrol_officer_id = $3`,
-      [reason || null, dispatchId, userId]
+       WHERE dispatch_id = $2`,
+      [reason || null, dispatchId]
     );
 
     return res.json({ success: true, message: 'Dispatch declined' });

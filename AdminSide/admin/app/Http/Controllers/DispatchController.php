@@ -381,6 +381,7 @@ class DispatchController extends Controller
         try {
             $request->validate([
                 'report_id' => 'required|exists:reports,report_id',
+                'notes' => 'nullable|string|max:500',
             ]);
 
             $report = Report::with('location')->findOrFail($request->report_id);
@@ -397,158 +398,54 @@ class DispatchController extends Controller
                 ], 400);
             }
 
-            // Get report coordinates
-            $reportLat = $report->location->latitude ?? null;
-            $reportLng = $report->location->longitude ?? null;
-
-            if (!$reportLat || !$reportLng) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Report location coordinates not available'
-                ], 400);
-            }
-
-                        // Find on-duty patrol officers with recent locations from patrol_locations table
-                        // NOTE: Don't require push_token here; we may still want to dispatch/assign.
-            $officers = DB::select("
-                SELECT 
-                    u.id,
-                    u.firstname,
-                    u.lastname,
-                    u.push_token,
-                    u.assigned_station_id,
-                    pl.latitude,
-                    pl.longitude,
-                    pl.updated_at as location_updated_at
-                FROM users_public u
-                JOIN patrol_locations pl ON u.id = pl.user_id
-                WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
-                  AND u.is_on_duty = true
-                  AND pl.latitude IS NOT NULL
-                  AND pl.longitude IS NOT NULL
-                  AND pl.updated_at > NOW() - INTERVAL '10 minutes'
-                ORDER BY pl.updated_at DESC
-            ");
-
-            if (empty($officers)) {
-                // Try fallback: find any on-duty officers regardless of location recency
-                $officers = DB::select("
-                    SELECT 
-                        u.id,
-                        u.firstname,
-                        u.lastname,
-                        u.push_token,
-                        u.assigned_station_id,
-                        pl.latitude,
-                        pl.longitude,
-                        pl.updated_at as location_updated_at
-                    FROM users_public u
-                    LEFT JOIN patrol_locations pl ON u.id = pl.user_id
-                    WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
-                      AND u.is_on_duty = true
-                    ORDER BY pl.updated_at DESC NULLS LAST
-                ");
-                
-                if (empty($officers)) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'No patrol officers are currently on duty'
-                    ], 400);
-                }
-            }
-
-            // Calculate distance to each officer using Haversine formula
-            $nearestOfficer = null;
-            $minDistance = PHP_FLOAT_MAX;
-
-            foreach ($officers as $officer) {
-                // Skip officers without location
-                if (!$officer->latitude || !$officer->longitude) {
-                    continue;
-                }
-                
-                $distance = $this->calculateDistance(
-                    $reportLat,
-                    $reportLng,
-                    $officer->latitude,
-                    $officer->longitude
-                );
-
-                if ($distance < $minDistance) {
-                    $minDistance = $distance;
-                    $nearestOfficer = $officer;
-                }
-            }
-
-            // If no officer with location found, just use the first on-duty officer
-            if (!$nearestOfficer && !empty($officers)) {
-                $nearestOfficer = $officers[0];
-                $minDistance = 0; // Unknown distance
-            }
-
-            if (!$nearestOfficer) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Could not find a suitable patrol officer'
-                ], 400);
-            }
-
-            // Create dispatch
+            // Create broadcast dispatch — no specific officer assigned
+            // All patrol officers will see it and can accept (first-come-first-served)
             $dispatch = PatrolDispatch::create([
                 'report_id' => $report->report_id,
                 'station_id' => $report->assigned_station_id,
-                'patrol_officer_id' => $nearestOfficer->id,
-                'status' => 'assigned',
+                'patrol_officer_id' => null,
+                'status' => 'pending',
                 'dispatched_at' => now(),
                 'dispatched_by' => auth()->id(),
-                'notes' => $minDistance > 0 
-                    ? 'Auto-dispatched to nearest patrol officer (' . round($minDistance, 2) . ' km away)'
-                    : 'Auto-dispatched to available patrol officer',
+                'notes' => $request->notes,
             ]);
 
-            // Load the dispatch with its relationships for notification
+            // Load the dispatch with its relationships
             $dispatch->load(['report.location']);
 
-            // Send urgent notification with ring and vibrate to ONLY the nearest officer
-            $notificationSent = false;
-            if (!empty($nearestOfficer->push_token)) {
-                try {
-                    $this->sendUrgentDispatchNotification($dispatch, $nearestOfficer, $minDistance);
-                    $notificationSent = true;
-                    Log::info('Push notification sent to officer', [
-                        'officer_id' => $nearestOfficer->id,
-                        'push_token' => substr($nearestOfficer->push_token, 0, 20) . '...',
-                    ]);
-                } catch (\Exception $notifError) {
-                    Log::error('Failed to send push notification', [
-                        'error' => $notifError->getMessage(),
-                        'officer_id' => $nearestOfficer->id,
-                    ]);
+            // Send push notification to ALL patrol officers
+            $allOfficers = DB::select("
+                SELECT u.id, u.push_token
+                FROM users_public u
+                WHERE LOWER(COALESCE(u.user_role::text, u.role::text, '')) = 'patrol_officer'
+                  AND u.push_token IS NOT NULL AND u.push_token != ''
+            ");
+
+            $notifiedCount = 0;
+            foreach ($allOfficers as $officer) {
+                if (!empty($officer->push_token)) {
+                    try {
+                        $this->sendBroadcastNotification($dispatch, $officer);
+                        $notifiedCount++;
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to notify officer', ['id' => $officer->id, 'error' => $e->getMessage()]);
+                    }
                 }
-            } else {
-                Log::warning('Officer has no push token', ['officer_id' => $nearestOfficer->id]);
             }
 
-            // Sync dispatch to UserSide backend (safety for multi-DB deployments)
-            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), $dispatch->notes, $nearestOfficer->id);
+            // Sync dispatch to UserSide backend
+            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), $request->notes, null);
 
-            Log::info('Auto-dispatch created', [
+            Log::info('Broadcast dispatch created', [
                 'dispatch_id' => $dispatch->dispatch_id,
                 'report_id' => $report->report_id,
-                'officer_id' => $nearestOfficer->id,
-                'distance_km' => round($minDistance, 2),
+                'officers_notified' => $notifiedCount,
             ]);
-
-            $officerName = ($nearestOfficer->firstname ?? '') . ' ' . ($nearestOfficer->lastname ?? '');
 
             return response()->json([
                 'success' => true,
-                'message' => $notificationSent
-                    ? 'Patrol dispatched successfully'
-                    : 'Dispatch created, but patrol officer has no push token (ask officer to login and allow notifications)',
-                'officer_name' => trim($officerName) ?: 'Patrol Officer',
-                'distance_km' => round($minDistance, 2),
-                'notification_sent' => $notificationSent,
+                'message' => "Dispatch broadcast to all patrol officers. {$notifiedCount} notified.",
+                'notification_sent' => $notifiedCount > 0,
             ]);
 
         } catch (\Exception $e) {
@@ -563,134 +460,36 @@ class DispatchController extends Controller
     }
 
     /**
-     * Calculate distance between two coordinates using Haversine formula
+     * Send broadcast notification to a patrol officer
      */
-    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    private function sendBroadcastNotification($dispatch, $officer)
     {
-        $earthRadius = 6371; // Earth's radius in kilometers
+        $report = $dispatch->report;
+        $location = $report->location ?? null;
+        $barangay = $location ? EncryptionService::decrypt($location->barangay) : 'Unknown';
 
-        $lat1 = deg2rad($lat1);
-        $lon1 = deg2rad($lon1);
-        $lat2 = deg2rad($lat2);
-        $lon2 = deg2rad($lon2);
+        $message = [
+            'to' => $officer->push_token,
+            'sound' => 'default',
+            'title' => '🚨 New Dispatch Alert',
+            'body' => ($report->report_type ?? 'Report') . ' at ' . $barangay,
+            'data' => [
+                'type' => 'dispatch',
+                'dispatch_id' => $dispatch->dispatch_id,
+                'report_id' => $report->report_id,
+            ],
+            'priority' => 'high',
+            'channelId' => 'dispatch',
+        ];
 
-        $latDiff = $lat2 - $lat1;
-        $lonDiff = $lon2 - $lon1;
-
-        $a = sin($latDiff / 2) ** 2 + cos($lat1) * cos($lat2) * sin($lonDiff / 2) ** 2;
-        $c = 2 * asin(sqrt($a));
-
-        return $earthRadius * $c;
-    }
-
-    /**
-     * Send urgent dispatch notification with ring and vibrate
-     */
-    private function sendUrgentDispatchNotification($dispatch, $officer, $distanceKm)
-    {
-        try {
-            if (!$officer->push_token) {
-                $officer->push_token = $this->fetchPushTokenFromBackend($officer->id);
-                if ($officer->push_token) {
-                    try {
-                        \DB::table('users_public')->where('id', $officer->id)->update([
-                            'push_token' => $officer->push_token,
-                            'updated_at' => now(),
-                        ]);
-                    } catch (\Throwable $e) {
-                        Log::warning('Failed to persist fetched push token', [
-                            'officer_id' => $officer->id,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                }
-            }
-
-            if (!$officer->push_token) {
-                Log::info('No push token for officer', ['officer_id' => $officer->id]);
-                return false;
-            }
-
-            $report = $dispatch->report;
-            if (!$report) {
-                Log::error('No report found for dispatch', ['dispatch_id' => $dispatch->dispatch_id]);
-                return false;
-            }
-            
-            $location = $report->location;
-            $barangay = $location ? EncryptionService::decrypt($location->barangay) : 'Unknown';
-            
-            Log::info('Sending push notification', [
-                'officer_id' => $officer->id,
-                'push_token' => substr($officer->push_token, 0, 30) . '...',
-                'report_type' => $report->report_type,
-                'barangay' => $barangay,
-            ]);
-            
-            // Prepare Expo push notification with urgent settings
-            $message = [
-                'to' => $officer->push_token,
-                'sound' => 'default',
-                'title' => '🚨 URGENT: New Dispatch Assigned',
-                'body' => "📍 {$report->report_type} reported at {$barangay}. You are " . round($distanceKm, 2) . " km away - respond immediately!",
-                'data' => [
-                    'type' => 'urgent_dispatch',
-                    'dispatch_id' => $dispatch->dispatch_id,
-                    'report_id' => $report->report_id,
-                    'crime_type' => $report->report_type,
-                    'location' => $barangay,
-                    'urgency' => $report->urgency_score ?? 10,
-                    'distance_km' => round($distanceKm, 2),
-                    'vibrate' => true,
-                    'ring' => true,
-                ],
-                'priority' => 'high',
-                'channelId' => 'urgent_dispatch',
-            ];
-
-            // Send to Expo Push Notification service with proper headers
-            $response = \Http::withHeaders([
-                'Accept' => 'application/json',
-                'Accept-Encoding' => 'gzip, deflate',
-                'Content-Type' => 'application/json',
-            ])->post('https://exp.host/--/api/v2/push/send', $message);
-
-            $responseBody = $response->json();
-            
-            Log::info('Expo push response', [
-                'status' => $response->status(),
-                'body' => $responseBody,
-            ]);
-
-            if ($response->successful()) {
-                // Check if Expo returned any errors in the response
-                if (isset($responseBody['data']['status']) && $responseBody['data']['status'] === 'error') {
-                    Log::error('Expo push notification error', [
-                        'dispatch_id' => $dispatch->dispatch_id,
-                        'error' => $responseBody['data']['message'] ?? 'Unknown error',
-                        'details' => $responseBody['data']['details'] ?? null,
-                    ]);
-                    return false;
-                }
-                
-                Log::info('Urgent dispatch notification sent successfully', [
-                    'dispatch_id' => $dispatch->dispatch_id,
-                    'officer_id' => $officer->id,
-                    'distance_km' => round($distanceKm, 2),
-                ]);
-                return true;
-            } else {
-                Log::error('Failed to send urgent dispatch notification', [
-                    'dispatch_id' => $dispatch->dispatch_id,
-                    'response' => $response->body(),
-                ]);
-                return false;
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Error sending urgent dispatch notification: ' . $e->getMessage());
-            return false;
-        }
+        $ch = curl_init('https://exp.host/--/api/v2/push/send');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_exec($ch);
+        curl_close($ch);
     }
 
     private function fetchPushTokenFromBackend($officerId)

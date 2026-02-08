@@ -30,7 +30,7 @@ export default function PatrolLayout() {
                 // Show alert for urgent dispatch
                 Alert.alert(
                     '🚨 New Dispatch!',
-                    notification.request.content.body || 'You have been assigned to a new dispatch',
+                    notification.request.content.body || 'A new dispatch is available for response',
                     [
                         {
                             text: 'View Dispatch',
@@ -83,6 +83,7 @@ export default function PatrolLayout() {
             <Stack.Screen name="dashboard" />
             <Stack.Screen name="dispatches" />
             <Stack.Screen name="dispatch-details" />
+            <Stack.Screen name="chat" />
             <Stack.Screen name="history" />
             <Stack.Screen name="profile" />
         </Stack>

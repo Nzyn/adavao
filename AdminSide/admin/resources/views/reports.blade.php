@@ -2219,17 +2219,21 @@ setInterval(updateSLATimers, 1000);
                     <div class="modal-body" style="text-align:center; padding:24px;">
                         <div id="dispatch-loading" style="display:none;">
                             <div style="width:60px; height:60px; border:4px solid #e5e7eb; border-top-color:#3b82f6; border-radius:50%; animation: spin 1s linear infinite; margin:0 auto 16px;"></div>
-                            <p style="color:#666; font-size:14px;">Finding nearest patrol officer...</p>
+                            <p style="color:#666; font-size:14px;">Broadcasting dispatch to all patrol officers...</p>
                         </div>
                         <div id="dispatch-confirm" style="display:block;">
                             <div style="width:80px; height:80px; background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
                                 <span style="font-size:36px;">🚓</span>
                             </div>
-                            <h3 style="margin:0 0 8px; font-size:18px; color:#1f2937;">Ready to Dispatch</h3>
-                            <p style="margin:0 0 24px; color:#666; font-size:14px; line-height:1.5;">
-                                The system will automatically find and notify the nearest on-duty patrol officer to respond to this report.
+                            <h3 style="margin:0 0 8px; font-size:18px; color:#1f2937;">Dispatch to All Patrol Officers</h3>
+                            <p style="margin:0 0 16px; color:#666; font-size:14px; line-height:1.5;">
+                                This dispatch will be broadcast to all patrol officers. Add a note to guide which officer should respond.
                             </p>
                             <input type="hidden" id="dispatch_report_id" />
+                            <div style="text-align:left; margin-bottom:20px;">
+                                <label for="dispatch_notes" style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">Note to Patrol Officers</label>
+                                <textarea id="dispatch_notes" rows="3" placeholder="e.g. This report location is nearby Sta. Ana Police Station, Patrol 3 please respond..." style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; resize:vertical; font-family:inherit; box-sizing:border-box;"></textarea>
+                            </div>
                             <div style="display:flex; gap:12px; justify-content:center;">
                                 <button type="button" data-dispatch-cancel style="padding:12px 24px; background:#f3f4f6; border:none; border-radius:8px; cursor:pointer; font-size:14px; font-weight:500;">Cancel</button>
                                 <button type="button" data-dispatch-confirm style="padding:12px 24px; background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:14px; box-shadow:0 4px 12px rgba(59,130,246,0.3);">🚓 Dispatch Now</button>
@@ -2239,9 +2243,9 @@ setInterval(updateSLATimers, 1000);
                             <div style="width:80px; height:80px; background:#dcfce7; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
                                 <span style="font-size:36px;">✅</span>
                             </div>
-                            <h3 style="margin:0 0 8px; font-size:18px; color:#16a34a;">Patrol Dispatched!</h3>
+                            <h3 style="margin:0 0 8px; font-size:18px; color:#16a34a;">Dispatch Broadcast Sent!</h3>
                             <p style="margin:0 0 24px; color:#666; font-size:14px; line-height:1.5;">
-                                Patrol sent to the nearest dispatch in the reported area. The officer has been notified with an urgent alert.
+                                All patrol officers have been notified. The assigned officer will accept and respond to this report.
                             </p>
                             <button type="button" data-dispatch-done style="padding:12px 24px; background:#16a34a; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:14px;">Done</button>
                         </div>
@@ -2277,6 +2281,10 @@ setInterval(updateSLATimers, 1000);
             const reportIdInput = modal.querySelector('#dispatch_report_id');
             if (reportIdInput) reportIdInput.value = String(reportId);
 
+            // Clear notes
+            const notesInput = modal.querySelector('#dispatch_notes');
+            if (notesInput) notesInput.value = '';
+
             // Reset states
             modal.querySelector('#dispatch-loading')?.style && (modal.querySelector('#dispatch-loading').style.display = 'none');
             modal.querySelector('#dispatch-confirm')?.style && (modal.querySelector('#dispatch-confirm').style.display = 'block');
@@ -2294,6 +2302,7 @@ setInterval(updateSLATimers, 1000);
         window.dispatchToNearestPatrol = async function dispatchToNearestPatrol() {
             const modal = window.ensureDispatchModalExists();
             const reportId = modal.querySelector('#dispatch_report_id')?.value;
+            const notes = modal.querySelector('#dispatch_notes')?.value || '';
             const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 
             modal.querySelector('#dispatch-confirm').style.display = 'none';
@@ -2307,7 +2316,7 @@ setInterval(updateSLATimers, 1000);
                         ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify({ report_id: reportId })
+                    body: JSON.stringify({ report_id: reportId, notes: notes })
                 });
 
                 const data = await res.json().catch(() => ({}));

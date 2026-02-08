@@ -8,7 +8,6 @@ import {
     RefreshControl,
     Dimensions,
     Alert,
-    Switch,
     Modal,
     Image,
     Linking,
@@ -17,7 +16,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize, containerPadding, borderRadius, isTablet } from '../../utils/responsive';
-import { startLocationTracking, stopLocationTracking, isLocationTrackingActive } from '../../services/patrolLocationService';
 import { API_URL, BACKEND_URL } from '../../config/backend';
 import { stopServerWarmup } from '../../utils/serverWarmup';
 import { onDataRefresh } from '../../services/sseService';
@@ -52,11 +50,9 @@ export default function PatrolDashboard() {
     const [unreadNotifications, setUnreadNotifications] = useState(0);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [showNotificationsModal, setShowNotificationsModal] = useState(false);
-    const [isOnDuty, setIsOnDuty] = useState(false);
-    const [isLocationTracking, setIsLocationTracking] = useState(false);
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [pendingDispatchCount, setPendingDispatchCount] = useState(0);
     const [activeDispatchCount, setActiveDispatchCount] = useState(0);
-    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [activeTab, setActiveTab] = useState('home');
     const [announcements, setAnnouncements] = useState<any[]>([]);
 
@@ -116,18 +112,6 @@ export default function PatrolDashboard() {
         return unsub;
     }, [userId, stationId]);
 
-    // Start location tracking when on duty
-    useEffect(() => {
-        if (isOnDuty) {
-            startLocationTracking(2000); // Poll every 2 seconds for real-time tracking
-            setIsLocationTracking(true);
-        } else {
-            stopLocationTracking();
-            setIsLocationTracking(false);
-        }
-        return () => stopLocationTracking();
-    }, [isOnDuty]);
-
     const loadUserData = async () => {
         try {
             const stored = await AsyncStorage.getItem('userData');
@@ -142,7 +126,6 @@ export default function PatrolDashboard() {
             setUserName(full || user?.email || 'Officer');
             setUserId(user?.id?.toString() || user?.userId?.toString());
             setStationId(user?.assigned_station_id || user?.stationId || 0);
-            setIsOnDuty(user?.is_on_duty || false);
         } catch {
             setUserName('Officer');
         }
@@ -282,50 +265,6 @@ export default function PatrolDashboard() {
         }
     }, [userId]);
 
-    const toggleDutyStatus = async () => {
-        const newStatus = !isOnDuty;
-        try {
-            const response = await fetch(`${API_URL}/user/duty-status`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: parseInt(userId || '0'), is_on_duty: newStatus }),
-            });
-            const data = await response.json();
-            if (data.success) {
-                setIsOnDuty(newStatus);
-                // Update stored user data
-                const stored = await AsyncStorage.getItem('userData');
-                if (stored) {
-                    const user = JSON.parse(stored);
-                    user.is_on_duty = newStatus;
-                    await AsyncStorage.setItem('userData', JSON.stringify(user));
-                }
-                
-                // CRITICAL: Re-register push notifications when turning ON duty
-                // This ensures the push token is saved/refreshed for receiving dispatch notifications
-                if (newStatus && userId) {
-                    const numericUserId = parseInt(userId);
-                    if (!isNaN(numericUserId)) {
-                        try {
-                            console.log('🔔 Re-registering push notifications for duty ON');
-                            const { initializePushNotifications } = await import('../../services/pushNotificationService');
-                            await initializePushNotifications(numericUserId);
-                            console.log('✅ Push notifications refreshed for duty status');
-                        } catch (pushError) {
-                            console.warn('⚠️ Failed to refresh push notifications:', pushError);
-                        }
-                    }
-                }
-                
-                Alert.alert('Status Updated', `You are now ${newStatus ? 'ON DUTY' : 'OFF DUTY'}`);
-            } else {
-                Alert.alert('Error', data.message || 'Failed to update duty status');
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Failed to update duty status');
-        }
-    };
-
     const onRefresh = () => {
         setLoading(true);
         loadDispatchCounts();
@@ -344,9 +283,6 @@ export default function PatrolDashboard() {
     const handleLogout = async () => {
         setShowLogoutDialog(false);
         try {
-            // Stop location tracking
-            stopLocationTracking();
-            
             // Stop server warmup pings
             stopServerWarmup();
 
@@ -467,64 +403,6 @@ export default function PatrolDashboard() {
                     />
                 }
             >
-                {/* Duty Status Toggle */}
-                <View style={styles.dutyStatusContainer}>
-                    <View style={[
-                        styles.dutyStatusCard,
-                        isOnDuty && styles.dutyStatusCardActive
-                    ]}>
-                        <View style={styles.dutyStatusHeader}>
-                            <View style={[
-                                styles.dutyStatusIconBg,
-                                { backgroundColor: isOnDuty ? '#DCFCE7' : '#F3F4F6' }
-                            ]}>
-                                <Ionicons 
-                                    name={isOnDuty ? "shield-checkmark" : "shield-outline"} 
-                                    size={28} 
-                                    color={isOnDuty ? COLORS.success : COLORS.textMuted} 
-                                />
-                            </View>
-                            <View style={styles.dutyStatusTextContainer}>
-                                <Text style={[
-                                    styles.dutyStatusTitle,
-                                    isOnDuty && styles.dutyStatusTitleActive
-                                ]}>
-                                    {isOnDuty ? '🟢 On Duty' : '⚪ Off Duty'}
-                                </Text>
-                                <Text style={styles.dutyStatusSubtitle}>
-                                    {isOnDuty 
-                                        ? (isLocationTracking ? 'Location tracking active' : 'Starting tracking...')
-                                        : 'Toggle to start your shift'
-                                    }
-                                </Text>
-                            </View>
-                        </View>
-                        <View style={styles.dutyToggleContainer}>
-                            <Text style={[
-                                styles.dutyToggleLabel,
-                                { color: isOnDuty ? COLORS.success : COLORS.textMuted }
-                            ]}>
-                                {isOnDuty ? 'ON' : 'OFF'}
-                            </Text>
-                            <Switch
-                                value={isOnDuty}
-                                onValueChange={toggleDutyStatus}
-                                trackColor={{ false: '#E5E7EB', true: '#86EFAC' }}
-                                thumbColor={isOnDuty ? COLORS.success : '#9CA3AF'}
-                                ios_backgroundColor="#E5E7EB"
-                            />
-                        </View>
-                    </View>
-                    {isOnDuty && (
-                        <View style={styles.dutyStatusIndicatorBar}>
-                            <View style={styles.dutyPulseIndicator} />
-                            <Text style={styles.dutyStatusIndicatorText}>
-                                Your location is being shared with dispatch
-                            </Text>
-                        </View>
-                    )}
-                </View>
-
                 {/* Banner */}
                 <View style={styles.bannerContainer}>
                     <View style={styles.banner}>
@@ -623,7 +501,7 @@ export default function PatrolDashboard() {
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Bottom Navigation - 2 items only */}
+            {/* Bottom Navigation */}
             <View style={styles.bottomNav}>
                 <TouchableOpacity 
                     style={styles.navItem}
@@ -631,6 +509,13 @@ export default function PatrolDashboard() {
                 >
                     <Ionicons name={activeTab === 'home' ? 'home' : 'home-outline'} size={24} color={activeTab === 'home' ? COLORS.primary : COLORS.textMuted} />
                     <Text style={[styles.navText, activeTab === 'home' && styles.navTextActive]}>Home</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                    style={styles.navItem}
+                    onPress={() => router.push('/(patrol)/chat')}
+                >
+                    <Ionicons name="chatbubbles-outline" size={24} color={COLORS.textMuted} />
+                    <Text style={styles.navText}>Chat</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.navItem}
@@ -984,98 +869,6 @@ const styles = StyleSheet.create({
     // Content
     content: {
         flex: 1,
-    },
-
-    // Duty Status Styles
-    dutyStatusContainer: {
-        paddingHorizontal: containerPadding.horizontal,
-        paddingTop: spacing.lg,
-    },
-    dutyStatusCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
-        borderWidth: 2,
-        borderColor: COLORS.border,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 4,
-    },
-    dutyStatusCardActive: {
-        borderColor: COLORS.success,
-        backgroundColor: '#F0FDF4',
-    },
-    dutyStatusHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: spacing.md,
-    },
-    dutyStatusIconBg: {
-        width: 56,
-        height: 56,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: spacing.md,
-    },
-    dutyStatusTextContainer: {
-        flex: 1,
-    },
-    dutyStatusLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    dutyIndicator: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        marginRight: spacing.md,
-    },
-    dutyStatusTitle: {
-        fontSize: fontSize.lg,
-        fontWeight: '700',
-        color: COLORS.textPrimary,
-    },
-    dutyStatusTitleActive: {
-        color: COLORS.success,
-    },
-    dutyStatusSubtitle: {
-        fontSize: fontSize.sm,
-        color: COLORS.textSecondary,
-        marginTop: 4,
-    },
-    dutyToggleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-    },
-    dutyToggleLabel: {
-        fontSize: fontSize.sm,
-        fontWeight: '700',
-        marginRight: spacing.sm,
-    },
-    dutyStatusIndicatorBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#DCFCE7',
-        borderRadius: borderRadius.md,
-        padding: spacing.sm,
-        marginTop: spacing.sm,
-    },
-    dutyPulseIndicator: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: COLORS.success,
-        marginRight: spacing.sm,
-    },
-    dutyStatusIndicatorText: {
-        fontSize: fontSize.xs,
-        color: COLORS.success,
-        fontWeight: '500',
     },
 
     // Banner Styles

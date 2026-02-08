@@ -218,11 +218,12 @@ export default function DispatchDetails() {
     };
 
     const renderTimeline = () => {
+        const officerName = dispatch?.officer_name || 'Officer';
         const steps = [
-            { key: 'dispatched', label: 'Dispatched', time: dispatch?.dispatched_at, icon: 'send' },
-            { key: 'accepted', label: 'Accepted', time: dispatch?.accepted_at, icon: 'checkmark-circle' },
-            { key: 'en_route', label: 'En Route', time: dispatch?.en_route_at, icon: 'car' },
-            { key: 'arrived', label: 'Arrived', time: dispatch?.arrived_at, icon: 'location' },
+            { key: 'dispatched', label: 'Dispatched to all patrol', time: dispatch?.dispatched_at, icon: 'send' },
+            { key: 'accepted', label: `${officerName} accepted`, time: dispatch?.accepted_at, icon: 'checkmark-circle' },
+            { key: 'en_route', label: `${officerName} en route`, time: dispatch?.en_route_at, icon: 'car' },
+            { key: 'arrived', label: `${officerName} arrived`, time: dispatch?.arrived_at, icon: 'location' },
             { key: 'completed', label: 'Completed', time: dispatch?.completed_at, icon: 'checkmark-done-circle' },
         ];
         const currentIndex = steps.findIndex(s => !s.time);
@@ -288,6 +289,7 @@ export default function DispatchDetails() {
     const renderActions = () => {
         if (!dispatch) return null;
         const { status } = dispatch;
+        const isMyDispatch = dispatch.patrol_officer_id && String(dispatch.patrol_officer_id) === userId;
 
         if (status === 'completed') {
             return (
@@ -298,9 +300,21 @@ export default function DispatchDetails() {
             );
         }
 
+        // If someone else accepted, show info banner
+        if (status !== 'pending' && !isMyDispatch) {
+            return (
+                <View style={[styles.completedBanner, { backgroundColor: '#EFF6FF' }]}>
+                    <Ionicons name="information-circle" size={24} color={COLORS.primary} />
+                    <Text style={[styles.completedText, { color: COLORS.primary }]}>
+                        {dispatch.officer_name || 'An officer'} is handling this dispatch
+                    </Text>
+                </View>
+            );
+        }
+
         return (
             <View style={styles.actionsContainer}>
-                {(status === 'pending' || status === 'assigned') && (
+                {status === 'pending' && (
                     <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.primary }]} onPress={acceptDispatch} disabled={actionLoading}>
                         {actionLoading ? <ActivityIndicator color={COLORS.white} /> : (
                             <><Ionicons name="checkmark-circle" size={20} color={COLORS.white} /><Text style={styles.actionButtonText}>Accept Dispatch</Text></>
@@ -385,6 +399,37 @@ export default function DispatchDetails() {
                     </View>
                     <Text style={styles.crimeType}>{formatCrimeType(dispatch?.report?.report_type)}</Text>
                 </View>
+
+                {/* Officer Status - visible to all patrol */}
+                {dispatch?.officer_name && dispatch.status !== 'pending' && (
+                    <View style={[styles.card, { backgroundColor: '#EFF6FF', borderLeftWidth: 4, borderLeftColor: COLORS.primary }]}>
+                        <View style={styles.cardHeader}>
+                            <Ionicons name="person" size={24} color={COLORS.primary} />
+                            <Text style={styles.cardTitle}>Officer Status</Text>
+                        </View>
+                        <Text style={{ fontSize: fontSize.md, color: COLORS.primary, fontWeight: '600' }}>
+                            {dispatch.status === 'arrived'
+                                ? `${dispatch.officer_name} has arrived at the location`
+                                : dispatch.status === 'en_route'
+                                ? `${dispatch.officer_name} is en route to the location`
+                                : `${dispatch.officer_name} has accepted this dispatch`
+                            }
+                        </Text>
+                    </View>
+                )}
+
+                {/* Admin Notes */}
+                {dispatch?.notes && (
+                    <View style={[styles.card, { backgroundColor: '#F5F3FF', borderLeftWidth: 4, borderLeftColor: '#7C3AED' }]}>
+                        <View style={styles.cardHeader}>
+                            <Ionicons name="chatbubble-ellipses" size={24} color="#7C3AED" />
+                            <Text style={[styles.cardTitle, { color: '#5B21B6' }]}>Dispatch Notes</Text>
+                        </View>
+                        <Text style={{ fontSize: fontSize.md, color: '#5B21B6', lineHeight: fontSize.md * 1.5, fontStyle: 'italic' }}>
+                            {dispatch.notes}
+                        </Text>
+                    </View>
+                )}
 
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>

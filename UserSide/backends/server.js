@@ -186,7 +186,9 @@ const {
   getCrimeAnalytics,
   getAllCrimeAnalytics,
   // Crime Forecasts
-  getCrimeForecasts
+  getCrimeForecasts,
+  // Admin/Police contacts for patrol chat
+  getAdminPoliceContacts
 } = require("./handleNewFeatures");
 
 // Add this new function for handling notifications
@@ -601,6 +603,7 @@ app.post("/api/verification/reject", rejectVerification);
 // Messages API Routes
 // IMPORTANT: Order matters! More specific routes must come before less specific routes
 app.get("/api/messages/conversations/:userId", getUserConversations);
+app.get("/api/messages/contacts/admin-police", getAdminPoliceContacts);
 app.get("/api/messages/unread/:userId", getUnreadCount);
 app.post("/api/messages/typing", updateUserTypingStatus);
 app.get("/api/messages/typing-status/:senderId/:receiverId", checkUserTypingStatus);

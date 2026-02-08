@@ -1056,6 +1056,32 @@ const checkUserTypingStatus = async (req, res) => {
   }
 };
 
+// Get admin and police contacts for patrol chat
+const getAdminPoliceContacts = async (req, res) => {
+  try {
+    const [contacts] = await db.query(`
+      SELECT u.id, u.firstname, u.lastname, r.role_name as role
+      FROM user_admin u
+      JOIN user_admin_roles uar ON u.id = uar.user_admin_id
+      JOIN roles r ON uar.role_id = r.role_id
+      WHERE r.role_name IN ('admin', 'police')
+      ORDER BY r.role_name, u.firstname
+    `);
+
+    res.json({
+      success: true,
+      data: contacts.map(c => ({
+        id: c.id,
+        name: `${c.firstname || ''} ${c.lastname || ''}`.trim() || 'Unknown',
+        role: c.role,
+      })),
+    });
+  } catch (error) {
+    console.error('Error getting admin/police contacts:', error);
+    res.status(500).json({ success: false, message: 'Failed to load contacts' });
+  }
+};
+
 module.exports = {
   // Police Stations
   getAllPoliceStations,
@@ -1085,5 +1111,7 @@ module.exports = {
   getCrimeAnalytics,
   getAllCrimeAnalytics,
   // Crime Forecasts
-  getCrimeForecasts
+  getCrimeForecasts,
+  // Admin/Police contacts for patrol chat
+  getAdminPoliceContacts
 };

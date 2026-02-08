@@ -43,8 +43,12 @@ interface Dispatch {
     report_id: number;
     station_id: number;
     patrol_officer_id?: number | null;
+    officer_name?: string | null;
     status: string;
     dispatched_at: string;
+    accepted_at?: string | null;
+    en_route_at?: string | null;
+    arrived_at?: string | null;
     notes: string | null;
     title: string;
     report_type: string | string[];
@@ -144,15 +148,13 @@ export default function PatrolDispatchesScreen() {
         if (!userId) return;
         if (!notifiedLoadedRef.current) return;
 
-        const userIdStr = String(userId);
-        const pendingAssigned = list.filter((dispatch) =>
-            (dispatch?.status === 'pending' || dispatch?.status === 'assigned') &&
-            dispatch?.patrol_officer_id != null &&
-            String(dispatch.patrol_officer_id) === userIdStr
+        // Notify about any new pending dispatches (broadcast model)
+        const pendingDispatches = list.filter((dispatch) =>
+            dispatch?.status === 'pending'
         );
 
         let hasNew = false;
-        for (const dispatch of pendingAssigned) {
+        for (const dispatch of pendingDispatches) {
             if (notifiedDispatchesRef.current.has(dispatch.dispatch_id)) continue;
 
             const crimeLabel = Array.isArray(dispatch.report_type)
@@ -163,7 +165,7 @@ export default function PatrolDispatchesScreen() {
             try {
                 await Notifications.scheduleNotificationAsync({
                     content: {
-                        title: '🚓 New Dispatch Assigned',
+                        title: '🚓 New Dispatch Alert',
                         body: `${crimeLabel} at ${locationLabel}`,
                         data: {
                             type: 'dispatch',
@@ -191,43 +193,34 @@ export default function PatrolDispatchesScreen() {
         if (!userId) return;
 
         try {
-            if (activeTab === 'pending') {
-                // Load pending dispatches for the station (also includes dispatches directly assigned to this officer)
-                const response = await fetch(
-                    `${API_URL}/dispatch/station/${stationId}/pending?userId=${userId}`,
-                    {
-                        headers: { 'X-User-Id': userId },
-                    }
-                );
-                const data = await response.json();
-                if (data.success) {
-                    await notifyNewAssignedDispatches(data.data || []);
-                    // Only update if data changed to prevent flickering
-                    setDispatches(prev => {
-                        const newIds = (data.data || []).map((d: any) => `${d.dispatch_id}-${d.status}`);
-                        const oldIds = prev.map(d => `${d.dispatch_id}-${d.status}`);
-                        if (JSON.stringify(newIds) === JSON.stringify(oldIds)) return prev;
-                        return data.data || [];
-                    });
+            // Load ALL dispatches (broadcast model - all patrol officers see everything)
+            const response = await fetch(
+                `${API_URL}/dispatch/station/${stationId}/pending?userId=${userId}`,
+                {
+                    headers: { 'X-User-Id': userId },
                 }
-            } else {
-                // Load my accepted dispatches
-                const response = await fetch(
-                    `${API_URL}/patrol/dispatches?userId=${userId}`,
-                    {
-                        headers: { 'X-User-Id': userId },
-                    }
-                );
-                const data = await response.json();
-                if (data.success) {
-                    // Only update if data changed to prevent flickering
-                    setMyDispatches(prev => {
-                        const newIds = (data.data || []).map((d: any) => `${d.dispatch_id}-${d.status}`);
-                        const oldIds = prev.map((d: any) => `${d.dispatch_id}-${d.status}`);
-                        if (JSON.stringify(newIds) === JSON.stringify(oldIds)) return prev;
-                        return data.data || [];
-                    });
-                }
+            );
+            const data = await response.json();
+            if (data.success) {
+                const allDispatches = data.data || [];
+                await notifyNewAssignedDispatches(allDispatches);
+
+                // Split into pending (no officer accepted) vs active (someone accepted)
+                const pending = allDispatches.filter((d: Dispatch) => d.status === 'pending');
+                const active = allDispatches.filter((d: Dispatch) => d.status !== 'pending');
+
+                setDispatches(prev => {
+                    const newIds = pending.map((d: any) => `${d.dispatch_id}-${d.status}-${d.officer_name}`);
+                    const oldIds = prev.map(d => `${d.dispatch_id}-${d.status}-${(d as any).officer_name}`);
+                    if (JSON.stringify(newIds) === JSON.stringify(oldIds)) return prev;
+                    return pending;
+                });
+                setMyDispatches(prev => {
+                    const newIds = active.map((d: any) => `${d.dispatch_id}-${d.status}-${d.officer_name}`);
+                    const oldIds = prev.map((d: any) => `${d.dispatch_id}-${d.status}-${d.officer_name}`);
+                    if (JSON.stringify(newIds) === JSON.stringify(oldIds)) return prev;
+                    return active;
+                });
             }
         } catch (error) {
             // Silent fail for background polling
@@ -374,6 +367,15 @@ export default function PatrolDispatchesScreen() {
                     </Text>
                 </View>
 
+                {dispatch.notes && (
+                    <View style={styles.notesContainer}>
+                        <Ionicons name="chatbubble-ellipses" size={14} color="#7C3AED" />
+                        <Text style={styles.notesText} numberOfLines={3}>
+                            {dispatch.notes}
+                        </Text>
+                    </View>
+                )}
+
                 <View style={styles.dispatchFooter}>
                     <Text style={styles.dispatchTime}>
                         Dispatched {formatTimeAgo(dispatch.dispatched_at)}
@@ -382,7 +384,7 @@ export default function PatrolDispatchesScreen() {
                         style={styles.respondButton}
                         onPress={() => handleRespondToDispatch(dispatch.dispatch_id)}
                     >
-                        <Text style={styles.respondButtonText}>RESPOND</Text>
+                        <Text style={styles.respondButtonText}>ACCEPT</Text>
                         <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
                     </TouchableOpacity>
                 </View>
@@ -395,7 +397,17 @@ export default function PatrolDispatchesScreen() {
             accepted: COLORS.primary,
             en_route: COLORS.warning,
             arrived: COLORS.success,
+            assigned: COLORS.primary,
         };
+
+        const statusLabels: Record<string, string> = {
+            accepted: 'ACCEPTED',
+            en_route: 'EN ROUTE',
+            arrived: 'ARRIVED',
+            assigned: 'ASSIGNED',
+        };
+
+        const officerName = dispatch.officer_name || 'An officer';
 
         return (
             <TouchableOpacity
@@ -407,26 +419,48 @@ export default function PatrolDispatchesScreen() {
                     <View style={styles.dispatchTitleRow}>
                         <Ionicons name="document-text" size={24} color={COLORS.primary} />
                         <Text style={styles.dispatchTitle}>
-                            {formatCrimeType(dispatch.report?.report_type)}
+                            {formatCrimeType(dispatch.report_type || dispatch.report?.report_type)}
                         </Text>
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: statusColors[dispatch.status] || COLORS.textMuted }]}>
                         <Text style={styles.statusText}>
-                            {dispatch.status?.replace('_', ' ').toUpperCase()}
+                            {statusLabels[dispatch.status] || dispatch.status?.replace('_', ' ').toUpperCase()}
                         </Text>
                     </View>
+                </View>
+
+                {/* Officer status update - visible to all */}
+                <View style={styles.officerStatusRow}>
+                    <Ionicons name="person" size={14} color={COLORS.primary} />
+                    <Text style={styles.officerStatusText}>
+                        {dispatch.status === 'arrived'
+                            ? `${officerName} has arrived at the location`
+                            : dispatch.status === 'en_route'
+                            ? `${officerName} is en route`
+                            : `${officerName} has accepted this dispatch`
+                        }
+                    </Text>
                 </View>
 
                 <View style={styles.dispatchLocation}>
                     <Ionicons name="location" size={16} color={COLORS.textSecondary} />
                     <Text style={styles.locationText}>
-                        {dispatch.report?.location?.barangay || 'Location unavailable'}
+                        {dispatch.barangay || dispatch.report?.location?.barangay || 'Location unavailable'}
                     </Text>
                 </View>
 
+                {dispatch.notes && (
+                    <View style={styles.notesContainer}>
+                        <Ionicons name="chatbubble-ellipses" size={14} color="#7C3AED" />
+                        <Text style={styles.notesText} numberOfLines={2}>
+                            {dispatch.notes}
+                        </Text>
+                    </View>
+                )}
+
                 <View style={styles.dispatchFooter}>
                     <Text style={styles.dispatchTime}>
-                        Accepted {formatTimeAgo(dispatch.accepted_at || dispatch.dispatched_at)}
+                        Dispatched {formatTimeAgo(dispatch.dispatched_at)}
                     </Text>
                     <View style={styles.viewDetailsRow}>
                         <Text style={styles.viewDetailsText}>View Details</Text>
@@ -457,7 +491,7 @@ export default function PatrolDispatchesScreen() {
                     onPress={() => setActiveTab('pending')}
                 >
                     <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>
-                        Pending ({dispatches.length})
+                        New ({dispatches.length})
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -465,7 +499,7 @@ export default function PatrolDispatchesScreen() {
                     onPress={() => setActiveTab('mine')}
                 >
                     <Text style={[styles.tabText, activeTab === 'mine' && styles.tabTextActive]}>
-                        My Dispatches ({myDispatches.length})
+                        Active ({myDispatches.length})
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -758,6 +792,38 @@ const styles = StyleSheet.create({
     viewDetailsText: {
         fontSize: fontSize.sm,
         color: COLORS.primary,
+        fontWeight: '500',
+    },
+    notesContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#F5F3FF',
+        borderRadius: borderRadius.md,
+        padding: spacing.sm,
+        marginBottom: spacing.sm,
+        borderLeftWidth: 3,
+        borderLeftColor: '#7C3AED',
+    },
+    notesText: {
+        fontSize: fontSize.sm,
+        color: '#5B21B6',
+        marginLeft: spacing.xs,
+        flex: 1,
+        lineHeight: fontSize.sm * 1.4,
+        fontStyle: 'italic',
+    },
+    officerStatusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        borderRadius: borderRadius.md,
+        padding: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    officerStatusText: {
+        fontSize: fontSize.sm,
+        color: COLORS.primary,
+        marginLeft: spacing.xs,
         fontWeight: '500',
     },
 });

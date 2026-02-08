@@ -282,61 +282,16 @@ async function sendToDispatch(req, res) {
             });
         }
 
-        // Get all on-duty patrol officers (not filtered by station — dispatch goes to nearest)
-        const [patrolOfficers] = await db.query(
-            `SELECT id, firstname, lastname, push_token, assigned_station_id
-             FROM users_public
-             WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer'
-               AND is_on_duty = true`
-        );
-
-        if (!patrolOfficers || patrolOfficers.length === 0) {
-            // If no on-duty officers at all, still create dispatch without assignment
-            console.log(`⚠️ No on-duty patrol officers found`);
-        }
-
-        // Use patrolOfficerId from admin if provided, otherwise try auto-assignment
-        let assignedOfficerId = patrolOfficerId || null;
-        let assignedOfficerName = null;
-
-        // If admin already specified an officer, look up their name
-        if (assignedOfficerId) {
-            const [officerRows] = await db.query(
-                `SELECT firstname, lastname FROM users_public WHERE id = $1`,
-                [assignedOfficerId]
-            );
-            if (officerRows && officerRows.length > 0) {
-                assignedOfficerName = `${officerRows[0].firstname} ${officerRows[0].lastname}`;
-                console.log(`👮 Admin pre-assigned dispatch to officer: ${assignedOfficerName}`);
-            }
-        }
-        
-        // If no officer specified, try to find the nearest on-duty patrol officer
-        if (!assignedOfficerId && report.latitude && report.longitude) {
-            const nearestOfficer = await findNearestPatrolOfficer(
-                parseFloat(report.latitude),
-                parseFloat(report.longitude),
-                report.assigned_station_id
-            );
-            
-            if (nearestOfficer) {
-                assignedOfficerId = nearestOfficer.user_id;
-                assignedOfficerName = `${nearestOfficer.firstname} ${nearestOfficer.lastname}`;
-                console.log(`📍 Auto-assigning dispatch to nearest officer: ${assignedOfficerName} (${nearestOfficer.distance}km away)`);
-            }
-        }
-
-        // Create dispatch record with optional auto-assignment
+        // Create broadcast dispatch — no specific officer assigned
+        // All patrol officers will see it and any can accept (first-come-first-served)
         const [dispatchResult] = await db.query(
             `INSERT INTO patrol_dispatches 
              (report_id, station_id, patrol_officer_id, status, dispatched_at, dispatched_by, notes, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, NOW(), $5, $6, NOW(), NOW())
+             VALUES ($1, $2, NULL, 'pending', NOW(), $3, $4, NOW(), NOW())
              RETURNING dispatch_id`,
             [
                 reportId, 
                 report.assigned_station_id, 
-                assignedOfficerId, 
-                assignedOfficerId ? 'assigned' : 'pending', 
                 dispatcherId || null, 
                 notes || null
             ]
@@ -350,8 +305,14 @@ async function sendToDispatch(req, res) {
             [reportId]
         );
 
-        // Send push notifications to all on-duty patrol officers at the station
-        const pushTokens = patrolOfficers
+        // Send push notifications to ALL patrol officers (broadcast)
+        const [allPatrolOfficers] = await db.query(
+            `SELECT id, push_token FROM users_public
+             WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer'
+               AND push_token IS NOT NULL AND push_token != ''`
+        );
+
+        const pushTokens = (allPatrolOfficers || [])
             .filter(officer => officer.push_token)
             .map(officer => officer.push_token);
 
@@ -362,24 +323,18 @@ async function sendToDispatch(req, res) {
                 crimeType: report.report_type,
                 barangay: report.barangay,
                 stationId: report.assigned_station_id,
-                assignedTo: assignedOfficerName,
+                assignedTo: null,
             });
         }
 
-        const assignmentMsg = assignedOfficerId 
-            ? ` Auto-assigned to ${assignedOfficerName}.`
-            : '';
-
-        console.log(`✅ Dispatch created: #${dispatchId} for report #${reportId}, notified ${pushTokens.length} officers${assignmentMsg}`);
+        console.log(`✅ Broadcast dispatch created: #${dispatchId} for report #${reportId}, notified ${pushTokens.length} officers`);
 
         return res.json({
             success: true,
-            message: `Report dispatched successfully.${assignmentMsg} ${pushTokens.length} officer(s) notified.`,
+            message: `Report dispatched to all patrol officers. ${pushTokens.length} officer(s) notified.`,
             data: {
                 dispatch_id: dispatchId,
-                officers_notified: pushTokens.length,
-                assigned_officer_id: assignedOfficerId,
-                assigned_officer_name: assignedOfficerName
+                officers_notified: pushTokens.length
             }
         });
 
@@ -455,8 +410,8 @@ async function getPendingDispatchesForStation(req, res) {
             });
         }
 
-        // Get pending dispatches assigned to this specific officer only
-        // Officers only see dispatches that are explicitly assigned to them
+        // Show ALL active dispatches to ALL patrol officers (broadcast model)
+        // Officers can see pending, assigned, accepted, en_route, arrived statuses
         const [rows] = await db.query(
             `SELECT
                 d.dispatch_id,
@@ -465,6 +420,9 @@ async function getPendingDispatchesForStation(req, res) {
                 d.patrol_officer_id,
                 d.status,
                 d.dispatched_at,
+                d.accepted_at,
+                d.en_route_at,
+                d.arrived_at,
                 d.notes,
                 r.title,
                 r.report_type::text AS report_type,
@@ -474,15 +432,16 @@ async function getPendingDispatchesForStation(req, res) {
                 l.longitude,
                 l.barangay,
                 l.reporters_address,
-                ps.station_name AS closest_station_name
+                ps.station_name AS closest_station_name,
+                u.firstname AS officer_firstname,
+                u.lastname AS officer_lastname
              FROM patrol_dispatches d
              JOIN reports r ON d.report_id = r.report_id
              LEFT JOIN locations l ON r.location_id = l.location_id
              LEFT JOIN police_stations ps ON d.station_id = ps.station_id
-             WHERE d.status IN ('pending', 'assigned')
-               AND d.patrol_officer_id = $1
-             ORDER BY d.dispatched_at DESC`,
-            [userId || 0]
+             LEFT JOIN users_public u ON d.patrol_officer_id = u.id
+             WHERE d.status NOT IN ('completed', 'cancelled', 'declined')
+             ORDER BY d.dispatched_at DESC`
         );
 
         // Decrypt encrypted fields before sending to client
@@ -491,6 +450,7 @@ async function getPendingDispatchesForStation(req, res) {
             description: row.description ? decrypt(row.description) : null,
             barangay: row.barangay ? decrypt(row.barangay) : null,
             reporters_address: row.reporters_address ? decrypt(row.reporters_address) : null,
+            officer_name: row.officer_firstname ? `${row.officer_firstname} ${row.officer_lastname}`.trim() : null,
         }));
 
         return res.json({
@@ -562,19 +522,11 @@ async function respondToDispatch(req, res) {
 
         const dispatch = dispatchRows[0];
 
-        // Verify patrol officer is the one assigned to this dispatch
-        // If dispatch has an assigned officer, only that officer can respond
-        if (dispatch.patrol_officer_id && dispatch.patrol_officer_id !== parseInt(userId)) {
-            return res.status(403).json({
-                success: false,
-                message: 'This dispatch is assigned to another officer'
-            });
-        }
-
+        // Any patrol officer can accept if dispatch is still pending/assigned
         if (dispatch.status !== 'pending' && dispatch.status !== 'assigned') {
             return res.status(400).json({
                 success: false,
-                message: `Dispatch is already ${dispatch.status}`
+                message: `Dispatch is already ${dispatch.status} by another officer`
             });
         }
 
@@ -647,8 +599,8 @@ async function markEnRoute(req, res) {
              SET status = 'en_route',
                  en_route_at = NOW(),
                  updated_at = NOW()
-             WHERE dispatch_id = $1 AND patrol_officer_id = $2`,
-            [dispatchId, userId]
+             WHERE dispatch_id = $1`,
+            [dispatchId]
         );
 
         // Ensure report status is investigating
@@ -692,8 +644,8 @@ async function markArrived(req, res) {
         // Get dispatch info for response time calculation
         const [dispatchRows] = await db.query(
             `SELECT dispatched_at FROM patrol_dispatches 
-             WHERE dispatch_id = $1 AND patrol_officer_id = $2`,
-            [dispatchId, userId]
+             WHERE dispatch_id = $1`,
+            [dispatchId]
         );
 
         if (!dispatchRows || dispatchRows.length === 0) {
@@ -710,8 +662,8 @@ async function markArrived(req, res) {
                  arrived_at = NOW(),
                  response_time = $1,
                  updated_at = NOW()
-             WHERE dispatch_id = $2 AND patrol_officer_id = $3`,
-            [responseTimeSeconds, dispatchId, userId]
+             WHERE dispatch_id = $2`,
+            [responseTimeSeconds, dispatchId]
         );
 
         return res.json({
