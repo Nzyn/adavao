@@ -309,10 +309,17 @@ app.post('/api/dispatch/admin-sync', async (req, res) => {
     if (existing && existing.length > 0) {
       // Dispatch already exists - update it if needed
       const d = existing[0];
-      if (patrolOfficerId && !d.patrol_officer_id) {
+      if (patrolOfficerId && String(patrolOfficerId) !== String(d.patrol_officer_id)) {
+        // Update officer assignment and set status to 'assigned'
         await db.query(
           `UPDATE patrol_dispatches SET patrol_officer_id = $1, status = 'assigned', updated_at = NOW() WHERE dispatch_id = $2`,
           [patrolOfficerId, d.dispatch_id]
+        );
+      } else if (patrolOfficerId && d.status === 'pending') {
+        // Officer already matches but status is still pending - fix it
+        await db.query(
+          `UPDATE patrol_dispatches SET status = 'assigned', updated_at = NOW() WHERE dispatch_id = $1`,
+          [d.dispatch_id]
         );
       }
       // Ensure report status is dispatched
@@ -324,15 +331,30 @@ app.post('/api/dispatch/admin-sync', async (req, res) => {
       );
       if (report && report.length > 0) {
         const stationId = report[0].assigned_station_id;
+        const effectiveOfficerId = patrolOfficerId || d.patrol_officer_id;
+        
+        // Send targeted notification to the assigned officer first
+        let targetTokens = [];
+        if (effectiveOfficerId) {
+          const [assignedOfficer] = await db.query(
+            `SELECT push_token FROM users_public WHERE id = $1 AND push_token IS NOT NULL`,
+            [effectiveOfficerId]
+          );
+          targetTokens = (assignedOfficer || []).map(o => o.push_token).filter(Boolean);
+        }
+        
+        // Also notify other on-duty officers at the station
         const [officers] = await db.query(
           `SELECT push_token FROM users_public WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer' AND assigned_station_id = $1 AND is_on_duty = true AND push_token IS NOT NULL`,
           [stationId]
         );
-        const tokens = (officers || []).map(o => o.push_token).filter(Boolean);
-        if (tokens.length > 0) {
-          const { sendDispatchNotifications } = require('./handleDispatch');
-          // We need to export sendDispatchNotifications - for now call inline
-          const messages = tokens.map(token => ({
+        const stationTokens = (officers || []).map(o => o.push_token).filter(Boolean);
+        
+        // Combine unique tokens (assigned officer + station officers)
+        const allTokens = [...new Set([...targetTokens, ...stationTokens])];
+        
+        if (allTokens.length > 0) {
+          const messages = allTokens.map(token => ({
             to: token, sound: 'default', title: '\u{1F6A8} New Dispatch Alert',
             body: `${report[0].report_type || 'Report'} at ${report[0].barangay || 'Unknown location'}`,
             data: { type: 'dispatch', dispatch_id: d.dispatch_id, report_id: reportId },
@@ -342,6 +364,7 @@ app.post('/api/dispatch/admin-sync', async (req, res) => {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(messages),
           }).catch(err => console.warn('Push notification error:', err));
+          console.log(`📱 Push notifications sent to ${allTokens.length} officers for dispatch #${d.dispatch_id}`);
         }
       }
 

@@ -130,7 +130,7 @@ class DispatchController extends Controller
                 'report_id' => $report->report_id,
                 'station_id' => $report->assigned_station_id,
                 'patrol_officer_id' => $request->patrol_officer_id,
-                'status' => 'pending',
+                'status' => $request->patrol_officer_id ? 'assigned' : 'pending',
                 'dispatched_at' => now(),
                 'dispatched_by' => auth()->id(),
                 'notes' => $request->notes,
@@ -498,7 +498,7 @@ class DispatchController extends Controller
                 'report_id' => $report->report_id,
                 'station_id' => $report->assigned_station_id,
                 'patrol_officer_id' => $nearestOfficer->id,
-                'status' => 'pending',
+                'status' => 'assigned',
                 'dispatched_at' => now(),
                 'dispatched_by' => auth()->id(),
                 'notes' => $minDistance > 0 

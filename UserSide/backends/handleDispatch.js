@@ -236,7 +236,7 @@ async function getPatrolOfficersByStation(req, res) {
  */
 async function sendToDispatch(req, res) {
     try {
-        const { reportId, dispatcherId, notes } = req.body;
+        const { reportId, dispatcherId, notes, patrolOfficerId } = req.body;
 
         if (!reportId) {
             return res.status(400).json({
@@ -302,11 +302,24 @@ async function sendToDispatch(req, res) {
             console.log(`⚠️ No on-duty patrol officers at station ${report.assigned_station_id}`);
         }
 
-        // Try to find the nearest on-duty patrol officer for auto-assignment
-        let assignedOfficerId = null;
+        // Use patrolOfficerId from admin if provided, otherwise try auto-assignment
+        let assignedOfficerId = patrolOfficerId || null;
         let assignedOfficerName = null;
+
+        // If admin already specified an officer, look up their name
+        if (assignedOfficerId) {
+            const [officerRows] = await db.query(
+                `SELECT firstname, lastname FROM users_public WHERE id = $1`,
+                [assignedOfficerId]
+            );
+            if (officerRows && officerRows.length > 0) {
+                assignedOfficerName = `${officerRows[0].firstname} ${officerRows[0].lastname}`;
+                console.log(`👮 Admin pre-assigned dispatch to officer: ${assignedOfficerName}`);
+            }
+        }
         
-        if (report.latitude && report.longitude) {
+        // If no officer specified, try to find the nearest on-duty patrol officer
+        if (!assignedOfficerId && report.latitude && report.longitude) {
             const nearestOfficer = await findNearestPatrolOfficer(
                 parseFloat(report.latitude),
                 parseFloat(report.longitude),

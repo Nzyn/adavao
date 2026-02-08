@@ -127,27 +127,42 @@ const handleLogin = async (req, res) => {
           });
 
           if (effectiveRole === 'patrol_officer') {
+            // Look up the officer's station_id from AdminSide user_admin table
+            let adminStationId = null;
+            try {
+              const [stationRows] = await db.query(
+                `SELECT station_id FROM user_admin WHERE id = $1`,
+                [adminUser.id]
+              );
+              if (stationRows.length > 0) {
+                adminStationId = stationRows[0].station_id;
+              }
+            } catch (stErr) {
+              console.warn('⚠️ Could not look up station for admin user:', stErr.message);
+            }
+
             await db.query(
               `INSERT INTO users_public (
                   firstname, lastname, email, contact, password,
-                  user_role, is_on_duty,
+                  user_role, is_on_duty, assigned_station_id,
                   email_verified_at,
                   created_at, updated_at
                 )
-                SELECT $1, $2, $3, $4, $5, 'patrol_officer', FALSE, COALESCE($6, NOW()), NOW(), NOW()
+                SELECT $1, $2, $3, $4, $5, 'patrol_officer', FALSE, $7, COALESCE($6, NOW()), NOW(), NOW()
                 WHERE NOT EXISTS (
                   SELECT 1 FROM users_public WHERE LOWER(TRIM(email)) = LOWER(TRIM($3))
                 )`,
-              [adminUser.firstname, adminUser.lastname, adminUser.email, adminUser.contact, adminUser.password, adminUser.email_verified_at]
+              [adminUser.firstname, adminUser.lastname, adminUser.email, adminUser.contact, adminUser.password, adminUser.email_verified_at, adminStationId]
             );
 
             await db.query(
               `UPDATE users_public
                SET user_role = 'patrol_officer',
+                   assigned_station_id = COALESCE(assigned_station_id, $3),
                    email_verified_at = COALESCE(email_verified_at, COALESCE($2, NOW())),
                    updated_at = NOW()
                WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-              [adminUser.email, adminUser.email_verified_at]
+              [adminUser.email, adminUser.email_verified_at, adminStationId]
             );
 
             const [syncedRows] = await db.query(
@@ -322,6 +337,7 @@ const handleLogin = async (req, res) => {
       user: {
         id: user.id,
         firstname: user.firstname,
+        lastname: user.lastname,
         lastName: user.lastname,
         email: user.email,
         contact: decryptedContact,
@@ -331,6 +347,8 @@ const handleLogin = async (req, res) => {
         profile_image: user.profile_image,
         user_role: effectiveRole,
         role: effectiveRole,
+        assigned_station_id: user.assigned_station_id || null,
+        is_on_duty: user.is_on_duty || false,
         createdAt: user.created_at,
         updatedAt: user.updated_at,
         emailVerified: Boolean(user.email_verified_at)
