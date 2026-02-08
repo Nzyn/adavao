@@ -251,29 +251,7 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-        .auto-refresh-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 999px;
-            font-size: 0.75rem;
-            color: #16a34a;
-        }
 
-        .refresh-dot {
-            width: 8px;
-            height: 8px;
-            background: #22c55e;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        .refresh-text {
-            font-weight: 500;
-        }
         
         .station-list {
             display: flex;
@@ -1515,15 +1493,6 @@
             <p>Manage and view all incident reports</p>
         </div>
 
-        <!-- Urgent Fix Button -->
-        @if(auth()->user() && (method_exists(auth()->user(), 'hasRole') && (auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))))
-        <a href="{{ route('reports.recalculateUrgency') }}" 
-           onclick="return confirm('Recalculate all urgency scores? This checks all report types and updates the score.')"
-           style="background: #f59e0b; color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;">
-            <span>⚠️</span> Fix Urgency Scores
-        </a>
-        @endif
-
         <!-- ITEM 15: DATE RANGE FILTER -->
         <form action="{{ route('reports') }}" method="GET" style="display: flex; gap: 0.75rem; align-items: center; background: white; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); flex-wrap: wrap;">
             @if(request('status'))
@@ -1613,10 +1582,6 @@
                 <span class="tab-label">Resolved</span>
                 <span class="tab-count" id="resolvedCount">{{ $resolvedCount ?? 0 }}</span>
             </a>
-        </div>
-        <div class="auto-refresh-indicator" id="autoRefreshIndicator">
-            <span class="refresh-dot"></span>
-            <span class="refresh-text">Auto-refresh active</span>
         </div>
     </div>
 
@@ -1712,18 +1677,24 @@
                                             $elapsedSeconds = $createdAt->diffInSeconds(\Carbon\Carbon::now());
                                         }
 
+                                        // Format elapsed time as human-readable
+                                        $formatTime = function($totalSec) {
+                                            $h = floor($totalSec / 3600);
+                                            $m = floor(($totalSec % 3600) / 60);
+                                            $s = $totalSec % 60;
+                                            if ($h > 0) return sprintf('%dh %dm %dsec', $h, $m, $s);
+                                            if ($m > 0) return sprintf('%dm %dsec', $m, $s);
+                                            return sprintf('%dsec', $s);
+                                        };
+
                                         if ($elapsedSeconds < $threeMinutes) {
                                             $remainingSeconds = $threeMinutes - $elapsedSeconds;
-                                            $minutes = floor($remainingSeconds / 60);
-                                            $seconds = $remainingSeconds % 60;
                                             $timerClass = 'countdown';
-                                            $timerDisplay = sprintf('%02d:%02d', $minutes, $seconds);
+                                            $timerDisplay = $formatTime($remainingSeconds);
                                         } else {
                                             $exceededSeconds = $elapsedSeconds - $threeMinutes;
-                                            $minutes = floor($exceededSeconds / 60);
-                                            $seconds = $exceededSeconds % 60;
                                             $timerClass = 'exceeded';
-                                            $timerDisplay = '+' . sprintf('%02d:%02d', $minutes, $seconds);
+                                            $timerDisplay = '+' . $formatTime($exceededSeconds);
                                         }
                                     @endphp
                                     <span class="sla-timer {{ $timerClass }}" 
@@ -2105,17 +2076,22 @@ function updateSLATimers() {
         const elapsedSeconds = endTime - createdAt;
         const threeMinutes = 180;
         
+        function formatTime(totalSec) {
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = totalSec % 60;
+            if (h > 0) return `${h}h ${m}m ${s}sec`;
+            if (m > 0) return `${m}m ${s}sec`;
+            return `${s}sec`;
+        }
+
         if (elapsedSeconds < threeMinutes) {
             const remainingSeconds = threeMinutes - elapsedSeconds;
-            const minutes = Math.floor(remainingSeconds / 60);
-            const seconds = remainingSeconds % 60;
-            timer.textContent = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            timer.textContent = formatTime(remainingSeconds);
             timer.className = 'sla-timer countdown';
         } else {
             const exceededSeconds = elapsedSeconds - threeMinutes;
-            const minutes = Math.floor(exceededSeconds / 60);
-            const seconds = exceededSeconds % 60;
-            timer.textContent = '+' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            timer.textContent = '+' + formatTime(exceededSeconds);
             timer.className = 'sla-timer exceeded';
         }
     });

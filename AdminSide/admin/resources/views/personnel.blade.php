@@ -471,11 +471,10 @@
                 <th class="sortable" onclick="sortPersonnelTable(1)">Name</th>
                 <th class="sortable" onclick="sortPersonnelTable(2)">Rank</th>
                 <th class="sortable" onclick="sortPersonnelTable(3)">Assigned Station</th>
-                <th class="sortable" onclick="sortPersonnelTable(4)">Level</th>
+                <th class="sortable" onclick="sortPersonnelTable(4)">Role</th>
                 <th class="sortable" onclick="sortPersonnelTable(5)">Email</th>
                 <th class="sortable" onclick="sortPersonnelTable(6)">Contact</th>
                 <th class="sortable" onclick="sortPersonnelTable(7)">Assigned Since</th>
-                <th class="sortable" onclick="sortPersonnelTable(8)">Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -500,13 +499,7 @@
                 </td>
                 <td>
                     @if($officer->user && $officer->user->role)
-                        @if($officer->user->role === 'admin')
-                            <span class="status-badge" style="color: #1e40af;">admin</span>
-                        @elseif($officer->user->role === 'police')
-                            <span class="status-badge" style="color: #3730a3;">police</span>
-                        @else
-                            <span style="color: #9ca3af;">{{ $officer->user->role }}</span>
-                        @endif
+                        <span class="status-badge" style="color: #1e40af; text-transform: capitalize;">{{ $officer->user->role }}</span>
                     @else
                         <span style="color: #9ca3af;">Not Set</span>
                     @endif
@@ -519,11 +512,6 @@
                     @else
                         <span style="color: #9ca3af;">N/A</span>
                     @endif
-                </td>
-                <td>
-                    <span class="status-badge {{ strtolower(str_replace(' ', '-', $officer->status ?? 'active')) }}">
-                        {{ $officer->status ?? 'Active' }}
-                    </span>
                 </td>
                 <td>
                     <button type="button" class="action-btn assign-station-btn" data-user-id="{{ $officer->user_id }}" title="Assign to Police Station">
@@ -545,7 +533,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="10" class="no-results">
+                <td colspan="9" class="no-results">
                     <svg style="width: 48px; height: 48px; margin: 0 auto 1rem; opacity: 0.3;" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
                     </svg>

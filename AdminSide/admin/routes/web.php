@@ -228,11 +228,12 @@ Route::middleware(['auth'])->group(function () {
             ->get();
         
         // Decrypt sensitive fields for display
+        // Always attempt decryption — decrypt() safely returns original text if not encrypted
         foreach ($users as $user) {
-            if ($user->address && \App\Services\EncryptionService::isEncrypted($user->address)) {
+            if ($user->address) {
                 $user->address = \App\Services\EncryptionService::decrypt($user->address);
             }
-            if ($user->contact && \App\Services\EncryptionService::isEncrypted($user->contact)) {
+            if ($user->contact) {
                 $user->contact = \App\Services\EncryptionService::decrypt($user->contact);
             }
         }
@@ -254,10 +255,10 @@ Route::middleware(['auth'])->group(function () {
         
         // Decrypt sensitive fields for display
         foreach ($users as $user) {
-            if ($user->address && \App\Services\EncryptionService::isEncrypted($user->address)) {
+            if ($user->address) {
                 $user->address = \App\Services\EncryptionService::decrypt($user->address);
             }
-            if ($user->contact && \App\Services\EncryptionService::isEncrypted($user->contact)) {
+            if ($user->contact) {
                 $user->contact = \App\Services\EncryptionService::decrypt($user->contact);
             }
         }

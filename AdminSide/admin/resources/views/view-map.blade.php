@@ -1692,14 +1692,10 @@
                 const lat = parseFloat(report.latitude);
                 const lng = parseFloat(report.longitude);
                 
-                // Add random scatter (±0.002 degrees ≈ ±200 meters) to prevent exact overlaps
-                const scatterLat = lat + (Math.random() - 0.5) * 0.004;
-                const scatterLng = lng + (Math.random() - 0.5) * 0.004;
-                
                 const cleanedCrimeType = cleanCrimeType(report.crime_type || report.title);
                 const icon = createCrimeMarker(report.crime_type, 1);
                 
-                const marker = L.marker([scatterLat, scatterLng], { icon: icon });
+                const marker = L.marker([lat, lng], { icon: icon });
                 marker.crimeType = cleanedCrimeType; // Store crime type for cluster grouping
                 marker.bindPopup(`
                     <div class="popup-title">${cleanedCrimeType}</div>

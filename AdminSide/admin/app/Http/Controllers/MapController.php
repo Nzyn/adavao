@@ -173,16 +173,37 @@ class MapController extends Controller
         
         \Log::info('Map Query Result Count: ' . $reports->count());
         
+        // Load barangay coordinates for fallback when reports lack valid lat/lng
+        $barangayCoords = $this->getBarangayCoordinates();
+        
         // Transform data for map display
-        $mapData = $reports->map(function ($report) {
+        $mapData = $reports->map(function ($report) use ($barangayCoords) {
             // Validate essential data
             if (!$report->location || !$report->date_reported) {
                 return null;
             }
             
-            // Filter out coordinates that are in water (Davao Gulf)
-            if ($this->isInWater($report->location->latitude, $report->location->longitude)) {
-                return null;
+            $lat = $report->location->latitude;
+            $lng = $report->location->longitude;
+            
+            // Check if coordinates are valid (not null, not zero, not default)
+            $hasValidCoords = $lat && $lng 
+                && abs($lat) > 0.01 && abs($lng) > 0.01
+                && !$this->isInWater($lat, $lng);
+            
+            if (!$hasValidCoords) {
+                // Fallback: use barangay coordinates from the JSON lookup
+                $decryptedBarangay = EncryptionService::decrypt($report->location->barangay);
+                $fallbackCoords = $this->findBarangayCoordinates($decryptedBarangay ?? '', $barangayCoords);
+                
+                if ($fallbackCoords) {
+                    // Place near barangay center with slight random spread (±0.002 degrees ≈ ±200m)
+                    $lat = $fallbackCoords[0] + (mt_rand(-200, 200) / 100000);
+                    $lng = $fallbackCoords[1] + (mt_rand(-200, 200) / 100000);
+                } else {
+                    // Last resort: skip this report if no barangay match either
+                    return null;
+                }
             }
 
             // Add slight random offset to coordinates (±0.0005 degrees ≈ ±50 meters)
@@ -212,9 +233,9 @@ class MapController extends Controller
                 'id' => $report->report_id,
                 'title' => $report->report_type,
                 'description' => $decryptedDescription,
-                'crime_type' => $report->report_type, // Using report_type as crime_type
-                'latitude' => $report->location->latitude + $latOffset,
-                'longitude' => $report->location->longitude + $lngOffset,
+                'crime_type' => $report->report_type,
+                'latitude' => $lat + $latOffset,
+                'longitude' => $lng + $lngOffset,
                 'location_name' => $decryptedBarangay,
                 'status' => $report->status,
                 'date_reported' => $dateFormatted,

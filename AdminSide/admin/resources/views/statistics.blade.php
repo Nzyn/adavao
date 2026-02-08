@@ -1163,6 +1163,37 @@ function renderTrendChart(historical, forecast) {
                         label: function(context) {
                             if (context.dataset.label.includes('CI')) return null;
                             return `${context.dataset.label}: ${Math.round(context.parsed.y)} crimes`;
+                        },
+                        afterBody: function(tooltipItems) {
+                            // Show crime type breakdown when hovering on a forecast point
+                            const forecastItem = tooltipItems.find(t => t.dataset.label === 'SARIMA Forecast' && t.parsed.y !== null);
+                            if (!forecastItem || !crimeStats?.byType?.length) return [];
+
+                            const totalHistorical = crimeStats.byType.reduce((sum, d) => sum + (parseInt(d.count) || 0), 0);
+                            if (totalHistorical === 0) return [];
+
+                            const forecastTotal = Math.round(forecastItem.parsed.y);
+                            const lines = ['\n── Crime Type Breakdown ──'];
+                            
+                            // Sort by count descending and show top types
+                            const sorted = [...crimeStats.byType].sort((a, b) => (parseInt(b.count) || 0) - (parseInt(a.count) || 0));
+                            const topTypes = sorted.slice(0, 8);
+                            
+                            topTypes.forEach(d => {
+                                const pct = (parseInt(d.count) || 0) / totalHistorical;
+                                const estimated = Math.round(forecastTotal * pct);
+                                if (estimated > 0) {
+                                    lines.push(`  ${d.type}: ~${estimated}`);
+                                }
+                            });
+                            
+                            if (sorted.length > 8) {
+                                const otherPct = sorted.slice(8).reduce((sum, d) => sum + ((parseInt(d.count) || 0) / totalHistorical), 0);
+                                const otherEst = Math.round(forecastTotal * otherPct);
+                                if (otherEst > 0) lines.push(`  Others: ~${otherEst}`);
+                            }
+                            
+                            return lines;
                         }
                     }
                 }
