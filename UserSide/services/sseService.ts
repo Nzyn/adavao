@@ -138,8 +138,3 @@ export function createSseConnection(onUpdate?: UpdateHandler): SseHandle {
     },
   };
 }
-      closed = true;
-      cleanup();
-    },
-  };
-}
