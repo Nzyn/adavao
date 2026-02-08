@@ -175,8 +175,15 @@ async function getDispatchDetails(req, res) {
     if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
     if (!dispatchId) return res.status(400).json({ success: false, message: 'dispatchId is required' });
 
-    // Patrol officers can only view their own dispatch
+    // Patrol officers can view their own dispatches AND pending/assigned station dispatches
     await assertPatrolOfficer(userId);
+
+    // Get this officer's station so they can view unassigned station dispatches too
+    const [userRows] = await db.query(
+      `SELECT assigned_station_id FROM users_public WHERE id = $1`,
+      [userId]
+    );
+    const officerStationId = userRows?.[0]?.assigned_station_id || 0;
 
     const [rows] = await db.query(
       `SELECT
@@ -222,7 +229,16 @@ async function getDispatchDetails(req, res) {
       LEFT JOIN locations l ON r.location_id = l.location_id
       LEFT JOIN report_media rm ON r.report_id = rm.report_id
       WHERE d.dispatch_id = $1
-        AND d.patrol_officer_id = $2
+        AND (
+          -- Officer can view dispatches assigned to them
+          d.patrol_officer_id = $2
+          -- OR pending/assigned dispatches at their station (not assigned to someone else)
+          OR (
+            d.station_id = $3
+            AND d.status IN ('pending', 'assigned')
+            AND (d.patrol_officer_id IS NULL OR d.patrol_officer_id = $2)
+          )
+        )
       GROUP BY
         d.dispatch_id,
         d.report_id,
@@ -250,7 +266,7 @@ async function getDispatchDetails(req, res) {
         l.longitude,
         l.barangay,
         l.reporters_address`,
-      [dispatchId, userId]
+      [dispatchId, userId, officerStationId]
     );
 
     if (!rows || rows.length === 0) {

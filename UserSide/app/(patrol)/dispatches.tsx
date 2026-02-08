@@ -318,7 +318,7 @@ export default function PatrolDispatchesScreen() {
                     isOverdue && styles.dispatchCardOverdue,
                     isUrgent && !isOverdue && styles.dispatchCardUrgent,
                 ]}
-                onPress={() => handleRespondToDispatch(dispatch.dispatch_id)}
+                onPress={() => router.push(`/(patrol)/dispatch-details?id=${dispatch.dispatch_id}`)}
             >
                 <View style={styles.dispatchHeader}>
                     <View style={styles.dispatchTitleRow}>
@@ -351,6 +351,21 @@ export default function PatrolDispatchesScreen() {
                         {dispatch.barangay || dispatch.reporters_address || 'Location unavailable'}
                     </Text>
                 </View>
+
+                {dispatch.title && (
+                    <View style={styles.dispatchDetailRow}>
+                        <Ionicons name="document-text-outline" size={16} color={COLORS.textSecondary} />
+                        <Text style={styles.reportTitleText} numberOfLines={1}>
+                            {dispatch.title}
+                        </Text>
+                    </View>
+                )}
+
+                {dispatch.description && (
+                    <Text style={styles.descriptionPreview} numberOfLines={2}>
+                        {dispatch.description}
+                    </Text>
+                )}
 
                 <View style={styles.dispatchStation}>
                     <Ionicons name="shield-checkmark" size={16} color={COLORS.primary} />
@@ -669,6 +684,25 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         marginLeft: spacing.xs,
         flex: 1,
+    },
+    dispatchDetailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
+    reportTitleText: {
+        fontSize: fontSize.sm,
+        color: COLORS.textPrimary,
+        fontWeight: '600',
+        marginLeft: spacing.xs,
+        flex: 1,
+    },
+    descriptionPreview: {
+        fontSize: fontSize.sm,
+        color: COLORS.textSecondary,
+        marginBottom: spacing.xs,
+        marginLeft: 20,
+        lineHeight: fontSize.sm * 1.4,
     },
     dispatchStation: {
         flexDirection: 'row',

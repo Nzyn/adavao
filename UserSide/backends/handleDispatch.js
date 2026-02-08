@@ -1,4 +1,5 @@
 const db = require('./db');
+const { decrypt } = require('./encryptionService');
 
 /**
  * Update patrol officer's current location
@@ -498,9 +499,17 @@ async function getPendingDispatchesForStation(req, res) {
             [stationId, userId || 0]
         );
 
+        // Decrypt encrypted fields before sending to client
+        const decryptedRows = rows.map(row => ({
+            ...row,
+            description: row.description ? decrypt(row.description) : null,
+            barangay: row.barangay ? decrypt(row.barangay) : null,
+            reporters_address: row.reporters_address ? decrypt(row.reporters_address) : null,
+        }));
+
         return res.json({
             success: true,
-            data: rows
+            data: decryptedRows
         });
 
     } catch (error) {

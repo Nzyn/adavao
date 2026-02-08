@@ -108,6 +108,29 @@ export default function DispatchDetails() {
         }
     };
 
+    const acceptDispatch = async () => {
+        if (!dispatchId || !userId) return;
+        setActionLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/dispatch/${dispatchId}/respond`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+                body: JSON.stringify({ userId }),
+            });
+            const data = await response.json();
+            if (response.ok && data?.success) {
+                Alert.alert('Success', 'You have accepted this dispatch!');
+                loadDetails();
+            } else {
+                Alert.alert('Error', data?.message || 'Failed to accept dispatch');
+            }
+        } catch {
+            Alert.alert('Error', 'Failed to accept dispatch');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const updateStatus = async (action: 'en-route' | 'arrived') => {
         if (!dispatchId || !userId) return;
         setActionLoading(true);
@@ -277,6 +300,13 @@ export default function DispatchDetails() {
 
         return (
             <View style={styles.actionsContainer}>
+                {(status === 'pending' || status === 'assigned') && (
+                    <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.primary }]} onPress={acceptDispatch} disabled={actionLoading}>
+                        {actionLoading ? <ActivityIndicator color={COLORS.white} /> : (
+                            <><Ionicons name="checkmark-circle" size={20} color={COLORS.white} /><Text style={styles.actionButtonText}>Accept Dispatch</Text></>
+                        )}
+                    </TouchableOpacity>
+                )}
                 {status === 'accepted' && (
                     <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.warning }]} onPress={() => updateStatus('en-route')} disabled={actionLoading}>
                         {actionLoading ? <ActivityIndicator color={COLORS.white} /> : (
