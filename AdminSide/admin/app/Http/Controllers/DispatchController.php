@@ -144,6 +144,9 @@ class DispatchController extends Controller
                 $this->sendDispatchNotification($dispatch);
             }
 
+            // Sync dispatch to UserSide backend (safety for multi-DB deployments)
+            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), $dispatch->notes);
+
             Log::info('Dispatch created', [
                 'dispatch_id' => $dispatch->dispatch_id,
                 'report_id' => $report->report_id,
@@ -271,6 +274,9 @@ class DispatchController extends Controller
 
             // Send notification
             $this->sendDispatchNotification($dispatch);
+
+            // Sync dispatch to UserSide backend (safety for multi-DB deployments)
+            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), null);
 
             return response()->json([
                 'success' => true,
