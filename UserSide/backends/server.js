@@ -410,7 +410,7 @@ app.post('/api/admin/clear-reports', async (req, res) => {
     // Clean orphaned locations
     await db.query(`DELETE FROM locations WHERE location_id NOT IN (
       SELECT DISTINCT location_id FROM reports WHERE location_id IS NOT NULL
-      UNION SELECT DISTINCT location_id FROM users WHERE location_id IS NOT NULL
+      UNION SELECT DISTINCT location_id FROM users_public WHERE location_id IS NOT NULL
     )`);
     const { rows } = await db.query('SELECT COUNT(*) as remaining FROM reports');
     res.json({ success: true, message: 'All test reports cleared', remaining: rows[0].remaining });
