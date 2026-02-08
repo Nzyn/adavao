@@ -272,6 +272,7 @@ async function getDispatchDetails(req, res) {
       success: true,
       data: {
         dispatch_id: row.dispatch_id,
+        patrol_officer_id: row.patrol_officer_id,
         status: row.status,
         dispatched_at: row.dispatched_at,
         accepted_at: row.accepted_at,
