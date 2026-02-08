@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { API_URL } from '../../config/backend';
+import { onDataRefresh } from '../../services/sseService';
 import { spacing, fontSize, containerPadding, borderRadius, isTablet } from '../../utils/responsive';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -105,6 +106,13 @@ export default function PatrolDispatchesScreen() {
         }, 2000);
         
         return () => clearInterval(interval);
+    }, [userId, stationId, activeTab]);
+
+    // SSE-triggered immediate refresh
+    useEffect(() => {
+        if (!userId) return;
+        const unsub = onDataRefresh(() => loadDispatches(false));
+        return unsub;
     }, [userId, stationId, activeTab]);
 
     const loadUserData = async () => {

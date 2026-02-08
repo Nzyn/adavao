@@ -562,7 +562,7 @@ async function respondToDispatch(req, res) {
             });
         }
 
-        if (dispatch.status !== 'pending') {
+        if (dispatch.status !== 'pending' && dispatch.status !== 'assigned') {
             return res.status(400).json({
                 success: false,
                 message: `Dispatch is already ${dispatch.status}`
@@ -587,6 +587,13 @@ async function respondToDispatch(req, res) {
                  updated_at = NOW()
              WHERE dispatch_id = $4`,
             [userId, acceptanceTimeSeconds, threeMinuteRuleMet, dispatchId]
+        );
+
+        // Update report status to 'investigating' when dispatch is accepted
+        await db.query(
+            `UPDATE reports SET status = 'investigating', updated_at = NOW()
+             WHERE report_id = (SELECT report_id FROM patrol_dispatches WHERE dispatch_id = $1)`,
+            [dispatchId]
         );
 
         console.log(`✅ Patrol officer ${userId} responded to dispatch #${dispatchId}`);
@@ -633,6 +640,14 @@ async function markEnRoute(req, res) {
                  updated_at = NOW()
              WHERE dispatch_id = $1 AND patrol_officer_id = $2`,
             [dispatchId, userId]
+        );
+
+        // Ensure report status is investigating
+        await db.query(
+            `UPDATE reports SET status = 'investigating', updated_at = NOW()
+             WHERE report_id = (SELECT report_id FROM patrol_dispatches WHERE dispatch_id = $1)
+               AND status NOT IN ('investigating', 'verified', 'resolved')`,
+            [dispatchId]
         );
 
         return res.json({
@@ -827,6 +842,7 @@ module.exports = {
     getAllPatrolLocations,
     getPatrolOfficersByStation,
     sendToDispatch,
+    sendDispatchNotifications,
     getPendingDispatchesForStation,
     respondToDispatch,
     markEnRoute,

@@ -28,6 +28,7 @@ import { inactivityManager } from '../../services/inactivityManager';
 import { debugService } from '../../services/debugService';
 import { API_URL, BACKEND_URL } from '../../config/backend';
 import { stopServerWarmup } from '../../utils/serverWarmup';
+import { onDataRefresh } from '../../services/sseService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -341,6 +342,15 @@ export default function UserDashboard() {
         }
     }, [isLoggedIn]);
 
+    // SSE-triggered immediate refresh
+    useEffect(() => {
+        if (!isLoggedIn) return;
+        const unsub = onDataRefresh(() => {
+            fetchAnnouncements();
+        });
+        return unsub;
+    }, [isLoggedIn]);
+
     const getInitials = (name: string) => {
         const parts = name.split(' ');
         if (parts.length >= 2) {
@@ -385,7 +395,8 @@ export default function UserDashboard() {
                 'userToken',
                 'pushToken',
                 'lastNotificationCheck',
-                'cachedNotifications'
+                'cachedNotifications',
+                'inactivityLogout'
             ]);
             if (!savedEmail) {
                 await AsyncStorage.removeItem('rememberedEmail');

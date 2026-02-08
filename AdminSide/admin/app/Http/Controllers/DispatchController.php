@@ -145,7 +145,7 @@ class DispatchController extends Controller
             }
 
             // Sync dispatch to UserSide backend (safety for multi-DB deployments)
-            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), $dispatch->notes);
+            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), $dispatch->notes, $dispatch->patrol_officer_id);
 
             Log::info('Dispatch created', [
                 'dispatch_id' => $dispatch->dispatch_id,
@@ -276,7 +276,7 @@ class DispatchController extends Controller
             $this->sendDispatchNotification($dispatch);
 
             // Sync dispatch to UserSide backend (safety for multi-DB deployments)
-            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), null);
+            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), null, $dispatch->patrol_officer_id);
 
             return response()->json([
                 'success' => true,
@@ -530,7 +530,7 @@ class DispatchController extends Controller
             }
 
             // Sync dispatch to UserSide backend (safety for multi-DB deployments)
-            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), $dispatch->notes);
+            $this->syncDispatchToUserSide($dispatch->report_id, auth()->id(), $dispatch->notes, $nearestOfficer->id);
 
             Log::info('Auto-dispatch created', [
                 'dispatch_id' => $dispatch->dispatch_id,
@@ -728,7 +728,7 @@ class DispatchController extends Controller
         }
     }
 
-    private function syncDispatchToUserSide($reportId, $dispatcherId = null, $notes = null)
+    private function syncDispatchToUserSide($reportId, $dispatcherId = null, $notes = null, $patrolOfficerId = null)
     {
         try {
             $baseUrl = rtrim(env('NODE_BACKEND_URL', 'https://node-server-gk1u.onrender.com'), '/');
@@ -746,6 +746,7 @@ class DispatchController extends Controller
                 'reportId' => $reportId,
                 'dispatcherId' => $dispatcherId,
                 'notes' => $notes,
+                'patrolOfficerId' => $patrolOfficerId,
             ];
 
             $response = \Http::withHeaders($headers)->post($url, $payload);

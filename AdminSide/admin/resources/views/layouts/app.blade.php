@@ -859,31 +859,49 @@
                 const sseUrl = "{{ env('SSE_URL', 'https://node-server-gk1u.onrender.com/api/stream') }}";
                 let lastRefresh = 0;
                 let source = null;
+                let pollTimer = null;
+
+                const handleUpdate = () => {
+                    const now = Date.now();
+                    if (document.visibilityState !== 'visible') return;
+                    if (now - lastRefresh < 3000) return;
+                    lastRefresh = now;
+                    window.location.reload();
+                };
 
                 const connect = () => {
                     if (source) {
                         try { source.close(); } catch (e) {}
                     }
 
-                    source = new EventSource(sseUrl);
+                    try {
+                        source = new EventSource(sseUrl);
 
-                    const handleUpdate = () => {
-                        const now = Date.now();
-                        if (document.visibilityState !== 'visible') return;
-                        if (now - lastRefresh < 2000) return;
-                        lastRefresh = now;
-                        window.location.reload();
-                    };
+                        source.addEventListener('update', handleUpdate);
+                        // Don't listen to 'tick' - it's just a keep-alive
 
-                    source.addEventListener('update', handleUpdate);
-                    source.addEventListener('tick', handleUpdate);
-                    source.onerror = () => {
-                        try { source.close(); } catch (e) {}
-                        setTimeout(connect, 5000);
-                    };
+                        source.onerror = () => {
+                            try { source.close(); } catch (e) {}
+                            setTimeout(connect, 5000);
+                        };
+                    } catch (e) {
+                        // Fallback polling every 15 seconds
+                        if (!pollTimer) {
+                            pollTimer = setInterval(handleUpdate, 15000);
+                        }
+                    }
                 };
 
                 connect();
+
+                // Reconnect when tab becomes visible
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        if (!source || source.readyState === 2) {
+                            connect();
+                        }
+                    }
+                });
             })();
         </script>
     </body>

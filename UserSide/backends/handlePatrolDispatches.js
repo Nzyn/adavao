@@ -332,6 +332,13 @@ async function acceptDispatch(req, res) {
       [acceptanceTime, threeMinuteRuleMet, dispatchId, userId]
     );
 
+    // Update report status to 'investigating' when dispatch is accepted
+    await db.query(
+      `UPDATE reports SET status = 'investigating', updated_at = NOW()
+       WHERE report_id = (SELECT report_id FROM patrol_dispatches WHERE dispatch_id = $1)`,
+      [dispatchId]
+    );
+
     return res.json({ success: true, message: 'Dispatch accepted', data: { acceptance_time: acceptanceTime, three_minute_rule_met: threeMinuteRuleMet } });
   } catch (e) {
     const statusCode = typeof e?.statusCode === 'number' ? e.statusCode : 500;

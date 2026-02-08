@@ -102,7 +102,12 @@ export default function PatrolProfile() {
             stopLocationTracking();
             stopServerWarmup();
 
+            // Stop inactivity manager
+            const { inactivityManager } = await import('../../services/inactivityManager');
+            inactivityManager.stop();
+
             if (userData?.id || userData?.email) {
+                // Clear patrol-specific server state
                 fetch(`${BACKEND_URL}/patrol-logout`, {
                     method: 'POST',
                     headers: {
@@ -114,6 +119,19 @@ export default function PatrolProfile() {
                         odEmail: userData?.email
                     })
                 }).catch(err => console.warn('Server patrol logout failed:', err));
+
+                // Also clear push token from users_public
+                fetch(`${BACKEND_URL}/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        userId: userData?.id,
+                        email: userData?.email
+                    })
+                }).catch(err => console.warn('Server logout failed:', err));
             }
 
             await AsyncStorage.multiRemove([
@@ -122,7 +140,8 @@ export default function PatrolProfile() {
                 'pushToken',
                 'lastNotificationCheck',
                 'cachedNotifications',
-                'patrolDutyStatus'
+                'patrolDutyStatus',
+                'inactivityLogout'
             ]);
 
             router.replace('/(tabs)/login');

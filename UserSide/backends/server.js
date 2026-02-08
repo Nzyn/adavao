@@ -294,8 +294,65 @@ app.post('/api/dispatch/admin-sync', async (req, res) => {
       }
     }
 
+    const { reportId, dispatcherId, notes, patrolOfficerId } = req.body;
+    if (!reportId) {
+      return res.status(400).json({ success: false, message: 'reportId is required' });
+    }
+
+    // Check if dispatch already exists for this report in UserSide DB
+    const [existing] = await db.query(
+      `SELECT dispatch_id, status, patrol_officer_id FROM patrol_dispatches
+       WHERE report_id = $1 AND status NOT IN ('completed','cancelled','declined')`,
+      [reportId]
+    );
+
+    if (existing && existing.length > 0) {
+      // Dispatch already exists - update it if needed
+      const d = existing[0];
+      if (patrolOfficerId && !d.patrol_officer_id) {
+        await db.query(
+          `UPDATE patrol_dispatches SET patrol_officer_id = $1, status = 'assigned', updated_at = NOW() WHERE dispatch_id = $2`,
+          [patrolOfficerId, d.dispatch_id]
+        );
+      }
+      // Ensure report status is dispatched
+      await db.query(`UPDATE reports SET status = 'dispatched', updated_at = NOW() WHERE report_id = $1 AND status NOT IN ('dispatched','investigating','verified','resolved')`, [reportId]);
+
+      // Still send push notifications to patrol officers
+      const [report] = await db.query(
+        `SELECT r.assigned_station_id, r.report_type, l.barangay FROM reports r LEFT JOIN locations l ON r.location_id = l.location_id WHERE r.report_id = $1`, [reportId]
+      );
+      if (report && report.length > 0) {
+        const stationId = report[0].assigned_station_id;
+        const [officers] = await db.query(
+          `SELECT push_token FROM users_public WHERE LOWER(COALESCE(user_role::text, role::text, '')) = 'patrol_officer' AND assigned_station_id = $1 AND is_on_duty = true AND push_token IS NOT NULL`,
+          [stationId]
+        );
+        const tokens = (officers || []).map(o => o.push_token).filter(Boolean);
+        if (tokens.length > 0) {
+          const { sendDispatchNotifications } = require('./handleDispatch');
+          // We need to export sendDispatchNotifications - for now call inline
+          const messages = tokens.map(token => ({
+            to: token, sound: 'default', title: '\u{1F6A8} New Dispatch Alert',
+            body: `${report[0].report_type || 'Report'} at ${report[0].barangay || 'Unknown location'}`,
+            data: { type: 'dispatch', dispatch_id: d.dispatch_id, report_id: reportId },
+            priority: 'high', channelId: 'dispatch',
+          }));
+          fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(messages),
+          }).catch(err => console.warn('Push notification error:', err));
+        }
+      }
+
+      console.log(`\u2705 Admin-sync: dispatch already exists #${d.dispatch_id} for report #${reportId}`);
+      return res.json({ success: true, message: 'Dispatch already exists, updated', data: { dispatch_id: d.dispatch_id } });
+    }
+
+    // No existing dispatch - create one via sendToDispatch
     return await sendToDispatch(req, res);
   } catch (error) {
+    console.error('Admin-sync error:', error);
     return res.status(500).json({ success: false, message: 'Failed to sync dispatch', error: error.message });
   }
 });

@@ -1,11 +1,11 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, usePathname, useRouter, useLocalSearchParams } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 
@@ -83,23 +83,18 @@ function AppContent() {
   const { isLoading, loadingMessage } = useLoading();
   const router = useRouter();
   const pathname = usePathname();
-  const params = useLocalSearchParams();
-  const lastRefreshRef = useRef(0);
-  const pathnameRef = useRef(pathname);
-  const paramsRef = useRef<Record<string, any>>({});
 
+  // Start inactivity manager when app loads (only if logged in)
   useEffect(() => {
-    pathnameRef.current = pathname;
-  }, [pathname]);
+    const checkAndStartInactivity = async () => {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      const userData = await AsyncStorage.getItem('userData');
+      if (userData) {
+        inactivityManager.start();
+      }
+    };
+    checkAndStartInactivity();
 
-  useEffect(() => {
-    paramsRef.current = params || {};
-  }, [params]);
-
-  // Start inactivity manager when app loads
-  useEffect(() => {
-    inactivityManager.start();
-    
     // Start server warmup to prevent cold start delays
     startServerWarmup();
 
@@ -109,41 +104,11 @@ function AppContent() {
     };
   }, []);
 
-  // SSE auto-refresh: re-mount current screen on backend updates
+  // SSE connection: runs in background, screens use onDataRefresh() to listen
   useEffect(() => {
-    const buildQuery = (data: Record<string, any>) => {
-      const parts: string[] = [];
-      Object.entries(data || {}).forEach(([key, value]) => {
-        if (value === undefined || value === null) return;
-        if (Array.isArray(value)) {
-          value.forEach((item) => {
-            if (item !== undefined && item !== null) {
-              parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(item))}`);
-            }
-          });
-        } else {
-          parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
-        }
-      });
-      return parts.join('&');
-    };
-
-    const connection = createSseConnection(() => {
-      const now = Date.now();
-      if (now - lastRefreshRef.current < 2000) return;
-      lastRefreshRef.current = now;
-
-      const currentPath = pathnameRef.current;
-      if (!currentPath) return;
-
-      const currentParams = { ...paramsRef.current, _sse: String(Date.now()) };
-      const query = buildQuery(currentParams);
-      const nextPath = query ? `${currentPath}?${query}` : currentPath;
-      router.replace(nextPath);
-    });
-
+    const connection = createSseConnection();
     return () => connection.close();
-  }, [router]);
+  }, []);
 
   // Reset inactivity timer on any touch - using onStartShouldSetResponder to capture all touches
   const handleUserActivity = () => {

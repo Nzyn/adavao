@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useUser } from '../../contexts/UserContext';
 import { reportService } from '../../services/reportService';
 import { BACKEND_URL } from '../../config/backend';
+import { onDataRefresh } from '../../services/sseService';
 
 // Color palette matching dashboard
 const COLORS = {
@@ -189,6 +190,12 @@ const history = () => {
       return () => clearInterval(pollInterval);
     }, [user])
   );
+
+  // SSE-triggered immediate refresh
+  useEffect(() => {
+    const unsub = onDataRefresh(() => fetchReports(false));
+    return unsub;
+  }, [user]);
 
   const onRefresh = () => {
     setRefreshing(true);

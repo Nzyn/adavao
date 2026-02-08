@@ -4625,13 +4625,13 @@ function generatePDF(report) {
 
             const handleUpdate = () => {
                 const now = Date.now();
-                if (now - lastSseUpdate < 2000) return;
+                if (now - lastSseUpdate < 3000) return;
                 lastSseUpdate = now;
                 fetchReportUpdates();
             };
 
             source.addEventListener('update', handleUpdate);
-            source.addEventListener('tick', handleUpdate);
+            // Don't listen to 'tick' - it's just a keep-alive
             source.onerror = () => {
                 try { source.close(); } catch (e) {}
                 setTimeout(connect, 5000);
@@ -4639,6 +4639,15 @@ function generatePDF(report) {
         };
 
         connect();
+
+        // Reconnect when tab becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                if (!source || source.readyState === 2) {
+                    connect();
+                }
+            }
+        });
     }
 
     // Initialize auto-refresh when page loads

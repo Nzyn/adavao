@@ -14,6 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../config/backend';
+import { onDataRefresh } from '../../services/sseService';
 import { spacing, fontSize, containerPadding, borderRadius } from '../../utils/responsive';
 
 const COLORS = {
@@ -62,6 +63,13 @@ export default function DispatchDetails() {
         }, 2000);
         
         return () => clearInterval(interval);
+    }, [userId, dispatchId]);
+
+    // SSE-triggered immediate refresh
+    useEffect(() => {
+        if (!userId || !dispatchId) return;
+        const unsub = onDataRefresh(() => loadDetails(false));
+        return unsub;
     }, [userId, dispatchId]);
 
     const loadUserData = async () => {

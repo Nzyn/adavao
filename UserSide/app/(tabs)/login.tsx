@@ -386,6 +386,9 @@ const Login = () => {
     // Store complete user data in AsyncStorage
     await AsyncStorage.setItem('userData', JSON.stringify(user));
 
+    // Clear any stale inactivity logout flag
+    await AsyncStorage.removeItem('inactivityLogout');
+
     // Set user in context with all available fields
     setUser({
       id: user.id?.toString() || user.userId?.toString() || '0',
@@ -405,6 +408,10 @@ const Login = () => {
     } else {
       await AsyncStorage.removeItem('rememberedEmail');
     }
+
+    // Start inactivity manager now that user is logged in
+    const { inactivityManager } = await import('../../services/inactivityManager');
+    inactivityManager.start();
 
     const effectiveRole = String(user.user_role || user.role || '').toLowerCase();
 

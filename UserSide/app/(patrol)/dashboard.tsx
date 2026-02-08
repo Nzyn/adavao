@@ -20,6 +20,7 @@ import { spacing, fontSize, containerPadding, borderRadius, isTablet } from '../
 import { startLocationTracking, stopLocationTracking, isLocationTrackingActive } from '../../services/patrolLocationService';
 import { API_URL, BACKEND_URL } from '../../config/backend';
 import { stopServerWarmup } from '../../utils/serverWarmup';
+import { onDataRefresh } from '../../services/sseService';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { notificationService, Notification } from '../../services/notificationService';
 
@@ -103,6 +104,16 @@ export default function PatrolDashboard() {
         }, 2000);
         
         return () => clearInterval(interval);
+    }, [userId, stationId]);
+
+    // SSE-triggered immediate refresh
+    useEffect(() => {
+        if (!userId) return;
+        const unsub = onDataRefresh(() => {
+            loadDispatchCounts();
+            fetchAnnouncements();
+        });
+        return unsub;
     }, [userId, stationId]);
 
     // Start location tracking when on duty
@@ -339,6 +350,10 @@ export default function PatrolDashboard() {
             // Stop server warmup pings
             stopServerWarmup();
 
+            // Stop inactivity manager
+            const { inactivityManager } = await import('../../services/inactivityManager');
+            inactivityManager.stop();
+
             // Get user data before clearing
             const userData = await AsyncStorage.getItem('userData');
             const parsedUser = userData ? JSON.parse(userData) : null;
@@ -356,6 +371,19 @@ export default function PatrolDashboard() {
                         odEmail: parsedUser?.email
                     })
                 }).catch(err => console.warn('Server patrol logout failed:', err));
+
+                // Also clear push token from users_public
+                fetch(`${BACKEND_URL}/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        userId: parsedUser?.id,
+                        email: parsedUser?.email
+                    })
+                }).catch(err => console.warn('Server logout failed:', err));
             }
 
             // Clear local storage
@@ -365,7 +393,8 @@ export default function PatrolDashboard() {
                 'pushToken',
                 'lastNotificationCheck',
                 'cachedNotifications',
-                'patrolDutyStatus'
+                'patrolDutyStatus',
+                'inactivityLogout'
             ]);
 
             router.replace('/(tabs)/login');

@@ -1774,8 +1774,8 @@ export default function ReportCrime() {
                         visible={showSuccessDialog}
                         title="Report Submitted!"
                         message="Your report has been submitted successfully. Thank you for helping make our community safer."
-                        okText="View History"
-                        onOk={() => {
+                        okText="Okay"
+                        onOk={async () => {
                             setShowSuccessDialog(false);
                             // Reset form
                             setTitle('');
@@ -1790,8 +1790,19 @@ export default function ReportCrime() {
                             setIsAnonymous(false);
                             setSelectedPhotoEvidence(null);
                             setSelectedVideoEvidence(null);
-                            // Navigate to history
-                            router.push('/history');
+                            // Navigate back to appropriate dashboard
+                            try {
+                                const stored = await AsyncStorage.getItem('userData');
+                                const user = stored ? JSON.parse(stored) : null;
+                                const role = String(user?.user_role || user?.role || '').toLowerCase();
+                                if (role === 'patrol_officer') {
+                                    router.replace('/(patrol)/dashboard' as any);
+                                } else {
+                                    router.replace('/(tabs)');
+                                }
+                            } catch {
+                                router.replace('/(tabs)');
+                            }
                         }}
                     />
                 )}
