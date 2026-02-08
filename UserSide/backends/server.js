@@ -407,13 +407,12 @@ app.post('/api/admin/clear-reports', async (req, res) => {
     await db.query('DELETE FROM report_timelines');
     await db.query('DELETE FROM messages');
     await db.query('DELETE FROM reports');
-    // Clean orphaned locations
+    // Clean orphaned locations (skip if no reports remain)
     await db.query(`DELETE FROM locations WHERE location_id NOT IN (
-      SELECT DISTINCT location_id FROM reports WHERE location_id IS NOT NULL
-      UNION SELECT DISTINCT location_id FROM users_public WHERE location_id IS NOT NULL
+      SELECT location_id FROM users_public WHERE location_id IS NOT NULL
     )`);
-    const { rows } = await db.query('SELECT COUNT(*) as remaining FROM reports');
-    res.json({ success: true, message: 'All test reports cleared', remaining: rows[0].remaining });
+    const result = await db.query('SELECT COUNT(*)::int AS cnt FROM reports');
+    res.json({ success: true, message: 'All test reports cleared', remaining: result.rows[0].cnt });
   } catch (err) {
     console.error('Clear reports error:', err);
     res.status(500).json({ success: false, message: err.message });
