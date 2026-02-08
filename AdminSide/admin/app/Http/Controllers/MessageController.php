@@ -51,7 +51,6 @@ class MessageController extends Controller
             $query->where('sender_id', $userId)
                   ->where('receiver_id', $currentUserId);
         })
-        ->with(['sender', 'receiver'])
         ->orderBy('sent_at', 'asc')
         ->get();
 
@@ -89,8 +88,6 @@ class MessageController extends Controller
             'status' => false,
             'sent_at' => now(),
         ]);
-
-        $message->load(['sender', 'receiver']);
         
         // Invalidate unread cache for the receiver
         Cache::forget('unread_messages_' . $request->receiver_id);

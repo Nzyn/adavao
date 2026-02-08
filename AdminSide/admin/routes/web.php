@@ -231,10 +231,13 @@ Route::middleware(['auth'])->group(function () {
         // Always attempt decryption — decrypt() safely returns original text if not encrypted
         foreach ($users as $user) {
             if ($user->address) {
-                $user->address = \App\Services\EncryptionService::decrypt($user->address);
+                $decrypted = \App\Services\EncryptionService::decrypt($user->address);
+                // If decryption returned the same encrypted-looking string, show a placeholder
+                $user->address = \App\Services\EncryptionService::isEncrypted($decrypted) ? 'Unable to decrypt' : $decrypted;
             }
             if ($user->contact) {
-                $user->contact = \App\Services\EncryptionService::decrypt($user->contact);
+                $decrypted = \App\Services\EncryptionService::decrypt($user->contact);
+                $user->contact = \App\Services\EncryptionService::isEncrypted($decrypted) ? 'Unable to decrypt' : $decrypted;
             }
         }
         
@@ -256,10 +259,12 @@ Route::middleware(['auth'])->group(function () {
         // Decrypt sensitive fields for display
         foreach ($users as $user) {
             if ($user->address) {
-                $user->address = \App\Services\EncryptionService::decrypt($user->address);
+                $decrypted = \App\Services\EncryptionService::decrypt($user->address);
+                $user->address = \App\Services\EncryptionService::isEncrypted($decrypted) ? 'Unable to decrypt' : $decrypted;
             }
             if ($user->contact) {
-                $user->contact = \App\Services\EncryptionService::decrypt($user->contact);
+                $decrypted = \App\Services\EncryptionService::decrypt($user->contact);
+                $user->contact = \App\Services\EncryptionService::isEncrypted($decrypted) ? 'Unable to decrypt' : $decrypted;
             }
         }
         

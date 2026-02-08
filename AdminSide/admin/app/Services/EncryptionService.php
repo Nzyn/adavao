@@ -71,7 +71,7 @@ class EncryptionService
             $iv = substr($combined, 0, 16);
             $encrypted = substr($combined, 16);
             
-            // Get encryption key
+            // Try with primary key first
             $key = self::getEncryptionKey();
             
             // Decrypt using AES-256-CBC
@@ -83,14 +83,32 @@ class EncryptionService
                 $iv
             );
             
-            if ($decrypted === false) {
-                 while ($msg = openssl_error_string()) {
-                     Log::debug('OpenSSL Error: ' . $msg);
-                 }
-                return null;
+            if ($decrypted !== false) {
+                return $decrypted;
             }
             
-            return $decrypted;
+            // Primary key failed — try Node.js hardcoded fallback key
+            // (handles case where APP_KEY differs between Laravel and Node.js services)
+            $fallbackKey = base64_decode('ciPqFYTQJ2bGZ0NUrfY7mvwODuOZ6zyUTlIh1D+pb+w=');
+            if ($fallbackKey !== $key) {
+                $decrypted = openssl_decrypt(
+                    $encrypted,
+                    'aes-256-cbc',
+                    $fallbackKey,
+                    OPENSSL_RAW_DATA,
+                    $iv
+                );
+                
+                if ($decrypted !== false) {
+                    Log::debug('Decrypted using Node.js fallback key');
+                    return $decrypted;
+                }
+            }
+            
+            while ($msg = openssl_error_string()) {
+                Log::debug('OpenSSL Error: ' . $msg);
+            }
+            return null;
         } catch (\Exception $e) {
             Log::debug('Node.js format decryption failed', [
                 'error' => $e->getMessage()
@@ -114,14 +132,16 @@ class EncryptionService
         
         try {
             // First, try Laravel's default decryption (JSON format with MAC)
-            $decrypted = Crypt::decryptString($encryptedText);
-            Log::debug('Successfully decrypted using Laravel format');
-            return $decrypted;
-        } catch (DecryptException $e) {
-            // Laravel format failed, try Node.js simple format
-            Log::debug('Laravel decryption failed, trying Node.js format', [
-                'error' => $e->getMessage()
-            ]);
+            try {
+                $decrypted = Crypt::decryptString($encryptedText);
+                Log::debug('Successfully decrypted using Laravel format');
+                return $decrypted;
+            } catch (\Exception $e) {
+                // Laravel format failed, try Node.js simple format
+                Log::debug('Laravel decryption failed, trying Node.js format', [
+                    'error' => $e->getMessage()
+                ]);
+            }
             
             $decrypted = self::decryptNodeJsFormat($encryptedText);
             if ($decrypted !== null) {
@@ -130,11 +150,11 @@ class EncryptionService
             }
             
             // Both formats failed, return original data
-             // This is expected for legacy plaintext data
-             Log::debug('Decryption failed for both formats - returning original data (likely plaintext)', [
-                 'data_preview' => substr($encryptedText, 0, 50)
-             ]);
-             return $encryptedText;
+            // This is expected for legacy plaintext data
+            Log::debug('Decryption failed for both formats - returning original data (likely plaintext)', [
+                'data_preview' => substr($encryptedText, 0, 50)
+            ]);
+            return $encryptedText;
         } catch (\Exception $e) {
             Log::error('Unexpected error during decryption', [
                 'error' => $e->getMessage(),

@@ -615,7 +615,7 @@
             <div class="metrics-grid">
                 <div class="metric-box info">
                     <div class="metric-value" id="patrolOnDuty">-</div>
-                    <div class="metric-label">Patrol On Duty</div>
+                    <div class="metric-label">Total Patrol Users</div>
                 </div>
                 <div class="metric-box success">
                     <div class="metric-value" id="patrolTotal">-</div>
@@ -1414,7 +1414,7 @@ function exportFullReport() {
     csv += `Resolved Cases,${document.getElementById('resolvedCases').textContent}\n`;
     csv += `Pending Review,${document.getElementById('pendingReview').textContent}\n`;
     csv += `Active Dispatches,${document.getElementById('activeDispatches').textContent}\n`;
-    csv += `Patrol On Duty,${document.getElementById('patrolOnDuty').textContent}\n\n`;
+    csv += `Total Patrol Users,${document.getElementById('patrolOnDuty').textContent}\n\n`;
     
     // Crime by type
     if (crimeStats?.byType?.length > 0) {
