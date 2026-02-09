@@ -40,7 +40,7 @@ const getUserById = async (req, res) => {
       // 2. If not found, try user_admin (officers)
       console.log(`   User ${id} not found in users_public, checking user_admin...`);
       const [adminRows] = await db.query(
-        `SELECT u.id, u.firstname, u.lastname, u.email, u.contact, u.station_id,
+        `SELECT u.id, u.firstname, u.lastname, u.email, u.contact, u.address, u.station_id,
                 ps.station_name, ps.address as station_address, ps.contact_number as station_contact,
                 r.role_name as role
          FROM user_admin u

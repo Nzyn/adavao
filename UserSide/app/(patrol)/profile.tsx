@@ -86,11 +86,15 @@ export default function PatrolProfile() {
                             const freshUser = {
                                 ...user,
                                 contact: data.data.contact || user.contact,
+                                phone: data.data.contact || user.contact,
                                 email: data.data.email || user.email,
                                 firstname: data.data.firstname || user.firstname,
                                 lastname: data.data.lastname || user.lastname,
+                                address: data.data.address || user.address,
                             };
                             setUserData(freshUser);
+                            // Update AsyncStorage with decrypted data so it persists
+                            AsyncStorage.setItem('userData', JSON.stringify(freshUser)).catch(() => {});
                         }
                     } catch (apiError) {
                         console.warn('Could not fetch fresh profile data:', apiError);

@@ -109,6 +109,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           console.log('🗄️  Data source: DATABASE');
           console.log(`👤 User: ${userWithSource.firstName} ${userWithSource.lastName}`);
           console.log(`📧 Email: ${userWithSource.email}`);
+          // Update AsyncStorage with decrypted data from API so stale encrypted values are cleared
+          try {
+            const updatedStoredUser = {
+              ...loggedInUser,
+              firstname: savedUser.firstName || loggedInUser.firstname,
+              lastname: savedUser.lastName || loggedInUser.lastname,
+              contact: savedUser.phone || loggedInUser.contact,
+              phone: savedUser.phone || loggedInUser.phone,
+              address: savedUser.address || loggedInUser.address,
+              email: savedUser.email || loggedInUser.email,
+            };
+            await AsyncStorage.setItem('userData', JSON.stringify(updatedStoredUser));
+          } catch (storageErr) {
+            console.warn('⚠️ Could not update AsyncStorage with decrypted data:', storageErr);
+          }
         } else {
           // User exists in auth but not in users table - create initial profile
           console.log('🆕 User not found in database, creating initial profile...');

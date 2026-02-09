@@ -689,7 +689,7 @@ export default function PatrolDashboard() {
             <Modal
                 visible={showNotificationsModal}
                 transparent={true}
-                animationType="slide"
+                animationType="fade"
                 onRequestClose={() => setShowNotificationsModal(false)}
             >
                 <View style={styles.modalOverlay}>
@@ -1420,12 +1420,10 @@ const styles = StyleSheet.create({
     // Notifications Modal Styles
     notificationsModal: {
         backgroundColor: COLORS.white,
-        borderTopLeftRadius: borderRadius.xl,
-        borderTopRightRadius: borderRadius.xl,
+        borderRadius: borderRadius.lg,
         width: '100%',
+        maxWidth: 400,
         maxHeight: '80%',
-        position: 'absolute',
-        bottom: 0,
     },
     notificationsHeader: {
         flexDirection: 'row',

@@ -309,8 +309,8 @@ export default function PatrolChatScreen() {
         return (
             <KeyboardAvoidingView
                 style={{ flex: 1, backgroundColor: COLORS.background }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+                behavior="padding"
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 80}
             >
                 {/* Chat Header */}
                 <View style={styles.chatHeader}>
@@ -999,7 +999,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: COLORS.borderLight,
         paddingTop: spacing.sm,
-        paddingBottom: Platform.OS === 'ios' ? spacing.lg + 10 : spacing.md + 4,
+        paddingBottom: Platform.OS === 'ios' ? spacing.lg + 10 : spacing.lg + 14,
         paddingHorizontal: spacing.md,
     },
     inputContainer: {
