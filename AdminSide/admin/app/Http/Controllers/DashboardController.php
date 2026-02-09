@@ -159,6 +159,11 @@ class DashboardController extends Controller
             ->where('status', 'pending')
             ->count();
         
+        // Count fake/invalid reports
+        $fakeReports = DB::table('reports')
+            ->where('is_valid', 'invalid')
+            ->count();
+        
         return view('welcome', compact(
             'userRole',
             'totalReports',
@@ -174,6 +179,7 @@ class DashboardController extends Controller
             'urgentPending',
             'activeInvestigations',
             'solvedThisMonth',
+            'fakeReports',
             'dateFrom',
             'dateTo'
         ));

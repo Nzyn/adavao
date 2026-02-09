@@ -807,6 +807,33 @@
         </a>
     </div>
 
+    <!-- Complaint Summary Cards -->
+    <h2 class="section-title">Complaint Summary</h2>
+    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
+
+        <!-- Total Complaints -->
+        <a href="{{ route('reports', $queryParams) }}" class="stat-card" style="border-left-color: #6366f1; background: #eef2ff;">
+            <div class="stat-title" style="color: #4338ca;">TOTAL COMPLAINTS</div>
+            <div class="stat-value" style="color: #312e81;">{{ $totalReports }}</div>
+            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">All submitted reports</div>
+        </a>
+
+        <!-- Resolved Complaints -->
+        <a href="{{ route('reports', array_merge(['status' => 'resolved'], $queryParams)) }}" class="stat-card" style="border-left-color: #22c55e; background: #f0fdf4;">
+            <div class="stat-title" style="color: #15803d;">RESOLVED COMPLAINTS</div>
+            <div class="stat-value" style="color: #14532d;">{{ $resolvedReports }}</div>
+            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">Successfully closed cases</div>
+        </a>
+
+        <!-- Fake Reports -->
+        <a href="{{ route('reports', array_merge(['validity' => 'invalid'], $queryParams)) }}" class="stat-card" style="border-left-color: #f43f5e; background: #fff1f2;">
+            <div class="stat-title" style="color: #be123c;">FAKE REPORTS</div>
+            <div class="stat-value" style="color: #881337;">{{ $fakeReports ?? 0 }}</div>
+            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">Marked as invalid</div>
+        </a>
+
+    </div>
+
     @if($userRole !== 'police')
         <!-- ADMIN DASHBOARD: System Overview -->
         <h2 class="section-title">System Overview</h2>
