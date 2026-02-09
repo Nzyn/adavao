@@ -26,7 +26,7 @@ const getUserById = async (req, res) => {
       `SELECT u.*, 
               ps.station_name, ps.address as station_address, ps.contact_number as station_contact 
        FROM users_public u
-       LEFT JOIN police_stations ps ON u.station_id = ps.station_id
+       LEFT JOIN police_stations ps ON COALESCE(u.assigned_station_id, u.station_id) = ps.station_id
        WHERE u.id = $1`,
       [id]
     );
@@ -68,10 +68,13 @@ const getUserById = async (req, res) => {
     console.log("✅ User profile fetched:", { id: user.id, name: `${user.firstname} ${user.lastname}`, role: user.role || 'user' });
 
     // 3. Structure the response to include 'station' object if applicable
+    const effectiveStationId = user.assigned_station_id || user.station_id;
     const responseData = {
       ...user,
-      station: user.station_id ? {
-        station_id: user.station_id,
+      station_id: effectiveStationId,
+      assigned_station_id: user.assigned_station_id || user.station_id,
+      station: effectiveStationId ? {
+        station_id: effectiveStationId,
         station_name: user.station_name,
         address: user.station_address,
         contact_number: user.station_contact
@@ -222,7 +225,7 @@ const updateUserStation = async (req, res) => {
 
     const query = `
       UPDATE users_public 
-      SET station_id = $1,
+      SET assigned_station_id = $1,
           updated_at = NOW()
       WHERE id = $2 RETURNING id
     `;
@@ -299,10 +302,11 @@ const getUserStation = async (req, res) => {
     console.log(`🚔 Fetching station for police officer ID: ${userId}`);
 
     const [userRows] = await db.query(
-      `SELECT u.id, u.firstname, u.lastname, u.email, u.station_id,
-              ps.station_id, ps.station_name, ps.address, ps.contact_number
+      `SELECT u.id, u.firstname, u.lastname, u.email, 
+              COALESCE(u.assigned_station_id, u.station_id) as station_id,
+              ps.station_id as ps_station_id, ps.station_name, ps.address, ps.contact_number
        FROM users_public u
-       LEFT JOIN police_stations ps ON u.station_id = ps.station_id
+       LEFT JOIN police_stations ps ON COALESCE(u.assigned_station_id, u.station_id) = ps.station_id
        WHERE u.id = $1`,
       [userId]
     );

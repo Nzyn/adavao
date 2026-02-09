@@ -158,7 +158,7 @@ const handleLogin = async (req, res) => {
             await db.query(
               `UPDATE users_public
                SET user_role = 'patrol_officer',
-                   assigned_station_id = COALESCE(assigned_station_id, $3),
+                   assigned_station_id = COALESCE($3, assigned_station_id),
                    email_verified_at = COALESCE(email_verified_at, COALESCE($2, NOW())),
                    updated_at = NOW()
                WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,

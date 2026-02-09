@@ -83,6 +83,7 @@ export default function PatrolProfile() {
                         const response = await fetch(`${API_URL}/users/${user.id}`);
                         const data = await response.json();
                         if (data.success && data.data) {
+                            const freshStationId = data.data.assigned_station_id || data.data.station_id;
                             const freshUser = {
                                 ...user,
                                 contact: data.data.contact || user.contact,
@@ -91,10 +92,21 @@ export default function PatrolProfile() {
                                 firstname: data.data.firstname || user.firstname,
                                 lastname: data.data.lastname || user.lastname,
                                 address: data.data.address || user.address,
+                                assigned_station_id: freshStationId || user.assigned_station_id,
                             };
                             setUserData(freshUser);
                             // Update AsyncStorage with decrypted data so it persists
                             AsyncStorage.setItem('userData', JSON.stringify(freshUser)).catch(() => {});
+                            
+                            // If fresh data has station info from API, use it directly
+                            if (data.data.station && data.data.station.station_name) {
+                                setStationInfo({
+                                    station_name: data.data.station.station_name,
+                                    station_address: data.data.station.address || '',
+                                });
+                            } else if (freshStationId) {
+                                fetchStationInfo(freshStationId);
+                            }
                         }
                     } catch (apiError) {
                         console.warn('Could not fetch fresh profile data:', apiError);
@@ -110,10 +122,13 @@ export default function PatrolProfile() {
 
     const fetchStationInfo = async (stationId: number) => {
         try {
-            const response = await fetch(`${API_URL}/stations/${stationId}`);
+            const response = await fetch(`${API_URL}/police-stations/${stationId}`);
             const data = await response.json();
             if (data.success && data.data) {
-                setStationInfo(data.data);
+                setStationInfo({
+                    station_name: data.data.station_name,
+                    station_address: data.data.address || '',
+                });
             }
         } catch (error) {
             console.error('Error fetching station info:', error);

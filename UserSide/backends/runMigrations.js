@@ -40,6 +40,48 @@ async function runMigrations() {
     }
     console.log('✅ Column type check complete.');
 
+    // ── Repair corrupted encrypted data ──────────────────────────
+    // Previously, VARCHAR(15) truncated encrypted values making them unrecoverable.
+    // Detect values that look like truncated base64 (24-50 chars of pure base64)
+    // and clear them so the user can re-enter their info.
+    console.log('🔧 Checking for corrupted encrypted data...');
+    const repairTables = [
+      { table: 'users_public', idCol: 'id' },
+      { table: 'user_admin', idCol: 'id' },
+    ];
+    for (const { table, idCol } of repairTables) {
+      try {
+        const [rows] = await db.query(
+          `SELECT ${idCol}, contact, address FROM ${table} 
+           WHERE (contact IS NOT NULL AND LENGTH(contact) BETWEEN 20 AND 50 AND contact ~ '^[A-Za-z0-9+/=]+$')
+              OR (address IS NOT NULL AND LENGTH(address) BETWEEN 20 AND 50 AND address ~ '^[A-Za-z0-9+/=]+$')`
+        );
+        for (const row of rows) {
+          const updates = [];
+          const vals = [];
+          let idx = 1;
+          // A valid encrypted value is 60+ chars. 20-50 chars of pure base64 = truncated/corrupted.
+          if (row.contact && row.contact.length >= 20 && row.contact.length <= 50 && /^[A-Za-z0-9+/=]+$/.test(row.contact)) {
+            updates.push(`contact = $${idx++}`);
+            vals.push(null);
+            console.log(`  ⚠️  ${table} ${idCol}=${row[idCol]}: clearing corrupted contact (len=${row.contact.length})`);
+          }
+          if (row.address && row.address.length >= 20 && row.address.length <= 50 && /^[A-Za-z0-9+/=]+$/.test(row.address)) {
+            updates.push(`address = $${idx++}`);
+            vals.push(null);
+            console.log(`  ⚠️  ${table} ${idCol}=${row[idCol]}: clearing corrupted address (len=${row.address.length})`);
+          }
+          if (updates.length > 0) {
+            vals.push(row[idCol]);
+            await db.query(`UPDATE ${table} SET ${updates.join(', ')} WHERE ${idCol} = $${idx}`, vals);
+          }
+        }
+      } catch (repairErr) {
+        console.warn(`  ℹ️  Could not repair ${table}: ${repairErr.message}`);
+      }
+    }
+    console.log('✅ Data integrity check complete.');
+
     console.log('✅ Startup tasks completed successfully!');
     return true;
   } catch (error) {

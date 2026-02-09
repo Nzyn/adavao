@@ -1292,7 +1292,7 @@ async function getAllReports(req, res) {
 
     if (requestingUserId) {
       const [requestingUsers] = await db.query(
-        "SELECT role, station_id FROM users_public WHERE id = $1",
+        "SELECT role, COALESCE(assigned_station_id, station_id) as station_id FROM users_public WHERE id = $1",
         [requestingUserId]
       );
       if (requestingUsers.length > 0) {

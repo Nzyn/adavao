@@ -640,6 +640,17 @@ class UserController extends Controller
             $user->station_id = $validatedData['station_id'];
             $user->save();
             
+            // Sync station assignment to users_public (patrol mobile app reads from this table)
+            if ($userType === 'admin') {
+                DB::table('users_public')
+                    ->where(DB::raw('LOWER(TRIM(email))'), strtolower(trim($user->email)))
+                    ->update([
+                        'assigned_station_id' => $validatedData['station_id'],
+                        'updated_at' => now()
+                    ]);
+                \Log::info('Synced station to users_public', ['email' => $user->email, 'station_id' => $validatedData['station_id']]);
+            }
+            
             // If police user, also update/create police officer record
             if ($role === 'police') {
                 if ($userType === 'user') {
@@ -742,6 +753,16 @@ class UserController extends Controller
             $previousStation = $user->station_id;
             $user->station_id = null;
             $user->save();
+            
+            // Sync station removal to users_public (patrol mobile app reads from this table)
+            if ($userType === 'admin') {
+                DB::table('users_public')
+                    ->where(DB::raw('LOWER(TRIM(email))'), strtolower(trim($user->email)))
+                    ->update([
+                        'assigned_station_id' => null,
+                        'updated_at' => now()
+                    ]);
+            }
             
             \Log::info('User unassigned from station', [
                 'user_id' => $user->id,
