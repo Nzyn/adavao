@@ -94,6 +94,34 @@ const evidenceStorage = multer.diskStorage({
   }
 });
 
+// Configure multer for announcement attachments (uploaded to Cloudinary)
+const announcementStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, '../temp_announcements');
+    const fs = require('fs');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'announcement-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const announcementUpload = multer({
+  storage: announcementStorage,
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/') || file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image, video, and PDF files are allowed!'), false);
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
 // Configure multer for verification files
 const verificationStorage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -246,7 +274,7 @@ const { getVerifiedUserRole } = require('./authMiddleware');
 const { verifyUserRole, requireAuthorizedRole } = require('./authMiddleware');
 
 // Announcements handlers
-const { getAnnouncements, getAnnouncementById } = require('./handleAnnouncements');
+const { getAnnouncements, getAnnouncementById, uploadAnnouncementFiles } = require('./handleAnnouncements');
 
 // Patrol dispatch handlers
 const {
@@ -277,6 +305,7 @@ app.use('/api/user', userRoutes);
 // Announcements API (public, no auth required)
 app.get('/api/announcements', getAnnouncements);
 app.get('/api/announcements/:id', getAnnouncementById);
+app.post('/api/announcements/upload', announcementUpload.array('attachments', 10), uploadAnnouncementFiles);
 
 // Patrol location tracking API
 app.post('/api/patrol/location', updatePatrolLocation);

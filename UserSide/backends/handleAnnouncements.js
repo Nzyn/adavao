@@ -1,4 +1,5 @@
 const db = require('./db');
+const { uploadFile, isConfigured } = require('./cloudinaryService');
 
 // Admin site base URL for storage assets (announcements, etc.)
 const ADMIN_BASE_URL = process.env.ADMIN_KEEP_ALIVE_URL || 'https://alertdavao-admin.onrender.com';
@@ -152,7 +153,69 @@ function formatDate(dateString) {
     }
 }
 
+/**
+ * Upload announcement attachment files to Cloudinary
+ * Called by the Laravel AdminSide when creating announcements
+ * Accepts multipart file upload, returns Cloudinary URLs
+ */
+async function uploadAnnouncementFiles(req, res) {
+    try {
+        if (!isConfigured()) {
+            return res.status(500).json({
+                success: false,
+                message: 'Cloudinary is not configured on the server'
+            });
+        }
+
+        const files = req.files;
+        if (!files || files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No files provided'
+            });
+        }
+
+        console.log(`☁️ Uploading ${files.length} announcement file(s) to Cloudinary...`);
+
+        const uploadedUrls = [];
+        for (const file of files) {
+            const result = await uploadFile(file.path, 'announcements', {
+                resource_type: 'auto'
+            });
+
+            if (result.success) {
+                uploadedUrls.push(result.url);
+                console.log(`   ✅ Uploaded: ${result.url}`);
+            } else {
+                console.error(`   ❌ Failed to upload ${file.originalname}: ${result.error}`);
+            }
+        }
+
+        if (uploadedUrls.length === 0) {
+            return res.status(500).json({
+                success: false,
+                message: 'All file uploads failed'
+            });
+        }
+
+        return res.json({
+            success: true,
+            urls: uploadedUrls,
+            count: uploadedUrls.length
+        });
+
+    } catch (error) {
+        console.error('Error uploading announcement files:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to upload files',
+            error: error.message
+        });
+    }
+}
+
 module.exports = {
     getAnnouncements,
-    getAnnouncementById
+    getAnnouncementById,
+    uploadAnnouncementFiles
 };
