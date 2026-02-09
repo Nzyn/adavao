@@ -151,8 +151,35 @@ async function encryptAllSensitiveData() {
         }
 
         // ========================================
-        // SUMMARY
+        // 1b. ENCRYPT USER_ADMIN CONTACT & ADDRESS
         // ========================================
+        console.log('\n📱 Encrypting user_admin contact and address fields...');
+        let adminEncrypted = 0;
+        if (!(await tableExists(pool, 'user_admin'))) {
+            console.warn('⚠️ user_admin table does not exist yet. Skipping.');
+        } else {
+            const adminUsers = await pool.query(
+                'SELECT id, contact, address FROM user_admin WHERE (contact IS NOT NULL AND contact != \'\') OR (address IS NOT NULL AND address != \'\')'
+            );
+            for (const user of adminUsers.rows) {
+                const updates = {};
+                if (user.contact && !isAlreadyEncrypted(user.contact)) {
+                    updates.contact = encrypt(user.contact);
+                    console.log(`  ✅ Admin ${user.id}: Encrypted contact`);
+                }
+                if (user.address && !isAlreadyEncrypted(user.address)) {
+                    updates.address = encrypt(user.address);
+                    console.log(`  ✅ Admin ${user.id}: Encrypted address`);
+                }
+                const updateKeys = Object.keys(updates);
+                if (updateKeys.length > 0) {
+                    const q = buildUpdateQuery('user_admin', 'id', user.id, updates);
+                    await pool.query(q.text, q.values);
+                    adminEncrypted++;
+                }
+            }
+        }
+
         // ========================================
         // SUMMARY
         // ========================================
@@ -160,6 +187,7 @@ async function encryptAllSensitiveData() {
         console.log('📊 ENCRYPTION SUMMARY');
         console.log('='.repeat(60));
         console.log(`✅ Users encrypted (contact/address): ${typeof userEncrypted === 'number' ? userEncrypted : 0}`);
+        console.log(`✅ Admin users encrypted: ${adminEncrypted}`);
         console.log(`✅ Verifications encrypted (images): ${verificationEncrypted}`);
         console.log('='.repeat(60));
         console.log('\n🎉 Encryption complete! Checking finished.');

@@ -18,6 +18,28 @@ async function runMigrations() {
     const result = await db.query('SELECT NOW() as server_time');
     console.log(`✅ Database connected. Server time: ${result[0][0].server_time}`);
 
+    // ── Widen contact & address columns to TEXT for encrypted data ────
+    // Encrypted values are 60+ chars; VARCHAR(15) truncates/errors on PostgreSQL.
+    console.log('🔧 Ensuring contact/address columns are TEXT type...');
+    const columnWidenQueries = [
+      `ALTER TABLE users_public ALTER COLUMN contact TYPE TEXT`,
+      `ALTER TABLE users_public ALTER COLUMN address TYPE TEXT`,
+      `ALTER TABLE user_admin ALTER COLUMN contact TYPE TEXT`,
+      `ALTER TABLE user_admin ALTER COLUMN address TYPE TEXT`,
+      `ALTER TABLE pending_user_admin_registrations ALTER COLUMN contact TYPE TEXT`,
+    ];
+    for (const q of columnWidenQueries) {
+      try {
+        await db.query(q);
+      } catch (colErr) {
+        // Column might already be TEXT, or table/column might not exist — safe to ignore
+        if (!colErr.message.includes('does not exist')) {
+          console.log(`  ℹ️  ${q.split('ALTER COLUMN ')[1]?.split(' ')[0] || ''}: ${colErr.message.includes('already') ? 'already TEXT' : colErr.message}`);
+        }
+      }
+    }
+    console.log('✅ Column type check complete.');
+
     console.log('✅ Startup tasks completed successfully!');
     return true;
   } catch (error) {

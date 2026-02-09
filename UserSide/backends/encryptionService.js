@@ -124,7 +124,10 @@ function decrypt(encryptedData) {
 
     return decrypted;
   } catch (error) {
-    // Silently return original data if decryption fails (might not be encrypted)
+    // Log decryption failures for debugging (but don't spam logs)
+    const preview = encryptedData.substring(0, 30);
+    console.warn(`⚠️ Decrypt failed for data starting with "${preview}..." (len=${encryptedData.length}): ${error.message}`);
+    // Return original data if decryption fails (might not be encrypted)
     return encryptedData;
   }
 }

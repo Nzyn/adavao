@@ -39,9 +39,9 @@ class ProfileController extends Controller
         $validator = Validator::make($request->all(), [
             'firstname' => 'required|string|max:50',
             'lastname' => 'required|string|max:50',
-            'contact' => 'required|string|max:15',
+            'contact' => 'required|string|max:20',
             'email' => 'required|email|unique:users,email,' . $user->id,
-            'address' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
@@ -51,9 +51,9 @@ class ProfileController extends Controller
         $user->update([
             'firstname' => $request->firstname,
             'lastname' => $request->lastname,
-            'contact' => $request->contact,
+            'contact' => $request->contact ? EncryptionService::encrypt($request->contact) : null,
             'email' => $request->email,
-            'address' => $request->address,
+            'address' => $request->address ? EncryptionService::encrypt($request->address) : null,
         ]);
 
         return back()->with('success', 'Profile updated successfully!');

@@ -7,6 +7,7 @@ use App\Models\PoliceStation;
 use App\Models\PoliceOfficer;
 use App\Models\Notification;
 use App\Events\UserFlagged;
+use App\Services\EncryptionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,10 @@ class UserController extends Controller
         try {
             $user = User::with('policeStation')->findOrFail($id);
             
+            // Decrypt sensitive fields before returning
+            $decryptedContact = $user->contact ? EncryptionService::decrypt($user->contact) : null;
+            $decryptedAddress = $user->address ? EncryptionService::decrypt($user->address) : null;
+            
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -31,8 +36,8 @@ class UserController extends Controller
                     'firstName' => $user->firstname,
                     'lastName' => $user->lastname,
                     'email' => $user->email,
-                    'phone' => $user->contact,
-                    'address' => $user->address,
+                    'phone' => $decryptedContact,
+                    'address' => $decryptedAddress,
                     'latitude' => $user->latitude,
                     'longitude' => $user->longitude,
                     'is_verified' => $user->is_verified,
@@ -73,8 +78,8 @@ class UserController extends Controller
                 'firstname' => 'sometimes|required|string|max:50',
                 'lastname' => 'sometimes|required|string|max:50',
                 'email' => 'sometimes|required|email|max:100|unique:users_public,email,' . $id,
-                'contact' => 'sometimes|nullable|string|max:15',
-                'address' => 'sometimes|nullable|string',
+                'contact' => 'sometimes|nullable|string|max:20',
+                'address' => 'sometimes|nullable|string|max:500',
                 'latitude' => 'sometimes|nullable|numeric',
                 'longitude' => 'sometimes|nullable|numeric',
             ]);
@@ -85,6 +90,10 @@ class UserController extends Controller
             // Invalidate user cache
             Cache::forget('users_list');
 
+            // Decrypt sensitive fields before returning
+            $decryptedContact = $user->contact ? EncryptionService::decrypt($user->contact) : null;
+            $decryptedAddress = $user->address ? EncryptionService::decrypt($user->address) : null;
+
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
@@ -93,8 +102,8 @@ class UserController extends Controller
                     'firstName' => $user->firstname,
                     'lastName' => $user->lastname,
                     'email' => $user->email,
-                    'phone' => $user->contact,
-                    'address' => $user->address,
+                    'phone' => $decryptedContact,
+                    'address' => $decryptedAddress,
                     'latitude' => $user->latitude,
                     'longitude' => $user->longitude,
                     'is_verified' => $user->is_verified,
@@ -137,8 +146,8 @@ class UserController extends Controller
                                     'firstName' => $user->firstname,
                                     'lastName' => $user->lastname,
                                     'email' => $user->email,
-                                    'phone' => $user->contact,
-                                    'address' => $user->address,
+                                    'phone' => $user->contact ? EncryptionService::decrypt($user->contact) : null,
+                                    'address' => $user->address ? EncryptionService::decrypt($user->address) : null,
                                     'latitude' => $user->latitude,
                                     'longitude' => $user->longitude,
                                     'is_verified' => $user->is_verified,

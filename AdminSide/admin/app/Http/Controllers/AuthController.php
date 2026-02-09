@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use App\Notifications\EmailVerification;
 use App\Notifications\PasswordResetNotification;
 use App\Models\AdminLoginAttempt;
+use App\Services\EncryptionService;
 
 class AuthController extends Controller
 {
@@ -35,7 +36,7 @@ class AuthController extends Controller
                 'max:100',
                 'regex:/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'
             ],
-            'contact' => 'required|string|max:15',
+            'contact' => 'required|string|max:20',
             'password' => [
                 'required',
                 'string',
@@ -110,7 +111,7 @@ class AuthController extends Controller
             $pending->update([
                 'firstname' => $request->firstname,
                 'lastname' => $request->lastname,
-                'contact' => $request->contact,
+                'contact' => EncryptionService::encrypt($request->contact),
                 'password' => Hash::make($request->password),
                 'user_role' => $userRole,
                 'verification_token' => $verificationToken,
@@ -127,7 +128,7 @@ class AuthController extends Controller
                     'firstname' => $request->firstname,
                     'lastname' => $request->lastname,
                     'email' => $request->email,
-                    'contact' => $request->contact,
+                    'contact' => EncryptionService::encrypt($request->contact),
                     'password' => Hash::make($request->password),
                     'verification_token' => $verificationToken,
                     'token_expires_at' => $tokenExpiresAt,
@@ -1245,7 +1246,7 @@ class AuthController extends Controller
             return redirect()->route('login')->with('error', 'User not found.');
         }
         
-        $userAdmin->contact = $request->contact;
+        $userAdmin->contact = EncryptionService::encrypt($request->contact);
         $userAdmin->save();
         
         // Clear pending session
