@@ -2,7 +2,7 @@ const { Pool } = require('pg');
 const fs = require('fs');
 
 const pool = new Pool({
-    connectionString: 'postgresql://alertdavao_user:rcXDr9MjmEJ8Kk6l2Nw7SbDLnOaS1m0l@dpg-d4t0k8u3jp1c73fhvulg-a.singapore-postgres.render.com/alertdavao_f2ij',
+    connectionString: 'postgresql://alertdavao_w07v_user:W7nLMXVel4jMKegzbLCEAn7CC8LFMIwT@dpg-d651i2ggjchc73fqnkqg-a.singapore-postgres.render.com/alertdavao_w07v',
     ssl: { rejectUnauthorized: false }
 });
 
@@ -48,7 +48,7 @@ async function generateDataDictionary() {
 
         // Generate markdown
         let md = `# AlertDavao Database Data Dictionary\n\n`;
-        md += `**Database:** alertdavao_f2ij (PostgreSQL)  \n`;
+        md += `**Database:** alertdavao_w07v (PostgreSQL)  \n`;
         md += `**Generated:** ${new Date().toISOString()}  \n`;
         md += `**Total Tables:** ${Object.keys(tableData).length}\n\n`;
         md += `---\n\n`;
