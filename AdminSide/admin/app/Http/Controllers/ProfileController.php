@@ -18,13 +18,7 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
         
-        // Decrypt sensitive fields for display in form
-        if ($user->address && EncryptionService::isEncrypted($user->address)) {
-            $user->address = EncryptionService::decrypt($user->address);
-        }
-        if ($user->contact && EncryptionService::isEncrypted($user->contact)) {
-            $user->contact = EncryptionService::decrypt($user->contact);
-        }
+        // Contact and address are auto-decrypted by model accessors
         
         return view('profile', compact('user'));
     }

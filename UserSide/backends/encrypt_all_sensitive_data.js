@@ -39,8 +39,30 @@ function encrypt(text) {
 
 function isAlreadyEncrypted(value) {
     if (!value) return true;
-    // Encrypted data is long base64 string
-    return value.length > 50 && /^[A-Za-z0-9+/=]+$/.test(value);
+    // Try to decrypt — if it succeeds, the value is already encrypted
+    // This is the only reliable way; length checks miss short encrypted values (e.g. phone ~44 chars)
+    if (typeof value !== 'string' || value.length < 24) return false;
+    if (!/^[A-Za-z0-9+/=]+$/.test(value)) return false;
+    try {
+        const combined = Buffer.from(value, 'base64');
+        if (combined.length < 17) return false;  // 16 IV + 1+ data
+        const iv = combined.slice(0, 16);
+        const encrypted = combined.slice(16);
+        const key = getEncryptionKey();
+        const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+        let decrypted = decipher.update(encrypted, undefined, 'utf8');
+        decrypted += decipher.final('utf8');
+        // If decrypt succeeded, it IS encrypted
+        return true;
+    } catch (e) {
+        // Also try Laravel JSON format
+        try {
+            const decoded = Buffer.from(value, 'base64').toString('utf8');
+            const payload = JSON.parse(decoded);
+            if (payload && payload.iv && payload.value) return true;
+        } catch (e2) {}
+        return false;
+    }
 }
 
 function buildUpdateQuery(tableName, idColumnName, idValue, updatesObject) {

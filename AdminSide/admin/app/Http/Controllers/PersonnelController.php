@@ -24,13 +24,7 @@ class PersonnelController extends Controller
             $officer->status = $user->is_verified ? 'Active' : 'Inactive';
             $officer->assigned_since = $user->created_at; 
             
-            // Decrypt sensitive fields for display
-            if ($user->contact && EncryptionService::isEncrypted($user->contact)) {
-                $user->contact = EncryptionService::decrypt($user->contact);
-            }
-            if ($user->address && EncryptionService::isEncrypted($user->address)) {
-                $user->address = EncryptionService::decrypt($user->address);
-            }
+            // Contact and address are auto-decrypted by UserAdmin model accessors
             
             // Attach 'role' attribute for view compatibility
             $roles = $user->adminRoles->pluck('role_name')->toArray();

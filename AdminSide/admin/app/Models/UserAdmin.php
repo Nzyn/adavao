@@ -88,6 +88,28 @@ class UserAdmin extends Authenticatable
     ];
 
     /**
+     * Auto-decrypt the contact field when accessed.
+     */
+    public function getContactAttribute($value)
+    {
+        if (empty($value) || !is_string($value)) {
+            return $value;
+        }
+        return \App\Services\EncryptionService::decrypt($value);
+    }
+
+    /**
+     * Auto-decrypt the address field when accessed.
+     */
+    public function getAddressAttribute($value)
+    {
+        if (empty($value) || !is_string($value)) {
+            return $value;
+        }
+        return \App\Services\EncryptionService::decrypt($value);
+    }
+
+    /**
      * Get the guard for this authenticatable.
      *
      * @return string

@@ -61,11 +61,11 @@ function encrypt(text) {
 }
 
 /**
- * Decrypt data using AES-256-CBC
+ * Decrypt data using AES-256-CBC (single pass)
  * @param {string} encryptedData - The base64 encoded encrypted data with IV
- * @returns {string} - The decrypted plain text
+ * @returns {string} - The decrypted plain text, or original if not encrypted
  */
-function decrypt(encryptedData) {
+function decryptOnce(encryptedData) {
   if (!encryptedData) return encryptedData;
 
   // If data is clearly not encrypted (too short or not base64), return as-is
@@ -124,12 +124,28 @@ function decrypt(encryptedData) {
 
     return decrypted;
   } catch (error) {
-    // Log decryption failures for debugging (but don't spam logs)
-    const preview = encryptedData.substring(0, 30);
-    console.warn(`⚠️ Decrypt failed for data starting with "${preview}..." (len=${encryptedData.length}): ${error.message}`);
     // Return original data if decryption fails (might not be encrypted)
     return encryptedData;
   }
+}
+
+/**
+ * Decrypt data using AES-256-CBC — handles multi-layered encryption
+ * (caused by old isAlreadyEncrypted bug re-encrypting on every server restart)
+ * @param {string} encryptedData - The base64 encoded encrypted data with IV
+ * @returns {string} - The fully decrypted plain text
+ */
+function decrypt(encryptedData) {
+  if (!encryptedData) return encryptedData;
+  if (typeof encryptedData !== 'string' || encryptedData.length < 24) return encryptedData;
+
+  let current = encryptedData;
+  for (let i = 0; i < 20; i++) {  // max 20 layers
+    const decrypted = decryptOnce(current);
+    if (decrypted === current) break;  // no change = plaintext reached
+    current = decrypted;
+  }
+  return current;
 }
 
 /**

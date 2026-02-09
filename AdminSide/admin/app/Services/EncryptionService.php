@@ -126,6 +126,35 @@ class EncryptionService
         }
         
         try {
+            // Recursively decrypt to handle multi-layered encryption
+            // (caused by old isAlreadyEncrypted bug re-encrypting on every server restart)
+            $current = $encryptedText;
+            for ($i = 0; $i < 20; $i++) {  // max 20 layers
+                $decrypted = self::decryptOnce($current);
+                if ($decrypted === $current) break;  // no change = plaintext reached
+                $current = $decrypted;
+            }
+            return $current;
+        } catch (\Exception $e) {
+            Log::error('Unexpected error during decryption', [
+                'error' => $e->getMessage(),
+                'data_preview' => substr($encryptedText, 0, 50)
+            ]);
+            return $encryptedText;
+        }
+    }
+
+    /**
+     * Single-pass decrypt — tries Laravel then Node.js format.
+     * Returns original string if neither works.
+     */
+    private static function decryptOnce($encryptedText)
+    {
+        if (empty($encryptedText) || !is_string($encryptedText)) {
+            return $encryptedText;
+        }
+
+        try {
             // First, try Laravel's default decryption (JSON format with MAC)
             try {
                 return Crypt::decryptString($encryptedText);
@@ -141,10 +170,6 @@ class EncryptionService
             // Both formats failed — likely plaintext, return as-is
             return $encryptedText;
         } catch (\Exception $e) {
-            Log::error('Unexpected error during decryption', [
-                'error' => $e->getMessage(),
-                'data_preview' => substr($encryptedText, 0, 50)
-            ]);
             return $encryptedText;
         }
     }

@@ -227,20 +227,6 @@ Route::middleware(['auth'])->group(function () {
             ->orderBy('created_at', 'desc')
             ->get();
         
-        // Decrypt sensitive fields for display
-        // Always attempt decryption — decrypt() safely returns original text if not encrypted
-        foreach ($users as $user) {
-            if ($user->address) {
-                $decrypted = \App\Services\EncryptionService::decrypt($user->address);
-                // If decryption returned the same encrypted-looking string, show a placeholder
-                $user->address = \App\Services\EncryptionService::isEncrypted($decrypted) ? 'Unable to decrypt' : $decrypted;
-            }
-            if ($user->contact) {
-                $decrypted = \App\Services\EncryptionService::decrypt($user->contact);
-                $user->contact = \App\Services\EncryptionService::isEncrypted($decrypted) ? 'Unable to decrypt' : $decrypted;
-            }
-        }
-        
         return view('users', compact('users'));
     })->name('users');
     
@@ -255,18 +241,6 @@ Route::middleware(['auth'])->group(function () {
             ->orderBy('total_flags', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
-        
-        // Decrypt sensitive fields for display
-        foreach ($users as $user) {
-            if ($user->address) {
-                $decrypted = \App\Services\EncryptionService::decrypt($user->address);
-                $user->address = \App\Services\EncryptionService::isEncrypted($decrypted) ? 'Unable to decrypt' : $decrypted;
-            }
-            if ($user->contact) {
-                $decrypted = \App\Services\EncryptionService::decrypt($user->contact);
-                $user->contact = \App\Services\EncryptionService::isEncrypted($decrypted) ? 'Unable to decrypt' : $decrypted;
-            }
-        }
         
         return view('flagged-users', compact('users'));
     })->name('flagged-users');

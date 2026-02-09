@@ -8,6 +8,7 @@
  */
 
 const db = require('./db');
+const { decrypt, encrypt } = require('./encryptionService');
 
 async function runMigrations() {
   console.log('🚀 Running startup tasks...');
@@ -42,8 +43,8 @@ async function runMigrations() {
 
     // ── Repair corrupted encrypted data ──────────────────────────
     // Previously, VARCHAR(15) truncated encrypted values making them unrecoverable.
-    // Detect values that look like truncated base64 (24-50 chars of pure base64)
-    // and clear them so the user can re-enter their info.
+    // Detect values that look like truncated base64 — try to decrypt them first;
+    // if decryption fails, they're corrupted and should be cleared.
     console.log('🔧 Checking for corrupted encrypted data...');
     const repairTables = [
       { table: 'users_public', idCol: 'id' },
@@ -53,23 +54,28 @@ async function runMigrations() {
       try {
         const [rows] = await db.query(
           `SELECT ${idCol}, contact, address FROM ${table} 
-           WHERE (contact IS NOT NULL AND LENGTH(contact) BETWEEN 20 AND 50 AND contact ~ '^[A-Za-z0-9+/=]+$')
-              OR (address IS NOT NULL AND LENGTH(address) BETWEEN 20 AND 50 AND address ~ '^[A-Za-z0-9+/=]+$')`
+           WHERE (contact IS NOT NULL AND contact ~ '^[A-Za-z0-9+/=]+$')
+              OR (address IS NOT NULL AND address ~ '^[A-Za-z0-9+/=]+$')`
         );
         for (const row of rows) {
           const updates = [];
           const vals = [];
           let idx = 1;
-          // A valid encrypted value is 60+ chars. 20-50 chars of pure base64 = truncated/corrupted.
-          if (row.contact && row.contact.length >= 20 && row.contact.length <= 50 && /^[A-Za-z0-9+/=]+$/.test(row.contact)) {
-            updates.push(`contact = $${idx++}`);
-            vals.push(null);
-            console.log(`  ⚠️  ${table} ${idCol}=${row[idCol]}: clearing corrupted contact (len=${row.contact.length})`);
-          }
-          if (row.address && row.address.length >= 20 && row.address.length <= 50 && /^[A-Za-z0-9+/=]+$/.test(row.address)) {
-            updates.push(`address = $${idx++}`);
-            vals.push(null);
-            console.log(`  ⚠️  ${table} ${idCol}=${row[idCol]}: clearing corrupted address (len=${row.address.length})`);
+          for (const col of ['contact', 'address']) {
+            const val = row[col];
+            if (!val || !/^[A-Za-z0-9+/=]+$/.test(val)) continue;
+            // Try to decrypt — if it fails, value is corrupted
+            const decrypted = decrypt(val);
+            if (decrypted === val) {
+              // decrypt returned original = failed to decrypt = corrupted data
+              // But skip plaintext values that just happen to be base64-ish
+              // Only clear if it looks like a truncated encrypted value (20-50 chars of pure base64)
+              if (val.length >= 20 && val.length <= 50) {
+                updates.push(`${col} = $${idx++}`);
+                vals.push(null);
+                console.log(`  ⚠️  ${table} ${idCol}=${row[idCol]}: clearing corrupted ${col} (len=${val.length})`);
+              }
+            }
           }
           if (updates.length > 0) {
             vals.push(row[idCol]);
@@ -81,6 +87,61 @@ async function runMigrations() {
       }
     }
     console.log('✅ Data integrity check complete.');
+
+    // ── Fix double/multi-encrypted data ──────────────────────────
+    // The old isAlreadyEncrypted() missed short encrypted values (<50 chars),
+    // causing them to be re-encrypted on every server restart.
+    // This step recursively decrypts until we get plaintext, then re-encrypts once.
+    console.log('🔧 Fixing double-encrypted data...');
+    const fixTables = [
+      { table: 'users_public', idCol: 'id' },
+      { table: 'user_admin', idCol: 'id' },
+    ];
+    for (const { table, idCol } of fixTables) {
+      try {
+        const [rows] = await db.query(
+          `SELECT ${idCol}, contact, address FROM ${table}
+           WHERE (contact IS NOT NULL AND contact != '')
+              OR (address IS NOT NULL AND address != '')`
+        );
+        let fixed = 0;
+        for (const row of rows) {
+          const updates = [];
+          const vals = [];
+          let idx = 1;
+
+          for (const col of ['contact', 'address']) {
+            const raw = row[col];
+            if (!raw) continue;
+            // Decrypt repeatedly until we get plaintext
+            let current = raw;
+            let layers = 0;
+            for (let i = 0; i < 20; i++) {  // max 20 layers
+              const decrypted = decrypt(current);
+              if (decrypted === current) break;  // no change = plaintext reached
+              current = decrypted;
+              layers++;
+            }
+            if (layers > 1) {
+              // Was multi-encrypted. Re-encrypt the plaintext once.
+              const reEncrypted = encrypt(current);
+              updates.push(`${col} = $${idx++}`);
+              vals.push(reEncrypted);
+              console.log(`  🔧 ${table} ${idCol}=${row[idCol]}: fixed ${col} (${layers} encryption layers → 1)`);
+            }
+          }
+          if (updates.length > 0) {
+            vals.push(row[idCol]);
+            await db.query(`UPDATE ${table} SET ${updates.join(', ')} WHERE ${idCol} = $${idx}`, vals);
+            fixed++;
+          }
+        }
+        if (fixed > 0) console.log(`  ✅ Fixed ${fixed} rows in ${table}`);
+      } catch (fixErr) {
+        console.warn(`  ℹ️  Could not fix double-encryption in ${table}: ${fixErr.message}`);
+      }
+    }
+    console.log('✅ Double-encryption fix complete.');
 
     console.log('✅ Startup tasks completed successfully!');
     return true;

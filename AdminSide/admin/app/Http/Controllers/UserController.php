@@ -25,10 +25,7 @@ class UserController extends Controller
         try {
             $user = User::with('policeStation')->findOrFail($id);
             
-            // Decrypt sensitive fields before returning
-            $decryptedContact = $user->contact ? EncryptionService::decrypt($user->contact) : null;
-            $decryptedAddress = $user->address ? EncryptionService::decrypt($user->address) : null;
-            
+            // contact & address are auto-decrypted by User model accessors
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -36,8 +33,8 @@ class UserController extends Controller
                     'firstName' => $user->firstname,
                     'lastName' => $user->lastname,
                     'email' => $user->email,
-                    'phone' => $decryptedContact,
-                    'address' => $decryptedAddress,
+                    'phone' => $user->contact,
+                    'address' => $user->address,
                     'latitude' => $user->latitude,
                     'longitude' => $user->longitude,
                     'is_verified' => $user->is_verified,
@@ -90,10 +87,7 @@ class UserController extends Controller
             // Invalidate user cache
             Cache::forget('users_list');
 
-            // Decrypt sensitive fields before returning
-            $decryptedContact = $user->contact ? EncryptionService::decrypt($user->contact) : null;
-            $decryptedAddress = $user->address ? EncryptionService::decrypt($user->address) : null;
-
+            // contact & address are auto-decrypted by User model accessors
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
@@ -102,8 +96,8 @@ class UserController extends Controller
                     'firstName' => $user->firstname,
                     'lastName' => $user->lastname,
                     'email' => $user->email,
-                    'phone' => $decryptedContact,
-                    'address' => $decryptedAddress,
+                    'phone' => $user->contact,
+                    'address' => $user->address,
                     'latitude' => $user->latitude,
                     'longitude' => $user->longitude,
                     'is_verified' => $user->is_verified,
@@ -146,8 +140,8 @@ class UserController extends Controller
                                     'firstName' => $user->firstname,
                                     'lastName' => $user->lastname,
                                     'email' => $user->email,
-                                    'phone' => $user->contact ? EncryptionService::decrypt($user->contact) : null,
-                                    'address' => $user->address ? EncryptionService::decrypt($user->address) : null,
+                                    'phone' => $user->contact,
+                                    'address' => $user->address,
                                     'latitude' => $user->latitude,
                                     'longitude' => $user->longitude,
                                     'is_verified' => $user->is_verified,

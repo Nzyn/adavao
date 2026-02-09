@@ -305,15 +305,15 @@
         </thead>
         <tbody>
             @foreach($users as $user)
-            <tr data-search="{{ strtolower($user->name . ' ' . $user->email . ' ' . ($user->phone ?? '')) }}">
+            <tr data-search="{{ strtolower(($user->firstname ?? '') . ' ' . ($user->lastname ?? '') . ' ' . $user->email . ' ' . ($user->contact ?? '')) }}">
                 <td>
                     <div class="user-info">
-                        <div class="user-avatar">{{ strtoupper(substr($user->name, 0, 1)) }}</div>
-                        <div class="user-details-name">{{ $user->name }}</div>
+                        <div class="user-avatar">{{ strtoupper(substr($user->firstname ?? '', 0, 1)) }}</div>
+                        <div class="user-details-name">{{ $user->firstname }} {{ $user->lastname }}</div>
                     </div>
                 </td>
                 <td class="user-details-email">{{ $user->email }}</td>
-                <td>{{ $user->phone ?? 'N/A' }}</td>
+                <td>{{ $user->contact ?? 'N/A' }}</td>
                 <td>
                     <span class="flag-badge">{{ $user->total_flags ?? 0 }} flags</span>
                 </td>

@@ -68,6 +68,28 @@ class User extends Authenticatable
         'reset_token_expires_at' => 'datetime',
     ];
     
+    /**
+     * Auto-decrypt the contact field when accessed.
+     */
+    public function getContactAttribute($value)
+    {
+        if (empty($value) || !is_string($value)) {
+            return $value;
+        }
+        return \App\Services\EncryptionService::decrypt($value);
+    }
+
+    /**
+     * Auto-decrypt the address field when accessed.
+     */
+    public function getAddressAttribute($value)
+    {
+        if (empty($value) || !is_string($value)) {
+            return $value;
+        }
+        return \App\Services\EncryptionService::decrypt($value);
+    }
+
     public function reports()
     {
         return $this->hasMany(Report::class);
