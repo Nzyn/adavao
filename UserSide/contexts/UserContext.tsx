@@ -91,31 +91,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         // Update current user ID
         setCurrentUserId(loggedInUserId);
         
-        // 2. Test MySQL connection
-        const connectionOk = await directDbService.testMysqlConnection();
-        if (!connectionOk) {
-          console.warn('⚠️ Cannot connect to alertdavao database, using AsyncStorage data only');
-          // Use the data from AsyncStorage as fallback
-          const fallbackUser: UserData = {
-            id: loggedInUser.id?.toString() || '0',
-            firstName: loggedInUser.firstname || loggedInUser.firstName || '',
-            lastName: loggedInUser.lastname || loggedInUser.lastName || '',
-            email: loggedInUser.email || '',
-            phone: loggedInUser.contact || loggedInUser.phone || '',
-            address: loggedInUser.address || '',
-            isVerified: Boolean(loggedInUser.is_verified || loggedInUser.isVerified),
-            profileImage: loggedInUser.profile_image || loggedInUser.profileImage,
-            dataSource: 'default'
-          };
-          setUserState(fallbackUser);
-          setIsLoading(false);
-          return;
-        }
-        
-        // 3. Load full user profile from alertdavao.users table using logged-in user's ID
+        // 2. Try loading full profile from database API (which decrypts contact/address)
         const userId = loggedInUser.id?.toString() || '0';
         console.log(`💾 Fetching full profile for user ID ${userId} from database...`);
-        const savedUser = await directDbService.getUserById(userId);
+        
+        let savedUser = null;
+        try {
+          savedUser = await directDbService.getUserById(userId);
+        } catch (fetchError) {
+          console.warn('⚠️ Could not fetch user profile from API:', fetchError);
+        }
         
         if (savedUser) {
           const userWithSource = { ...savedUser, dataSource: 'database' as const };

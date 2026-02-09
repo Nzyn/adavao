@@ -19,6 +19,10 @@ cd "$ADMIN_DIR"
 # If your DB connection is not ready yet, Render will restart the service and this will run again.
 php artisan migrate --force
 
+# Create storage symlink for public file access (announcements, uploads, etc.)
+echo "🔗 Creating storage symlink..."
+php artisan storage:link --force 2>/dev/null || echo "   storage:link already exists or not needed"
+
 echo "✅ Migrations complete."
 
 # Run essential seeders (safe to re-run - uses insertOrIgnore)

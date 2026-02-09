@@ -76,6 +76,26 @@ export default function PatrolProfile() {
                 if (user.assigned_station_id) {
                     fetchStationInfo(user.assigned_station_id);
                 }
+
+                // Fetch fresh data from API to get decrypted contact info
+                if (user.id) {
+                    try {
+                        const response = await fetch(`${API_URL}/users/${user.id}`);
+                        const data = await response.json();
+                        if (data.success && data.data) {
+                            const freshUser = {
+                                ...user,
+                                contact: data.data.contact || user.contact,
+                                email: data.data.email || user.email,
+                                firstname: data.data.firstname || user.firstname,
+                                lastname: data.data.lastname || user.lastname,
+                            };
+                            setUserData(freshUser);
+                        }
+                    } catch (apiError) {
+                        console.warn('Could not fetch fresh profile data:', apiError);
+                    }
+                }
             }
         } catch (error) {
             console.error('Error loading user data:', error);
@@ -144,14 +164,11 @@ export default function PatrolProfile() {
                 'inactivityLogout'
             ]);
 
-            // 4. Navigate to login — dismiss all screens first, then navigate
-            while (router.canGoBack()) {
-                router.back();
-            }
-            router.replace('/login');
+            // Navigate directly to login screen
+            router.replace('/(tabs)/login');
         } catch (error) {
             console.error('Error logging out:', error);
-            router.replace('/login');
+            router.replace('/(tabs)/login');
         }
     };
 

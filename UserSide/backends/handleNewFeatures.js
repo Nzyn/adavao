@@ -660,10 +660,16 @@ const getUserConversations = async (req, res) => {
 
       if (lastMessageResult.length > 0) {
         conversations.push({
+          other_user_id: otherUserId,
           user_id: otherUserId,
+          id: otherUserId,
           user_firstname: user.firstname,
           user_lastname: user.lastname,
+          name: `${user.firstname} ${user.lastname}`,
           user_name: `${user.firstname} ${user.lastname}`,
+          firstname: user.firstname,
+          lastname: user.lastname,
+          role: user.role,
           last_message: lastMessageResult[0].message,
           last_message_time: lastMessageResult[0].sent_at,
           unread_count: unreadResult[0]?.count || 0

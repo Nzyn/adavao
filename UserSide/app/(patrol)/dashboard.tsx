@@ -230,6 +230,21 @@ export default function PatrolDashboard() {
         }
     };
 
+    // Mark all notifications as read
+    const markAllNotificationsAsRead = async () => {
+        if (!userId) return;
+        try {
+            const unreadNotifs = notifications.filter(n => !n.read);
+            await Promise.all(
+                unreadNotifs.map(n => notificationService.markAsRead(n.id, userId!))
+            );
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            setUnreadNotifications(0);
+        } catch (error) {
+            console.error('Error marking all notifications as read:', error);
+        }
+    };
+
     // Format time ago
     const formatTimeAgo = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -681,9 +696,21 @@ export default function PatrolDashboard() {
                     <View style={styles.notificationsModal}>
                         <View style={styles.notificationsHeader}>
                             <Text style={styles.notificationsTitle}>Notifications</Text>
-                            <TouchableOpacity onPress={() => setShowNotificationsModal(false)}>
-                                <Ionicons name="close" size={24} color={COLORS.textMuted} />
-                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                {unreadNotifications > 0 && (
+                                    <TouchableOpacity 
+                                        onPress={markAllNotificationsAsRead}
+                                        style={{ paddingVertical: 4, paddingHorizontal: 8 }}
+                                    >
+                                        <Text style={{ fontSize: 13, color: COLORS.primary, fontWeight: '600' }}>
+                                            Mark All Read
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity onPress={() => setShowNotificationsModal(false)}>
+                                    <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
                         <ScrollView style={styles.notificationsList}>
                             {notifications.length === 0 ? (
@@ -740,7 +767,15 @@ export default function PatrolDashboard() {
                                             </Text>
                                         </View>
                                         {!notification.read && (
-                                            <View style={styles.unreadDot} />
+                                            <TouchableOpacity 
+                                                onPress={(e) => {
+                                                    e.stopPropagation();
+                                                    markNotificationAsRead(notification.id);
+                                                }}
+                                                style={{ padding: 4 }}
+                                            >
+                                                <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.primary} />
+                                            </TouchableOpacity>
                                         )}
                                     </TouchableOpacity>
                                 ))

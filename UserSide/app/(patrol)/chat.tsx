@@ -125,17 +125,15 @@ export default function PatrolChatScreen() {
             const response = await fetch(`${API_URL}/messages/conversations/${userId}`);
             const data = await response.json();
             if (data.success) {
-                const filtered = (data.data || []).filter((c: any) =>
-                    c.role === 'admin' || c.role === 'police'
-                );
-                setConversations(filtered.map((c: any) => ({
-                    id: c.other_user_id || c.id,
-                    name: c.name || `${c.firstname || ''} ${c.lastname || ''}`.trim() || 'Unknown',
+                const allConversations = (data.data || []).map((c: any) => ({
+                    id: c.other_user_id || c.user_id || c.id,
+                    name: c.name || c.user_name || `${c.firstname || c.user_firstname || ''} ${c.lastname || c.user_lastname || ''}`.trim() || 'Unknown',
                     role: c.role || 'admin',
                     lastMessage: c.last_message || c.lastMessage,
                     lastMessageTime: c.last_message_time || c.lastMessageTime,
                     unreadCount: c.unread_count || 0,
-                })));
+                }));
+                setConversations(allConversations);
             }
         } catch (error) {
             console.error('Error loading conversations:', error);
@@ -311,7 +309,7 @@ export default function PatrolChatScreen() {
         return (
             <KeyboardAvoidingView
                 style={{ flex: 1, backgroundColor: COLORS.background }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 {/* Chat Header */}
@@ -425,7 +423,7 @@ export default function PatrolChatScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={() => router.replace('/(patrol)/dashboard')}
                     style={styles.backBtn}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >

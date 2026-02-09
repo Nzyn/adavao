@@ -1350,9 +1350,6 @@ export default function ReportCrime() {
                     <Text style={[styles.label, { marginVertical: 0 }]}>Evidence (Photo or Video)</Text>
                     <Text style={{ color: '#E63946', fontWeight: '700', fontSize: 16 }}> *</Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-                    Required for most crime types. Upload a photo OR a video of the incident, damage, or suspect.
-                </Text>
                 {/* Evidence Warning */}
                 <View style={{ 
                     backgroundColor: '#fff3cd', 
@@ -1703,8 +1700,8 @@ export default function ReportCrime() {
                                     }}
                                     disabled={isSubmitting}
                                 >
-                                    <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
                                     <Text style={confirmStyles.submitButtonText}>Submit Report</Text>
+                                    <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginLeft: 8 }} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -1774,7 +1771,7 @@ export default function ReportCrime() {
                         visible={showSuccessDialog}
                         title="Report Submitted!"
                         message="Your report has been submitted successfully. Thank you for helping make our community safer."
-                        okText="Okay"
+                        okText="Proceed"
                         onOk={async () => {
                             setShowSuccessDialog(false);
                             // Reset form
