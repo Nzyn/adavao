@@ -91,7 +91,7 @@ const handleGoogleRegister = async (req, res) => {
 
     } catch (err) {
         console.error("❌ Google register error:", err);
-        if (err.code === 'ER_DUP_ENTRY') {
+        if (err.code === '23505' || err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ message: "Email or Contact already registered" });
         }
         res.status(500).json({ message: "Server error during registration", error: err.message });

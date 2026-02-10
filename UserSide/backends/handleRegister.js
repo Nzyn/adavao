@@ -92,11 +92,11 @@ const handleRegister = async (req, res) => {
     console.error("❌ Registration error:", err);
 
     // Provide more specific error messages
-    if (err.code === 'ER_DUP_ENTRY') {
+    if (err.code === '23505' || err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: "Email already registered" });
     }
     if (err.code === 'ECONNREFUSED') {
-      return res.status(500).json({ message: "Database connection failed. Please check if MySQL is running." });
+      return res.status(500).json({ message: "Database connection failed. Please check if the database is running." });
     }
     if (err.code === 'ER_ACCESS_DENIED_ERROR') {
       return res.status(500).json({ message: "Database access denied. Please check credentials." });
