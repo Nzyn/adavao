@@ -4,7 +4,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const crypto = require('crypto');
-const { encrypt, decrypt, canDecrypt, encryptFields, decryptFields } = require("./encryptionService");
+const { encrypt, decrypt, canDecrypt } = require("./encryptionService");
 const { getClientIp, normalizeIp, getUserAgent } = require("./ipUtils");
 
 let cachedUsersPublicColumns = null;

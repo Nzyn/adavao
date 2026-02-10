@@ -53,7 +53,7 @@ const handleGoogleRegister = async (req, res) => {
         }
 
         // Create New User
-        const placeholderPassword = 'GOOGLE_TEMP_' + googleId;
+        const hashedPlaceholder = await bcrypt.hash('GOOGLE_AUTH_' + Date.now(), 10);
         const encryptedContact = encrypt(cleanContact);
 
         const sql = `
@@ -68,7 +68,7 @@ const handleGoogleRegister = async (req, res) => {
             email,
             googleId,
             profilePicture || null,
-            placeholderPassword,
+            hashedPlaceholder,
             encryptedContact
         ]);
 

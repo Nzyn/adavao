@@ -158,13 +158,6 @@ const handleGoogleLoginWithToken = async (req, res) => {
         );
       }
 
-      // [MODIFIED] instead of returning user directly, enforce OTP if phone exists
-      if (!existingUser) {
-        // Logic for new user response (requiresPhone) - effectively handled by standard login if needed
-        // But here we know it's an existing user
-        return res.status(500).json({ message: 'User found but variable missing' });
-      }
-
       // Check if user has a valid phone number
       const decryptedContact = existingUser.contact ? decrypt(existingUser.contact) : null;
       if (!decryptedContact || decryptedContact === '0000000000') {
@@ -256,13 +249,16 @@ const handleGoogleOtpVerify = async (req, res) => {
     // Success - Log them in
     await db.query('UPDATE users_public SET last_login = NOW() WHERE id = $1', [user.id]);
 
+    // Strip password before sending to client
+    const { password, ...userWithoutPassword } = user;
+
     // 🔓 Decrypt sensitive fields for display
-    if (user.address) user.address = decrypt(user.address);
-    if (user.contact) user.contact = decrypt(user.contact);
+    if (userWithoutPassword.address) userWithoutPassword.address = decrypt(userWithoutPassword.address);
+    if (userWithoutPassword.contact) userWithoutPassword.contact = decrypt(userWithoutPassword.contact);
 
     res.json({
       message: 'Login successful',
-      user: user
+      user: userWithoutPassword
     });
 
   } catch (error) {

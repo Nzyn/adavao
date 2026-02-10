@@ -2853,16 +2853,16 @@ setInterval(updateSLATimers, 1000);
                                     `}
                                 </div>
 
-                                <div class="info-row">
+                                <div class="info-row" style="grid-template-columns: 1fr;">
                                     <div class="detail-item">
                                         <div class="detail-label">📝 Description</div>
                                         <div class="detail-value" style="white-space: pre-wrap;">${report.description || 'No description provided'}</div>
                                     </div>
-                                    <div class="detail-item">
-                                        <!-- Spacer label to align button with description text -->
-                                        <div class="detail-label" style="visibility: hidden;">Action&nbsp;</div>
-                                        ${getActionButtons(report)}
-                                    </div>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div style="margin-top: 4px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+                                    ${getActionButtons(report)}
                                 </div>
                             </div>
                         `;
@@ -3121,25 +3121,41 @@ function getVerificationBadge(report) {
 
  function getActionButtons(report) {
      const userRole = '{{ auth()->user()->hasRole("super_admin") ? "super_admin" : (auth()->user()->hasRole("admin") ? "admin" : (auth()->user()->hasRole("police") ? "police" : "")) }}';
-     console.log('Debug - User Role:', userRole, 'Report ID:', report.report_id);
      const isUnassigned = !report.assigned_station_id;
      
+     // Shared button styles
+     const baseBtn = `
+         display: inline-flex; align-items: center; justify-content: center;
+         padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+         cursor: pointer; border: none; transition: all 0.2s ease;
+         letter-spacing: 0.3px; white-space: nowrap;
+     `;
+     const assignStyle = isUnassigned
+         ? `${baseBtn} background: #f0fdf4; color: #15803d; border: 1.5px solid #86efac;`
+         : `${baseBtn} background: #fefce8; color: #a16207; border: 1.5px solid #fde047;`;
+     const dispatchStyle = `${baseBtn} background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #fff; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);`;
+     const reassignStyle = `${baseBtn} background: #fffbeb; color: #b45309; border: 1.5px solid #fcd34d;`;
+
+     const assignIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; flex-shrink: 0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+     const dispatchIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`;
+     const reassignIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; flex-shrink: 0;"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>`;
+
      let buttons = '';
      
-     // For admin and super_admin users - show assign/reassign button AND dispatch patrol button
+     // For admin and super_admin users
      if (userRole === 'admin' || userRole === 'super_admin') {
          const buttonText = isUnassigned ? 'Assign to Station' : 'Reassign Station';
          buttons = `
-             <div style="display: flex; flex-direction: column; gap: 8px;">
-                 <button class="btn btn-sm btn-primary" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start;" onclick="openAssignStationModal(${report.report_id})">
-                     <svg style="width: 16px; height: 16px; margin-right: 8px;" viewBox="0 0 24 24" fill="currentColor">
-                         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                     </svg>
-                     ${buttonText}
+             <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                 <button onclick="openAssignStationModal(${report.report_id})" style="${assignStyle}"
+                     onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                     onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                     ${assignIcon} ${buttonText}
                  </button>
-                 <button class="btn btn-sm dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
-                     <span style="font-size: 18px; margin-right: 8px;">🚓</span>
-                     Dispatch Patrol
+                 <button class="dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="${dispatchStyle}"
+                     onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(37, 99, 235, 0.4)'"
+                     onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 6px rgba(37, 99, 235, 0.25)'">
+                     ${dispatchIcon} Dispatch Patrol
                  </button>
              </div>
          `;
@@ -3147,27 +3163,28 @@ function getVerificationBadge(report) {
      // For police users
      else if (userRole === 'police') {
          buttons = `
-             <div style="display: flex; flex-direction: column; gap: 8px;">
-                 <button class="btn btn-sm btn-warning" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start;" onclick="openReassignmentModal(${report.report_id})">
-                     <svg style="width: 16px; height: 16px; margin-right: 8px;" viewBox="0 0 24 24" fill="currentColor">
-                         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                     </svg>
-                     Request Reassignment
+             <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                 <button onclick="openReassignmentModal(${report.report_id})" style="${reassignStyle}"
+                     onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                     onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                     ${reassignIcon} Request Reassignment
                  </button>
-                 <button class="btn btn-sm dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
-                     <span style="font-size: 18px; margin-right: 8px;">🚓</span>
-                     Dispatch Patrol
+                 <button class="dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="${dispatchStyle}"
+                     onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(37, 99, 235, 0.4)'"
+                     onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 6px rgba(37, 99, 235, 0.25)'">
+                     ${dispatchIcon} Dispatch Patrol
                  </button>
              </div>
          `;
      }
-     // Fallback - show dispatch button for any authenticated user with no specific role
+     // Fallback
      else {
          buttons = `
-             <div style="display: flex; flex-direction: column; gap: 8px;">
-                 <button class="btn btn-sm dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="display: inline-flex; align-items: center; width: auto; justify-content: flex-start; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
-                     <span style="font-size: 18px; margin-right: 8px;">🚓</span>
-                     Dispatch Patrol
+             <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                 <button class="dispatch-patrol-btn" data-dispatch-report="${report.report_id}" style="${dispatchStyle}"
+                     onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(37, 99, 235, 0.4)'"
+                     onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 6px rgba(37, 99, 235, 0.25)'">
+                     ${dispatchIcon} Dispatch Patrol
                  </button>
              </div>
          `;

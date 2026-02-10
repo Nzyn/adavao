@@ -248,37 +248,6 @@ function canDecrypt(userRole) {
   return authorizedRoles.includes(userRole);
 }
 
-/**
- * Get verified user role from database (async version)
- * SECURITY: Always verify roles from database, never trust client input
- * @param {number|string} userId - The user's ID
- * @param {object} db - Database connection object
- * @returns {Promise<string>} - The verified user role from database
- */
-async function getVerifiedUserRole(userId, db) {
-  if (!userId || !db) {
-    return 'user';
-  }
-
-  try {
-    const [users] = await db.query(
-      "SELECT role FROM users WHERE id = ?",
-      [userId]
-    );
-
-    if (users.length === 0) {
-      return 'user';
-    }
-
-    const role = users[0].role || 'user';
-    console.log(`✅ Verified user ${userId} has role: ${role}`);
-    return role;
-  } catch (error) {
-    console.error('❌ Error verifying user role:', error);
-    return 'user';
-  }
-}
-
 module.exports = {
   encrypt,
   decrypt,
@@ -287,6 +256,5 @@ module.exports = {
   encryptFields,
   decryptFields,
   canDecrypt,
-  getVerifiedUserRole,
   ALGORITHM
 };

@@ -3,7 +3,7 @@ const db = require("./db");
 const { verifyOtpInternal } = require("./handleOtp");
 const { encrypt, decrypt } = require("./encryptionService");
 
-// Test MySQL connection
+// Test database connection
 const testConnection = async (req, res) => {
   try {
     await db.query("SELECT 1");
@@ -354,35 +354,11 @@ const getUserStation = async (req, res) => {
   }
 };
 
-// Execute raw SQL query (for debugging/testing)
-const executeQuery = async (req, res) => {
-  const { query, params } = req.body;
-
-  try {
-    console.log("🔧 Executing query:", query, params);
-
-    const [rows] = await db.query(query, params || []);
-
-    res.json({
-      success: true,
-      data: rows
-    });
-  } catch (error) {
-    console.error("❌ Query execution failed:", error);
-    res.status(500).json({
-      success: false,
-      message: "Query execution failed",
-      error: error.message
-    });
-  }
-};
-
 module.exports = {
   testConnection,
   getUserById,
   upsertUser,
   updateUserAddress,
   updateUserStation,
-  getUserStation,
-  executeQuery
+  getUserStation
 };

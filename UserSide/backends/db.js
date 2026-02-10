@@ -43,7 +43,7 @@ pool.on('connect', () => {
   // Silent - don't log every connection
 });
 
-// Wrapper to mimic mysql2 interface: returns [rows, fields]
+// Wrapper that returns [rows, fields] tuple for consistent interface
 const db = {
   query: async (text, params) => {
     const result = await pool.query(text, params);
@@ -52,13 +52,10 @@ const db = {
   getConnection: async () => {
     // For transactions
     const client = await pool.connect();
-    // Wrap client to match expected mysql2 connection interface
+    // Wrap client for consistent [rows, fields] interface
     const connection = {
       query: async (text, params) => {
         const result = await client.query(text, params);
-        // Postgres INSERT returns rows if RETURNING clause is used, 
-        // but mysql2 returns { insertId: ... }. 
-        // We will need to adjust calling code, but for SELECTs:
         return [result.rows, result.fields];
       },
       beginTransaction: () => client.query('BEGIN'),

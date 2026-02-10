@@ -176,8 +176,7 @@ const {
   upsertUser,
   updateUserAddress,
   updateUserStation,
-  getUserStation,
-  executeQuery
+  getUserStation
 } = require("./handleUserProfile");
 const {
   upload: reportUpload,
@@ -583,7 +582,6 @@ app.get("/api/users/:userId/station", getUserStation);
 app.post("/api/users/upsert", upsertUser);
 app.patch("/api/users/:id/address", updateUserAddress);
 app.patch("/api/users/:id/station", updateUserStation);
-app.post("/api/query", executeQuery);
 
 // Report API Routes - with detailed logging
 app.post("/api/reports", (req, res, next) => {

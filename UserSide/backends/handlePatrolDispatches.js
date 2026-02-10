@@ -429,7 +429,7 @@ async function getMyHistory(req, res) {
         dispatch_id: row.dispatch_id,
         report_id: row.report_id,
         crime_type: crimeTypes.join(', '),
-        barangay: row.barangay || 'Unknown location',
+        barangay: row.barangay ? decrypt(row.barangay) : 'Unknown location',
         status: row.status,
         dispatched_at: row.dispatched_at,
         responded_at: row.accepted_at,

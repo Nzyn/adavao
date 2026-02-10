@@ -232,11 +232,8 @@ const sendOtp = async (req, res) => {
     console.log('═'.repeat(60));
     console.log('Phone:', phone);
     console.log('Email:', email || 'N/A');
-    console.log('═'.repeat(60));
-    console.log('Phone:', phone);
     console.log('OTP Code:', otp);
     console.log('Expires:', expiresAt.toLocaleString());
-    console.log('Message: "Your verification code is ' + otp + '. It is valid for 5 minutes. Do not share this code with anyone for your security."');
     console.log('═'.repeat(60) + '\n');
 
     // Include OTP in response for development (remove in production)
