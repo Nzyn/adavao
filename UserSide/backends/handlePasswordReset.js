@@ -1,7 +1,7 @@
 const db = require("./db");
 const bcrypt = require("bcryptjs");
 const { sendPasswordResetEmail } = require("./emailService");
-const { generateToken, getResetTokenExpiry, formatForMySQL } = require("./tokenUtils");
+const { generateToken, getResetTokenExpiry, formatTimestamp } = require("./tokenUtils");
 
 // Request password reset (send email)
 const handleForgotPassword = async (req, res) => {
@@ -35,7 +35,7 @@ const handleForgotPassword = async (req, res) => {
 
     // Generate reset token
     const resetToken = generateToken();
-    const tokenExpiresAt = formatForMySQL(getResetTokenExpiry());
+    const tokenExpiresAt = formatTimestamp(getResetTokenExpiry());
 
     await db.query(
       "UPDATE users_public SET reset_token = $1, reset_token_expires_at = $2 WHERE id = $3",
@@ -63,7 +63,7 @@ const handleForgotPassword = async (req, res) => {
     console.error("❌ Forgot password error:", error);
     res.status(500).json({
       message: "Server error while processing password reset request",
-      error: error.message || error.sqlMessage || "Unknown error"
+      error: error.message || "Unknown error"
     });
   }
 };
@@ -98,7 +98,7 @@ const handleVerifyResetToken = async (req, res) => {
     console.error("❌ Verify reset token error:", error);
     res.status(500).json({
       message: "Server error while verifying reset token",
-      error: error.message || error.sqlMessage || "Unknown error"
+      error: error.message || "Unknown error"
     });
   }
 };
@@ -155,7 +155,7 @@ const handleResetPassword = async (req, res) => {
     console.error("❌ Reset password error:", error);
     res.status(500).json({
       message: "Server error while resetting password",
-      error: error.message || error.sqlMessage || "Unknown error"
+      error: error.message || "Unknown error"
     });
   }
 };

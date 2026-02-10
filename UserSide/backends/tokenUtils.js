@@ -22,8 +22,8 @@ const getResetTokenExpiry = () => {
   return now;
 };
 
-// Format date for MySQL
-const formatForMySQL = (date) => {
+// Format date for PostgreSQL timestamp (YYYY-MM-DD HH:MM:SS)
+const formatTimestamp = (date) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 };
 
@@ -31,5 +31,5 @@ module.exports = {
   generateToken,
   getVerificationTokenExpiry,
   getResetTokenExpiry,
-  formatForMySQL,
+  formatTimestamp,
 };

@@ -360,7 +360,7 @@ const handleLogin = async (req, res) => {
     console.error("❌ Login error occurred:", error);
     res.status(500).json({
       message: "Server error",
-      error: error.message || error.sqlMessage || "Unknown error",
+      error: error.message || "Unknown error",
     });
   }
 };

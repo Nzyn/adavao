@@ -220,16 +220,8 @@ const sendOtp = async (req, res) => {
     // Get email for the notification message (optional)
     let email = req.body.email;
 
-    // If no email provided but we have a phone, try to find the user's email
-    if (!email && phone) {
-      try {
-        // Try to find in users_public
-        const [userRows] = await db.query('SELECT email FROM users_public WHERE contact = $1', [phone]);
-        if (userRows.length > 0) {
-          email = userRows[0].email;
-        }
-      } catch (e) { console.error('Error finding user email for OTP:', e); }
-    }
+    // Note: Cannot look up email by contact in DB because contact is AES-encrypted.
+    // Callers should pass email in the request body if available.
 
     // Send SMS via Supabase or fallback (Twilio WhatsApp)
     const sent = await sendSms(phone, otp, email, purpose);
@@ -298,13 +290,8 @@ const sendOtpInternal = async (phone, purpose, email = null) => {
       [phone, otpHash, purpose, expiresAt]
     );
 
-    // Try to find email if not provided (for notification text)
-    if (!email) {
-      try {
-        const [userRows] = await db.query('SELECT email FROM users_public WHERE contact = $1', [phone]);
-        if (userRows.length > 0) email = userRows[0].email;
-      } catch (e) { }
-    }
+    // Note: Cannot look up email by contact in DB because contact is AES-encrypted.
+    // Callers should pass email parameter if available.
 
     const sent = await sendSms(phone, otp, email, purpose);
 

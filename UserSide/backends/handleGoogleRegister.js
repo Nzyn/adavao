@@ -1,6 +1,7 @@
 const db = require("./db");
 const { sendOtpInternal } = require('./handleOtp');
 const bcrypt = require("bcryptjs");
+const { encrypt, decrypt } = require("./encryptionService");
 
 // Handle Google Registration with Phone Number
 const handleGoogleRegister = async (req, res) => {
@@ -43,6 +44,8 @@ const handleGoogleRegister = async (req, res) => {
             }
 
             const { password, ...userWithoutPassword } = user;
+            if (userWithoutPassword.contact) userWithoutPassword.contact = decrypt(userWithoutPassword.contact);
+            if (userWithoutPassword.address) userWithoutPassword.address = decrypt(userWithoutPassword.address);
             return res.status(200).json({
                 message: "User logged in (account existed)",
                 user: userWithoutPassword
@@ -51,6 +54,7 @@ const handleGoogleRegister = async (req, res) => {
 
         // Create New User
         const placeholderPassword = 'GOOGLE_TEMP_' + googleId;
+        const encryptedContact = encrypt(cleanContact);
 
         const sql = `
             INSERT INTO users_public(
@@ -65,7 +69,7 @@ const handleGoogleRegister = async (req, res) => {
             googleId,
             profilePicture || null,
             placeholderPassword,
-            cleanContact
+            encryptedContact
         ]);
 
         // Fetch new user
@@ -84,14 +88,17 @@ const handleGoogleRegister = async (req, res) => {
         }
 
         // Fallback if OTP fails
+        const fallbackUser = newUser[0];
+        if (fallbackUser.contact) fallbackUser.contact = decrypt(fallbackUser.contact);
+        if (fallbackUser.address) fallbackUser.address = decrypt(fallbackUser.address);
         return res.status(201).json({
             message: 'User registered successfully (OTP failed)',
-            user: newUser[0]
+            user: fallbackUser
         });
 
     } catch (err) {
         console.error("❌ Google register error:", err);
-        if (err.code === '23505' || err.code === 'ER_DUP_ENTRY') {
+        if (err.code === '23505') {
             return res.status(409).json({ message: "Email or Contact already registered" });
         }
         res.status(500).json({ message: "Server error during registration", error: err.message });

@@ -166,7 +166,8 @@ const handleGoogleLoginWithToken = async (req, res) => {
       }
 
       // Check if user has a valid phone number
-      if (!existingUser.contact || existingUser.contact === '0000000000') {
+      const decryptedContact = existingUser.contact ? decrypt(existingUser.contact) : null;
+      if (!decryptedContact || decryptedContact === '0000000000') {
         // Treat as if phone is needed
         return res.json({
           requiresPhone: true,
@@ -181,14 +182,14 @@ const handleGoogleLoginWithToken = async (req, res) => {
       }
 
       // Send OTP
-      const otpResult = await sendOtpInternal(existingUser.contact, 'login', existingUser.email);
+      const otpResult = await sendOtpInternal(decryptedContact, 'login', existingUser.email);
 
       if (otpResult.success) {
         return res.json({
           requireOtp: true,
           userId: existingUser.id,
           email: existingUser.email,
-          contact: existingUser.contact, // Mask this in production ideally
+          contact: decryptedContact,
           message: 'OTP sent to your registered phone number'
         });
       } else {
@@ -234,8 +235,11 @@ const handleGoogleOtpVerify = async (req, res) => {
     if (users.length === 0) return res.status(404).json({ message: 'User not found' });
     const user = users[0];
 
+    // Decrypt contact before OTP verification (contact is encrypted in DB)
+    const decryptedContact = user.contact ? decrypt(user.contact) : null;
+
     // Verify OTP
-    const verification = await verifyOtpInternal(user.contact, otp, 'login');
+    const verification = await verifyOtpInternal(decryptedContact, otp, 'login');
 
     if (!verification.success) {
       // Also try 'register' purpose in case it came from registration flow?
@@ -243,7 +247,7 @@ const handleGoogleOtpVerify = async (req, res) => {
       // Let's just stick to 'login' for this endpoint, registration uses 'register' and then maybe auto-logins?
       // If they just registered, they might have an OTP with purpose 'register'.
       // Let's try 'register' if 'login' fails.
-      const vidReg = await verifyOtpInternal(user.contact, otp, 'register');
+      const vidReg = await verifyOtpInternal(decryptedContact, otp, 'register');
       if (!vidReg.success) {
         return res.status(400).json({ message: verification.message || 'Invalid OTP' });
       }

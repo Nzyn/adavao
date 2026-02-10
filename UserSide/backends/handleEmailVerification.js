@@ -238,7 +238,7 @@ const handleVerifyEmail = async (req, res) => {
     console.error("❌ Email verification error:", error);
     res.status(500).json({
       message: "Server error during email verification",
-      error: error.message || error.sqlMessage || "Unknown error"
+      error: error.message || "Unknown error"
     });
   }
 };
@@ -247,7 +247,7 @@ const handleVerifyEmail = async (req, res) => {
 const handleResendVerification = async (req, res) => {
   const { email } = req.body;
   const { sendVerificationEmail } = require("./emailService");
-  const { generateToken, getVerificationTokenExpiry, formatForMySQL } = require("./tokenUtils");
+  const { generateToken, getVerificationTokenExpiry, formatTimestamp } = require("./tokenUtils");
 
   if (!email) {
     return res.status(400).json({ message: "Email is required" });
@@ -275,7 +275,7 @@ const handleResendVerification = async (req, res) => {
 
     // Generate new verification token
     const verificationToken = generateToken();
-    const tokenExpiresAt = formatForMySQL(getVerificationTokenExpiry());
+    const tokenExpiresAt = formatTimestamp(getVerificationTokenExpiry());
 
     await db.query(
       "UPDATE users_public SET verification_token = $1, token_expires_at = $2 WHERE id = $3",
@@ -303,7 +303,7 @@ const handleResendVerification = async (req, res) => {
     console.error("❌ Resend verification error:", error);
     res.status(500).json({
       message: "Server error while resending verification email",
-      error: error.message || error.sqlMessage || "Unknown error"
+      error: error.message || "Unknown error"
     });
   }
 };

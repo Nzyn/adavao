@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const db = require("./db");
 const { sendVerificationEmail } = require("./emailService");
-const { generateToken, getVerificationTokenExpiry, formatForMySQL } = require("./tokenUtils");
+const { generateToken, getVerificationTokenExpiry, formatTimestamp } = require("./tokenUtils");
 const { encrypt } = require("./encryptionService");
 
 const handleRegister = async (req, res) => {
@@ -39,7 +39,7 @@ const handleRegister = async (req, res) => {
 
     // Generate verification token
     const verificationToken = generateToken();
-    const tokenExpiresAt = formatForMySQL(getVerificationTokenExpiry());
+    const tokenExpiresAt = formatTimestamp(getVerificationTokenExpiry());
 
     // Encrypt sensitive data (contact/phone number)
     const encryptedContact = encrypt(contact);
@@ -92,19 +92,19 @@ const handleRegister = async (req, res) => {
     console.error("❌ Registration error:", err);
 
     // Provide more specific error messages
-    if (err.code === '23505' || err.code === 'ER_DUP_ENTRY') {
+    if (err.code === '23505') {
       return res.status(409).json({ message: "Email already registered" });
     }
     if (err.code === 'ECONNREFUSED') {
       return res.status(500).json({ message: "Database connection failed. Please check if the database is running." });
     }
-    if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+    if (err.code === '28P01' || err.code === '28000') {
       return res.status(500).json({ message: "Database access denied. Please check credentials." });
     }
 
     res.status(500).json({
       message: "Error saving user",
-      error: err.message || err.sqlMessage || "Unknown error"
+      error: err.message || "Unknown error"
     });
   }
 };
