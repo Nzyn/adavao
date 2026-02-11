@@ -76,10 +76,9 @@ const getUserById = async (req, res) => {
         console.log(`🔓 Second decrypt - Result length: ${user.address.length}, Still encrypted: ${user.address.startsWith('ENC_')}`);
       }
 
-      // If STILL encrypted after two attempts, set to empty string with warning
+      // If STILL encrypted after two attempts, log a warning
       if (user.address && (user.address.startsWith('ENC_') || (user.address.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(user.address)))) {
         console.error(`❌ DECRYPTION FAILED for address after 2 attempts - User ID: ${user.id}`);
-        user.address = ''; // Return empty instead of encrypted value
       }
     }
 
@@ -95,10 +94,9 @@ const getUserById = async (req, res) => {
         console.log(`🔓 Second decrypt - Result length: ${user.contact.length}, Still encrypted: ${user.contact.startsWith('ENC_')}`);
       }
 
-      // If STILL encrypted after two attempts, set to empty string with warning
+      // If STILL encrypted after two attempts, log a warning
       if (user.contact && (user.contact.startsWith('ENC_') || (user.contact.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(user.contact)))) {
         console.error(`❌ DECRYPTION FAILED for contact after 2 attempts - User ID: ${user.id}`);
-        user.contact = ''; // Return empty instead of encrypted value
       }
     }
 
