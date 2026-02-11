@@ -23,7 +23,7 @@ function getBackendUrl(): string {
   }
 
   // Default to Render URL for APK builds
-  return 'https://node-server-gk1u.onrender.com';
+  return 'https://userside-node-server.onrender.com';
 }
 
 export const BACKEND_URL = getBackendUrl();
