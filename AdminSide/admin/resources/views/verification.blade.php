@@ -565,7 +565,31 @@
     </div>
 </div>
 
-<!-- Lightbox Modal -->
+</div>
+
+<!-- Rejection Reason Modal -->
+<div class="modal-overlay" id="rejectionModal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2 class="modal-title" style="color: #ef4444;">Reject Verification</h2>
+            <button class="modal-close" onclick="closeRejectionModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 1rem; color: #4b5563;">Please provide a reason for rejecting this verification request. This will be sent to the user.</p>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label for="rejectionReason" style="display: block; font-weight: 500; margin-bottom: 0.5rem; color: #374151;">Reason <span style="color: #ef4444;">*</span></label>
+                <textarea id="rejectionReason" rows="4" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;" placeholder="e.g., ID is blurry, Document expired, Name does not match..."></textarea>
+                <p id="rejectionError" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.5rem; display: none;">Rejection reason is required.</p>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button class="btn btn-secondary" onclick="closeRejectionModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="submitRejection()">Confirm Rejection</button>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="lightbox-overlay" id="lightboxModal">
     <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
     <div class="lightbox-content">
@@ -584,6 +608,9 @@ let currentImages = [];
 let currentImageIndex = 0;
 let verificationSortDirections = {};
 let activeTab = 'pending'; // 'pending' or 'history'
+// Variables for Rejection Modal
+let pendingRejectionVerificationId = null;
+let pendingRejectionUserId = null;
 
 // Tab switching function
 function switchVerificationTab(tabName) {
@@ -1128,16 +1155,56 @@ async function approveVerification(verificationId, userId) {
 }
 
 // Reject verification
-async function rejectVerification(verificationId, userId) {
+// Open Rejection Modal
+function rejectVerification(verificationId, userId) {
     if (!confirm('Are you sure you want to reject this verification request?')) {
         return;
     }
+    
+    // Store variables
+    pendingRejectionVerificationId = verificationId;
+    pendingRejectionUserId = userId;
+    
+    // Reset modal
+    document.getElementById('rejectionReason').value = '';
+    document.getElementById('rejectionError').style.display = 'none';
+    
+    // Show Rejection Modal and Hide Details Modal
+    document.getElementById('verificationModal').style.display = 'none';
+    document.getElementById('rejectionModal').style.display = 'flex';
+    document.getElementById('rejectionReason').focus();
+}
 
-    const rejectionReason = prompt('Please provide a rejection reason (required):');
-    if (!rejectionReason || !rejectionReason.trim()) {
-        alert('Rejection reason is required.');
+// Close Rejection Modal
+function closeRejectionModal() {
+    document.getElementById('rejectionModal').style.display = 'none';
+    // Re-open verification modal so admin isn't lost
+    document.getElementById('verificationModal').style.display = 'flex';
+    
+    // Clear variables
+    pendingRejectionVerificationId = null;
+    pendingRejectionUserId = null;
+}
+
+// Submit Rejection
+async function submitRejection() {
+    const reasonInput = document.getElementById('rejectionReason');
+    const reason = reasonInput.value.trim();
+    const errorMsg = document.getElementById('rejectionError');
+    
+    if (!reason) {
+        errorMsg.style.display = 'block';
+        reasonInput.focus();
         return;
     }
+    
+    errorMsg.style.display = 'none';
+    
+    // Disable button to prevent double submit
+    const confirmBtn = document.querySelector('#rejectionModal .btn-danger');
+    const originalText = confirmBtn.innerText;
+    confirmBtn.disabled = true;
+    confirmBtn.innerText = 'Rejecting...';
     
     try {
         const response = await fetch('/api/verification/reject', {
@@ -1149,9 +1216,9 @@ async function rejectVerification(verificationId, userId) {
                 'Accept': 'application/json'
             },
             body: JSON.stringify({
-                verificationId: verificationId,
-                userId: userId,
-                rejection_reason: rejectionReason.trim()
+                verificationId: pendingRejectionVerificationId,
+                userId: pendingRejectionUserId,
+                rejection_reason: reason
             })
         });
         
@@ -1159,7 +1226,14 @@ async function rejectVerification(verificationId, userId) {
         
         if (data.success) {
             alert('Verification rejected successfully');
-            closeModal();
+            document.getElementById('rejectionModal').style.display = 'none';
+            // Also ensure verification modal is closed if it wasn't already
+            document.getElementById('verificationModal').style.display = 'none';
+            
+            // Clear variables
+            pendingRejectionVerificationId = null;
+            pendingRejectionUserId = null;
+            
             loadVerificationRequests(); // Refresh the list
         } else {
             alert('Error: ' + (data.message || 'Failed to reject verification'));
@@ -1167,6 +1241,11 @@ async function rejectVerification(verificationId, userId) {
     } catch (error) {
         console.error('Error rejecting verification:', error);
         alert('Error rejecting verification');
+    } finally {
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.innerText = originalText;
+        }
     }
 }
 
