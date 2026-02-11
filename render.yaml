@@ -16,6 +16,9 @@ services:
     region: singapore
     buildCommand: cd UserSide/backends && npm install
     startCommand: cd UserSide/backends && npm start
+    envVars:
+      - key: APP_KEY
+        sync: false
   - type: cron
     name: reset-verification-status
     env: node
