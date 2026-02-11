@@ -1,0 +1,14 @@
+
+--- DEBUG: Check User Visibility ---
+Listing all users:
+ID: 36 | Email: imiyataox@gmail.com | Role: user | Station: NULL
+ID: 37 | Email: seacancer2@gmail.com | Role: user | Station: NULL
+
+--- Recent 5 Reports ---
+Report ID: 14434 | Station:  | Barangay: NULL | Created: 2025-12-10 04:04:36
+Report ID: 14433 | Station:  | Barangay: NULL | Created: 2025-12-10 02:58:25
+Report ID: 14432 | Station:  | Barangay: NULL | Created: 2025-12-10 02:34:08
+Report ID: 14431 | Station:  | Barangay: NULL | Created: 2023-01-27 19:23:00
+Report ID: 14430 | Station:  | Barangay: NULL | Created: 2023-01-27 16:08:00
+
+--- End Debug ---

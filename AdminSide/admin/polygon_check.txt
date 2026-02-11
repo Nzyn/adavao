@@ -1,0 +1,8 @@
+=== Checking Police Station Polygon Data ===
+
+PS2 (Station ID: 2):
+  Name: PS2 San Pedro
+  Polygon-related columns found: 
+
+PS3 (Station ID: 3):
+  Name: PS3 Talomo

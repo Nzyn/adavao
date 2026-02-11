@@ -1,0 +1,17 @@
+--- DATABASE CHECK ---
+Found 5 OTP records:
+ID: 66 | Phone: +639054057984 | OTP Hash: $2y$12$.MA... | Purpose: admin_login | Created: 2025-12-07 11:14:35
+ID: 64 | Phone: +639054057984 | OTP Hash: $2y$12$.6S... | Purpose: register | Created: 2025-12-01 05:46:06
+ID: 63 | Phone: +639691883113 | OTP Hash: $2a$10$yXr... | Purpose: register | Created: 2025-11-27 03:53:05
+ID: 62 | Phone: +639691883113 | OTP Hash: $2a$10$7Cs... | Purpose: register | Created: 2025-11-27 02:35:11
+ID: 61 | Phone: +639054057984 | OTP Hash: $2a$10$p5B... | Purpose: register | Created: 2025-11-26 23:59:48
+
+--- TWILIO CONFIG CHECK ---
+SID: Set (ACc56...)
+Token: Set (bf6c1...)
+From: Set (+19294608714)
+
+--- TEST SEND to +639054057984 ---
+HTTP Code: 0
+Response: 
+Curl Error: URL rejected: Malformed input to a URL function

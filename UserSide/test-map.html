@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Map Test</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    #map { height: 100vh; width: 100%; }
+    .location-info {
+      position: fixed; bottom: 10px; left: 10px; right: 10px;
+      background: white; padding: 12px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000;
+    }
+    .controls {
+      position: fixed; top: 10px; right: 10px; z-index: 1001;
+    }
+    .btn {
+      background: white; border: none; padding: 8px; margin: 2px;
+      border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <div class="controls">
+    <button class="btn" onclick="centerOnMarker()" title="Center">🎯</button>
+  </div>
+  
+  <div class="location-info">
+    <div><strong>📍 Location Picker Test</strong></div>
+    <div id="location-address">Click on map to select location</div>
+  </div>
+  
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    let map, marker;
+    
+    function initMap() {
+      try {
+        console.log('Initializing test map...');
+        
+        map = L.map('map').setView([7.0731, 125.6128], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        marker = L.marker([7.0731, 125.6128], { draggable: true }).addTo(map);
+        
+        // Click to select location
+        map.on('click', function(e) {
+          const lat = e.latlng.lat;
+          const lng = e.latlng.lng;
+          marker.setLatLng([lat, lng]);
+          document.getElementById('location-address').innerHTML = 
+            'Selected: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+        });
+        
+        // Drag marker
+        marker.on('dragend', function(e) {
+          const pos = e.target.getLatLng();
+          document.getElementById('location-address').innerHTML = 
+            'Selected: ' + pos.lat.toFixed(6) + ', ' + pos.lng.toFixed(6);
+        });
+        
+        console.log('Test map initialized successfully');
+      } catch (error) {
+        console.error('Test map error:', error);
+        document.getElementById('location-address').innerHTML = 'Error: ' + error.message;
+      }
+    }
+    
+    function centerOnMarker() {
+      if (map && marker) {
+        map.setView(marker.getLatLng(), 13);
+      }
+    }
+    
+    // Initialize when page loads
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initMap);
+    } else {
+      initMap();
+    }
+  </script>
+</body>
+</html>

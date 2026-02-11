@@ -1,0 +1,39 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath('com.android.tools.build:gradle')
+    classpath('com.facebook.react:react-native-gradle-plugin')
+    classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+  }
+}
+
+ext {
+  // Ensure consistent SDK versions across app + native modules.
+  // Some modules fall back to minSdk 21/22 if these are not defined.
+  buildToolsVersion = findProperty('android.buildToolsVersion') ?: '36.0.0'
+  minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '24')
+  compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '36')
+  targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '36')
+  ndkVersion = findProperty('android.ndkVersion') ?: '27.1.12297006'
+}
+
+allprojects {
+  repositories {
+    google()
+    mavenCentral()
+    maven { url 'https://www.jitpack.io' }
+  }
+}
+
+apply plugin: "expo-root-project"
+apply plugin: "com.facebook.react.rootproject"
+
+// Some Android library build scripts look for rootProject.ext.minSdk (not minSdkVersion)
+// and some plugin configurations may override ext values. Re-assert these after plugins.
+rootProject.ext.minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '24')
+rootProject.ext.minSdk = rootProject.ext.minSdkVersion

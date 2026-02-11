@@ -1,0 +1,168 @@
+services:
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: alertdavao_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - alertdavao_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Database (Target for Migration)
+  postgres:
+    image: postgres:15-alpine
+    container_name: alertdavao_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: alertdavao
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - alertdavao_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: alertdavao_mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword123}
+      MYSQL_DATABASE: ${DB_DATABASE:-alertdavao}
+      MYSQL_USER: ${DB_USERNAME:-alertdavao_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-alertdavao_pass123}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - alertdavao_network
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+
+  # AdminSide - Laravel Backend
+  adminside:
+    build:
+      context: ./AdminSide/admin
+      dockerfile: Dockerfile
+    container_name: alertdavao_adminside
+    restart: unless-stopped
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_HOST=mysql
+      - DB_DATABASE=${DB_DATABASE:-alertdavao}
+      - DB_USERNAME=${DB_USERNAME:-alertdavao_user}
+      - DB_PASSWORD=${DB_PASSWORD:-alertdavao_pass123}
+      - NODE_BACKEND_URL=http://userside-backend:3000
+      - CACHE_DRIVER=redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+    volumes:
+      - ./AdminSide/admin:/var/www/html
+      - adminside_vendor:/var/www/html/vendor
+    ports:
+      - "8000:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - alertdavao_network
+
+  # UserSide Backend - Node.js/Express
+  userside-backend:
+    build:
+      context: ./UserSide/backends
+      dockerfile: Dockerfile
+    container_name: alertdavao_userside_backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=mysql
+      - DB_USER=${DB_USERNAME:-alertdavao_user}
+      - DB_PASSWORD=${DB_PASSWORD:-alertdavao_pass123}
+      - DB_DATABASE=${DB_DATABASE:-alertdavao}
+      - BACKEND_URL=${BACKEND_URL:-http://localhost:3000}
+    volumes:
+      - ./UserSide/backends:/app
+      - userside_node_modules:/app/node_modules
+      - ./UserSide/evidence:/app/../evidence
+      - ./UserSide/verifications:/app/../verifications
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - alertdavao_network
+
+  # SARIMA API - Python/FastAPI
+  sarima-api:
+    build:
+      context: ./AdminSide/sarima_api
+      dockerfile: Dockerfile
+    container_name: alertdavao_sarima_api
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./AdminSide/sarima_api:/app
+    ports:
+      - "8080:8080"
+    networks:
+      - alertdavao_network
+
+  # Ngrok - Expose services to the internet
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: alertdavao_ngrok
+    restart: unless-stopped
+    command:
+      - "start"
+      - "--all"
+      - "--config"
+      - "/etc/ngrok.yml"
+    volumes:
+      - ./ngrok.yml:/etc/ngrok.yml
+    ports:
+      - "4040:4040" # Ngrok web interface
+    depends_on:
+      - adminside
+      - userside-backend
+      - sarima-api
+    networks:
+      - alertdavao_network
+
+networks:
+  alertdavao_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  postgres_data:
+  redis_data:
+  adminside_vendor:
+  userside_node_modules:

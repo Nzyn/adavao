@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: alertdavao-admin
+    env: php
+    plan: free
+    region: singapore
+    buildCommand: cd AdminSide/admin && composer install --no-dev --optimize-autoloader
+    startCommand: bash scripts/render-migrate.sh && cd AdminSide/admin && heroku-php-apache2 public/
+    envVars:
+      - key: PHP_VERSION
+        value: 8.1
+  - type: web
+    name: alertdavao-userside-backend
+    env: node
+    plan: free
+    region: singapore
+    buildCommand: cd UserSide/backends && npm install
+    startCommand: cd UserSide/backends && npm start

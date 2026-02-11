@@ -1,0 +1,26 @@
+# Ngrok Configuration for AlertDavao
+# Get your authtoken from: https://dashboard.ngrok.com/get-started/your-authtoken
+
+version: "2"
+authtoken: 36M48hnJnylQU98ZnRkj9ubsNjk_5fVVrH3jk11mm4MPD9z1y
+
+tunnels:
+  # AdminSide Backend (Laravel) - PRIMARY
+  adminside:
+    proto: http
+    addr: adminside:80
+    inspect: true
+    schemes:
+      - https
+  
+  # UserSide Backend API (Node.js) - For Mobile App
+  userside-backend:
+    proto: http
+    addr: userside-backend:3000
+    inspect: true
+    schemes:
+      - https
+
+# Web Interface Configuration
+web_addr: 0.0.0.0:4040
+console_ui: true

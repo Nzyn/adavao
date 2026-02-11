@@ -1,0 +1,1262 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
+use App\Models\CrimeForecast;
+use App\Models\CrimeAnalytics;
+
+class StatisticsController extends Controller
+{
+    private $sarimaApiUrl;
+
+    private const REPORT_VALID = 'valid';
+    private const REPORT_INVALID = 'invalid';
+    private const REPORT_CHECKING = 'checking_for_report_validity';
+
+    public function __construct() {
+        // Default to localhost:8001 for local development, Docker override via env
+        $this->sarimaApiUrl = env('SARIMA_API_URL', 'http://localhost:8001');
+    }
+
+    /**
+     * Check if SARIMA API is running
+     * Increased timeout to 60s to handle Render cold starts
+     */
+    private function isSarimaApiRunning()
+    {
+        try {
+            $response = Http::timeout(60)->get("{$this->sarimaApiUrl}/");
+            return $response->successful();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Auto-start SARIMA API if not running (development only)
+     */
+    private function autoStartSarimaApi()
+    {
+        if ($this->isSarimaApiRunning()) {
+            return true;
+        }
+
+        // Only auto-start in local development
+        if (!app()->environment('local')) {
+            return false;
+        }
+
+        try {
+            // Path to sarima_api/main.py relative to Laravel root (admin)
+            // base_path() is .../admin, so we go up one level
+            $pythonScript = base_path('../sarima_api/main.py');
+            
+            if (file_exists($pythonScript)) {
+                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                    // Windows
+                    pclose(popen("start /B python \"$pythonScript\"", "r"));
+                } else {
+                    // Linux/Mac
+                    exec("python3 \"$pythonScript\" > /dev/null 2>&1 &");
+                }
+                
+                // Wait a moment for the API to start
+                sleep(5);
+                return $this->isSarimaApiRunning();
+            } else {
+                \Log::error("SARIMA script not found at: $pythonScript");
+            }
+        } catch (\Exception $e) {
+            \Log::error('Failed to auto-start SARIMA API: ' . $e->getMessage());
+        }
+
+        return false;
+    }
+
+    /**
+     * Display the statistics page
+     */
+    public function index()
+    {
+        // Try to auto-start SARIMA API if in development
+        $this->autoStartSarimaApi();
+        
+        return view('statistics');
+    }
+
+    /**
+     * Get crime forecast from pre-generated SARIMA CSV file
+     * Uses sarima_forecast.csv (12 months forecast from CrimeDAta.csv)
+     */
+
+    /**
+     * Pre-warm all caches
+     */
+    public function warmUpCache()
+    {
+        try {
+            \Log::info('Starting cache warm-up...');
+            
+            // Warm up forecasts for common horizons
+            foreach ([6, 12, 18, 24] as $horizon) {
+                $this->_getForecast($horizon);
+            }
+            
+            // Warm up crime stats (all time)
+            $this->_getCrimeStats(null, null);
+            
+            // Warm up barangay stats
+            $this->_getBarangayStats(null, null);
+            
+            \Log::info('Cache warm-up completed.');
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Cache warm-up failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getForecast(Request $request)
+    {
+        $horizon = $request->input('horizon', 12);
+        $crimeType = $request->input('crime_type');
+
+        try {
+            // Ensure API is running
+            $this->autoStartSarimaApi();
+            
+            // Get full response from API (scalable)
+            $apiResponse = $this->_getForecast($horizon, $crimeType);
+            
+            // Base response structure
+            $response = [
+                'status' => 'success',
+                'horizon' => $horizon,
+                'model' => 'SARIMA(0,1,1)(0,1,1)[12]',
+                'source' => 'Live SARIMA API'
+            ];
+
+            // If API returns a direct array (legacy/simple mode), assume it's data
+            // If API returns an assoc array with keys, merge it (scalable mode)
+            if (isset($apiResponse['data'])) {
+                 // API follows standard { data: [...], other_metrics: ... }
+                 $response = array_merge($response, $apiResponse);
+            } else {
+                 // API returns raw list of points
+                 $response['data'] = $apiResponse;
+            }
+            
+            return response()->json($response);
+        } catch (\Exception $e) {
+             return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to load SARIMA forecast data',
+                'details' => $e->getMessage()
+            ], 503);
+        }
+    }
+
+    private function _getForecast($horizon, $crimeType = null) 
+    {
+        // Cache key must include crime type
+        $cacheKey = "sarima_forecast_full_{$horizon}";
+        if ($crimeType) {
+            $cacheKey .= "_" . md5($crimeType);
+        }
+
+        return Cache::remember($cacheKey, 3600, function () use ($horizon, $crimeType) {
+            $params = ['horizon' => $horizon];
+            if ($crimeType) {
+                $params['crime_type'] = $crimeType;
+            }
+
+            // 60s timeout to handle Render cold starts
+            $response = Http::timeout(60)->get("{$this->sarimaApiUrl}/forecast", $params);
+            
+            if ($response->successful()) {
+                // Return EVERYTHING the API sends, not just ['data']
+                return $response->json();
+            }
+            
+            throw new \Exception('Failed to fetch forecast from API: ' . $response->status());
+        });
+    }
+
+    /**
+     * Get crime statistics from CSV files
+     * Uses CrimeDAta.csv and DCPO_5years_monthly.csv
+     * Supports optional month/year filtering
+     */
+    public function getCrimeStats(Request $request)
+    {
+        $month = $request->input('month');
+        $year = $request->input('year');
+        
+        try {
+            $statsData = $this->_getCrimeStats($month, $year);
+             return response()->json([
+                'status' => 'success',
+                'data' => $statsData,
+                'filter' => ['month' => $month, 'year' => $year]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * DB-backed report summary for analytics cards (role-aware)
+     * Supports optional filtering by year and/or month.
+     */
+    public function getReportSummary(Request $request)
+    {
+        $month = $request->input('month'); // '01'..'12'
+        $year = $request->input('year');   // '2025'..
+
+        // Determine role similarly to DashboardController
+        $user = auth()->user();
+        $email = $user->email ?? '';
+        $role = $user->role ?? null;
+        $isSuperAdmin = $user && ($email === 'alertdavao.ph@gmail.com' || str_contains($email, 'alertdavao.ph'));
+
+        $reportsQuery = DB::table('reports');
+
+        // Optional date filters
+        if ($year) {
+            $reportsQuery->whereYear('created_at', $year);
+        }
+        if ($month) {
+            // Accept either '01'..'12' or 'YYYY-MM'
+            if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                $reportsQuery->whereRaw("to_char(created_at, 'YYYY-MM') = ?", [$month]);
+            } else {
+                $reportsQuery->whereMonth('created_at', intval($month));
+            }
+        }
+
+        // Role-aware scoping
+        if (!$isSuperAdmin) {
+            if ($role === 'police') {
+                $stationId = $user->station_id ?? null;
+                if ($stationId) {
+                    $reportsQuery->where('assigned_station_id', $stationId);
+                } else {
+                    // Police without station: return zeros
+                    return response()->json([
+                        'status' => 'success',
+                        'filter' => ['month' => $month, 'year' => $year],
+                        'data' => [
+                            'total' => 0,
+                            'resolved' => 0,
+                            'pending' => 0,
+                            'investigating' => 0,
+                            'valid' => 0,
+                            'invalid' => 0,
+                            'checking' => 0,
+
+                            // Aliases / extra cards
+                            'complaints' => 0,
+                            'hoaxes' => 0,
+                            'total_complaints' => 0,
+                            'resolved_cases' => 0,
+                            'fake_reports' => 0,
+                            'patrol_total' => 0,
+                            'patrol_on_duty' => 0,
+                            'active_dispatches' => 0,
+                        ]
+                    ]);
+                }
+            } else {
+                // Admin: only assigned reports
+                $reportsQuery->whereNotNull('assigned_station_id');
+            }
+        }
+
+        $base = clone $reportsQuery;
+
+        $total = (clone $base)->count();
+        $resolved = (clone $base)->where('status', 'resolved')->count();
+        $pending = (clone $base)->where('status', 'pending')->count();
+        $investigating = (clone $base)->where('status', 'investigating')->count();
+
+        $valid = (clone $base)->where('is_valid', self::REPORT_VALID)->count();
+        $invalid = (clone $base)->where('is_valid', self::REPORT_INVALID)->count();
+        $checking = (clone $base)->where('is_valid', self::REPORT_CHECKING)->count();
+
+        // Patrol dispatch validity (used as a proxy for "fake reports" after on-ground validation)
+        $dispatchQuery = DB::table('patrol_dispatches');
+        if ($year) {
+            $dispatchQuery->whereYear('dispatched_at', $year);
+        }
+        if ($month) {
+            if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                // Try to keep it cross-db: use year+month split
+                [$y, $m] = explode('-', $month);
+                $dispatchQuery->whereYear('dispatched_at', $y)->whereMonth('dispatched_at', intval($m));
+            } else {
+                $dispatchQuery->whereMonth('dispatched_at', intval($month));
+            }
+        }
+
+        if (!$isSuperAdmin) {
+            if ($role === 'police') {
+                $stationId = $user->station_id ?? null;
+                if ($stationId) {
+                    $dispatchQuery->where('station_id', $stationId);
+                }
+            }
+        }
+
+        $fakeReports = (clone $dispatchQuery)
+            ->whereNotNull('validated_at')
+            ->where('is_valid', false)
+            ->count();
+
+        $activeDispatches = (clone $dispatchQuery)
+            ->whereIn('status', ['pending', 'accepted', 'en_route', 'arrived'])
+            ->count();
+
+        // Police deployment numbers (patrol officers)
+        $officersQuery = DB::table('users_public')->where('user_role', 'patrol_officer');
+        if (!$isSuperAdmin && $role === 'police') {
+            $stationId = $user->station_id ?? null;
+            if ($stationId) {
+                $officersQuery->where('assigned_station_id', $stationId);
+            }
+        }
+        $patrolTotal = (clone $officersQuery)->count();
+        $patrolOnDuty = (clone $officersQuery)->where('is_on_duty', true)->count();
+
+        return response()->json([
+            'status' => 'success',
+            'filter' => ['month' => $month, 'year' => $year],
+            'data' => [
+                'total' => $total,
+                'resolved' => $resolved,
+                'pending' => $pending,
+                'investigating' => $investigating,
+                'valid' => $valid,
+                'invalid' => $invalid,
+                'checking' => $checking,
+
+                // Backlog naming / extra cards
+                'complaints' => $valid,
+                'hoaxes' => $invalid,
+                'total_complaints' => $total,
+                'resolved_cases' => $resolved,
+                'fake_reports' => $fakeReports,
+                'patrol_total' => $patrolTotal,
+                'patrol_on_duty' => $patrolOnDuty,
+                'active_dispatches' => $activeDispatches,
+            ]
+        ]);
+    }
+
+    /**
+     * Insights endpoint: deployment suggestions, seasonality and barangay correlation.
+     * Role-aware and supports optional month/year filtering (same semantics as report-summary).
+     */
+    public function getInsights(Request $request)
+    {
+        $month = $request->input('month'); // 'YYYY-MM' or '01'..'12'
+        $year = $request->input('year');
+
+        $user = auth()->user();
+        $email = $user->email ?? '';
+        $role = $user->role ?? null;
+        $isSuperAdmin = $user && ($email === 'alertdavao.ph@gmail.com' || str_contains($email, 'alertdavao.ph'));
+
+        $stationScopeId = null;
+        if (!$isSuperAdmin && $role === 'police') {
+            $stationScopeId = $user->station_id ?? null;
+            if (!$stationScopeId) {
+                return response()->json([
+                    'status' => 'success',
+                    'filter' => ['month' => $month, 'year' => $year],
+                    'data' => [
+                        'deployment' => [
+                            'patrol_total' => 0,
+                            'patrol_on_duty' => 0,
+                            'active_dispatches' => 0,
+                            'overdue_dispatches' => 0,
+                            'fake_reports' => 0,
+                        ],
+                        'recommendations' => ['No station assigned to this police account; deployment insights are unavailable.'],
+                        'seasonality' => [
+                            'topMonths' => [],
+                        ],
+                        'correlation' => [
+                            'topPairs' => [],
+                            'topByBarangay' => [],
+                        ],
+                    ]
+                ]);
+            }
+        }
+
+        $cacheKey = 'statistics_insights_v1'
+            . ($month ? "_m{$month}" : '')
+            . ($year ? "_y{$year}" : '')
+            . ($stationScopeId ? "_s{$stationScopeId}" : ($isSuperAdmin ? '_super' : '_admin'));
+
+        $payload = Cache::remember($cacheKey, 600, function () use ($month, $year, $isSuperAdmin, $role, $stationScopeId) {
+            // Deployment stats
+            $officersQuery = DB::table('users_public')->where('user_role', 'patrol_officer');
+            if ($stationScopeId) {
+                $officersQuery->where('assigned_station_id', $stationScopeId);
+            }
+            $patrolTotal = (clone $officersQuery)->count();
+            $patrolOnDuty = (clone $officersQuery)->where('is_on_duty', true)->count();
+
+            $dispatchQuery = DB::table('patrol_dispatches');
+            if ($stationScopeId) {
+                $dispatchQuery->where('station_id', $stationScopeId);
+            }
+            if ($year) {
+                $dispatchQuery->whereYear('dispatched_at', $year);
+            }
+            if ($month) {
+                if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                    [$y, $m] = explode('-', $month);
+                    $dispatchQuery->whereYear('dispatched_at', $y)->whereMonth('dispatched_at', intval($m));
+                } else {
+                    $dispatchQuery->whereMonth('dispatched_at', intval($month));
+                }
+            }
+
+            $activeDispatches = (clone $dispatchQuery)
+                ->whereIn('status', ['pending', 'accepted', 'en_route', 'arrived'])
+                ->count();
+
+            $overdueDispatches = (clone $dispatchQuery)
+                ->whereIn('status', ['pending', 'accepted', 'en_route'])
+                ->where('dispatched_at', '<=', Carbon::now()->subSeconds(180))
+                ->count();
+
+            $fakeReports = (clone $dispatchQuery)
+                ->whereNotNull('validated_at')
+                ->where('is_valid', false)
+                ->count();
+
+            // Invalid vs valid reports (for recommendation context)
+            $reportsQuery = DB::table('reports');
+            if ($year) {
+                $reportsQuery->whereYear('created_at', $year);
+            }
+            if ($month) {
+                if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                    [$y, $m] = explode('-', $month);
+                    $reportsQuery->whereYear('created_at', $y)->whereMonth('created_at', intval($m));
+                } else {
+                    $reportsQuery->whereMonth('created_at', intval($month));
+                }
+            }
+            if ($stationScopeId) {
+                $reportsQuery->where('assigned_station_id', $stationScopeId);
+            } elseif (!$isSuperAdmin && $role !== 'police') {
+                // Admin scope: assigned only
+                $reportsQuery->whereNotNull('assigned_station_id');
+            }
+
+            $validReports = (clone $reportsQuery)->where('is_valid', self::REPORT_VALID)->count();
+            $invalidReports = (clone $reportsQuery)->where('is_valid', self::REPORT_INVALID)->count();
+            $checkingReports = (clone $reportsQuery)->where('is_valid', self::REPORT_CHECKING)->count();
+
+            // Recommendations
+            $recommendations = [];
+            if ($patrolOnDuty <= 0 && $activeDispatches > 0) {
+                $recommendations[] = 'No patrol officers are ON DUTY while there are active dispatches. Consider activating at least 1–2 officers immediately.';
+            }
+            if ($overdueDispatches > 0) {
+                $recommendations[] = "{$overdueDispatches} dispatch(es) are over the 3-minute response threshold. Review officer assignment and station routing.";
+            }
+            $loadRatio = $patrolOnDuty > 0 ? ($activeDispatches / $patrolOnDuty) : null;
+            if ($loadRatio !== null && $loadRatio > 2.0) {
+                $recommendations[] = sprintf('High dispatch load: %.2f active dispatches per on-duty officer. Consider adding more officers on-duty or rebalancing stations.', $loadRatio);
+            }
+            if (($invalidReports + $fakeReports) > 0 && ($validReports + $invalidReports + $checkingReports) > 0) {
+                $totalProcessed = ($validReports + $invalidReports + $checkingReports);
+                $invalidRate = round((($invalidReports) / max(1, $totalProcessed)) * 100, 1);
+                if ($invalidRate >= 20) {
+                    $recommendations[] = "High invalid-report rate ({$invalidRate}%). Consider tightening reporting guidance and prioritizing verification.";
+                }
+            }
+            if (empty($recommendations)) {
+                $recommendations[] = 'No critical issues detected for the selected filter. Continue monitoring dispatch response times and report validity.';
+            }
+
+            // Per-station deployment suggestions (admin/super-admin), or station-only for police
+            $stations = [];
+            if ($stationScopeId) {
+                $stationRows = DB::table('police_stations')
+                    ->select('station_id', 'station_name')
+                    ->where('station_id', $stationScopeId)
+                    ->get();
+            } else {
+                $stationRows = DB::table('police_stations')
+                    ->select('station_id', 'station_name')
+                    ->orderBy('station_name', 'asc')
+                    ->get();
+            }
+
+            $officerAgg = DB::table('users_public')
+                ->select(
+                    'assigned_station_id',
+                    DB::raw('COUNT(*) as patrol_total'),
+                    DB::raw('SUM(CASE WHEN is_on_duty = true THEN 1 ELSE 0 END) as patrol_on_duty')
+                )
+                ->where('user_role', 'patrol_officer')
+                ->whereNotNull('assigned_station_id')
+                ->groupBy('assigned_station_id')
+                ->get()
+                ->keyBy('assigned_station_id');
+
+            $dispatchAggQuery = DB::table('patrol_dispatches')
+                ->select('station_id', DB::raw('COUNT(*) as active_dispatches'))
+                ->whereIn('status', ['pending', 'accepted', 'en_route', 'arrived'])
+                ->groupBy('station_id');
+            if ($year) {
+                $dispatchAggQuery->whereYear('dispatched_at', $year);
+            }
+            if ($month) {
+                if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                    [$y, $m] = explode('-', $month);
+                    $dispatchAggQuery->whereYear('dispatched_at', $y)->whereMonth('dispatched_at', intval($m));
+                } else {
+                    $dispatchAggQuery->whereMonth('dispatched_at', intval($month));
+                }
+            }
+            $dispatchAgg = $dispatchAggQuery->get()->keyBy('station_id');
+
+            $overdueAggQuery = DB::table('patrol_dispatches')
+                ->select('station_id', DB::raw('COUNT(*) as overdue_dispatches'))
+                ->whereIn('status', ['pending', 'accepted', 'en_route'])
+                ->where('dispatched_at', '<=', Carbon::now()->subSeconds(180))
+                ->groupBy('station_id');
+            if ($year) {
+                $overdueAggQuery->whereYear('dispatched_at', $year);
+            }
+            if ($month) {
+                if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                    [$y, $m] = explode('-', $month);
+                    $overdueAggQuery->whereYear('dispatched_at', $y)->whereMonth('dispatched_at', intval($m));
+                } else {
+                    $overdueAggQuery->whereMonth('dispatched_at', intval($month));
+                }
+            }
+            $overdueAgg = $overdueAggQuery->get()->keyBy('station_id');
+
+            foreach ($stationRows as $s) {
+                $sid = $s->station_id;
+                $o = $officerAgg->get($sid);
+                $d = $dispatchAgg->get($sid);
+                $od = $overdueAgg->get($sid);
+
+                $sPatrolTotal = intval($o->patrol_total ?? 0);
+                $sPatrolOnDuty = intval($o->patrol_on_duty ?? 0);
+                $sActive = intval($d->active_dispatches ?? 0);
+                $sOverdue = intval($od->overdue_dispatches ?? 0);
+                $ratio = $sPatrolOnDuty > 0 ? ($sActive / $sPatrolOnDuty) : null;
+
+                $suggestion = 'OK';
+                if ($sPatrolOnDuty <= 0 && $sActive > 0) {
+                    $suggestion = 'Activate at least 1–2 patrol officers (active dispatches exist).';
+                } elseif ($sOverdue > 0) {
+                    $suggestion = 'Dispatches overdue (3-min). Reassign or add on-duty officers.';
+                } elseif ($ratio !== null && $ratio > 2.0) {
+                    $suggestion = sprintf('High load (%.2f active per on-duty). Add officers or rebalance.', $ratio);
+                }
+
+                $stations[] = [
+                    'station_id' => $sid,
+                    'station_name' => $s->station_name,
+                    'patrol_total' => $sPatrolTotal,
+                    'patrol_on_duty' => $sPatrolOnDuty,
+                    'active_dispatches' => $sActive,
+                    'overdue_dispatches' => $sOverdue,
+                    'suggestion' => $suggestion,
+                ];
+            }
+
+            // Seasonality from CSV (month-of-year aggregation)
+            $seasonality = $this->computeSeasonalityFromCsv($year);
+
+            // Crime type vs barangay correlation (DB)
+            $correlation = $this->computeCrimeTypeBarangayCorrelation($month, $year, $stationScopeId, $isSuperAdmin, $role);
+
+            return [
+                'deployment' => [
+                    'patrol_total' => $patrolTotal,
+                    'patrol_on_duty' => $patrolOnDuty,
+                    'active_dispatches' => $activeDispatches,
+                    'overdue_dispatches' => $overdueDispatches,
+                    'fake_reports' => $fakeReports,
+                ],
+                'stations' => $stations,
+                'recommendations' => $recommendations,
+                'seasonality' => $seasonality,
+                'correlation' => $correlation,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'filter' => ['month' => $month, 'year' => $year],
+            'data' => $payload,
+        ]);
+    }
+
+    private function computeSeasonalityFromCsv($year = null): array
+    {
+        $csvPath = storage_path('app/davao_crime_5years.csv');
+        if (!file_exists($csvPath)) {
+            return ['topMonths' => []];
+        }
+
+        $monthTotals = array_fill(1, 12, 0.0);
+        $monthCounts = array_fill(1, 12, 0);
+
+        $file = fopen($csvPath, 'r');
+        $header = fgetcsv($file);
+        $headerMap = array_flip($header ?: []);
+        $idxDate = $headerMap['date'] ?? 1;
+        $idxCount = $headerMap['crime_count'] ?? 4;
+
+        while (($row = fgetcsv($file)) !== false) {
+            if (count($row) < 5) continue;
+            $date = $row[$idxDate] ?? null;
+            if (!$date || strlen($date) < 7) continue;
+
+            $rowYear = substr($date, 0, 4);
+            $rowMonth = intval(substr($date, 5, 2));
+            if ($rowMonth < 1 || $rowMonth > 12) continue;
+            if ($year && $rowYear !== (string)$year) continue;
+
+            $count = floatval($row[$idxCount] ?? 0);
+            $monthTotals[$rowMonth] += $count;
+            $monthCounts[$rowMonth] += 1;
+        }
+        fclose($file);
+
+        $monthNames = [
+            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June',
+            7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+        ];
+
+        $averages = [];
+        foreach ($monthTotals as $m => $total) {
+            $avg = $monthCounts[$m] > 0 ? ($total / $monthCounts[$m]) : 0;
+            $averages[] = [
+                'month' => $m,
+                'monthName' => $monthNames[$m],
+                'averageCount' => round($avg, 2),
+                'totalCount' => round($total, 2),
+            ];
+        }
+
+        usort($averages, function ($a, $b) {
+            return $b['averageCount'] <=> $a['averageCount'];
+        });
+
+        return [
+            'topMonths' => array_slice($averages, 0, 3),
+            'monthAverages' => $averages,
+        ];
+    }
+
+    private function normalizeReportTypes($reportTypeRaw): array
+    {
+        if ($reportTypeRaw === null) return [];
+
+        if (is_string($reportTypeRaw)) {
+            $decoded = json_decode($reportTypeRaw, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $reportTypeRaw = $decoded;
+            }
+        }
+
+        $types = [];
+        if (is_array($reportTypeRaw)) {
+            foreach ($reportTypeRaw as $t) {
+                if (!is_string($t)) continue;
+                $clean = trim($t);
+                if ($clean !== '') $types[] = $clean;
+            }
+        } elseif (is_string($reportTypeRaw)) {
+            $clean = trim($reportTypeRaw);
+            if ($clean !== '') $types[] = $clean;
+        }
+
+        return array_values(array_unique($types));
+    }
+
+    private function computeCrimeTypeBarangayCorrelation($month, $year, $stationScopeId, $isSuperAdmin, $role): array
+    {
+        $query = DB::table('reports')
+            ->join('locations', 'reports.location_id', '=', 'locations.location_id')
+            ->select('reports.report_type', 'locations.barangay', 'reports.created_at', 'reports.assigned_station_id')
+            ->where('reports.is_valid', self::REPORT_VALID);
+
+        if ($year) {
+            $query->whereYear('reports.created_at', $year);
+        }
+        if ($month) {
+            if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+                [$y, $m] = explode('-', $month);
+                $query->whereYear('reports.created_at', $y)->whereMonth('reports.created_at', intval($m));
+            } else {
+                $query->whereMonth('reports.created_at', intval($month));
+            }
+        }
+
+        if ($stationScopeId) {
+            $query->where('reports.assigned_station_id', $stationScopeId);
+        } elseif (!$isSuperAdmin && $role !== 'police') {
+            $query->whereNotNull('reports.assigned_station_id');
+        }
+
+        // Keep it bounded to avoid heavy loads on large datasets
+        $rows = $query->orderBy('reports.created_at', 'desc')->limit(5000)->get();
+
+        $pairCounts = [];
+        $byBarangay = [];
+
+        foreach ($rows as $row) {
+            $barangay = trim((string)($row->barangay ?? ''));
+            if ($barangay === '') continue;
+
+            $types = $this->normalizeReportTypes($row->report_type);
+            foreach ($types as $t) {
+                $type = trim($t);
+                if ($type === '') continue;
+
+                $pairKey = $barangay . '||' . $type;
+                $pairCounts[$pairKey] = ($pairCounts[$pairKey] ?? 0) + 1;
+
+                if (!isset($byBarangay[$barangay])) {
+                    $byBarangay[$barangay] = [];
+                }
+                $byBarangay[$barangay][$type] = ($byBarangay[$barangay][$type] ?? 0) + 1;
+            }
+        }
+
+        arsort($pairCounts);
+        $topPairs = [];
+        foreach (array_slice($pairCounts, 0, 12, true) as $key => $count) {
+            [$barangay, $type] = explode('||', $key, 2);
+            $topPairs[] = ['barangay' => $barangay, 'crimeType' => $type, 'count' => $count];
+        }
+
+        // For each barangay, keep top 3 types
+        $topByBarangay = [];
+        foreach ($byBarangay as $barangay => $counts) {
+            arsort($counts);
+            $topTypes = [];
+            foreach (array_slice($counts, 0, 3, true) as $type => $count) {
+                $topTypes[] = ['crimeType' => $type, 'count' => $count];
+            }
+            $topByBarangay[] = ['barangay' => $barangay, 'topTypes' => $topTypes];
+        }
+        usort($topByBarangay, function ($a, $b) {
+            return strcmp($a['barangay'], $b['barangay']);
+        });
+
+        return [
+            'topPairs' => $topPairs,
+            'topByBarangay' => array_slice($topByBarangay, 0, 15),
+        ];
+    }
+
+    private function _getCrimeStats($month, $year)
+    {
+        $cacheKey = 'crime_stats_data_v2' . ($month ? "_$month" : "") . ($year ? "_$year" : "");
+            
+        return Cache::remember($cacheKey, 3600, function () use ($month, $year) {
+            $csvPath = storage_path('app/davao_crime_5years.csv');
+            
+            if (!file_exists($csvPath)) {
+                throw new \Exception('Data file not found at: ' . $csvPath);
+            }
+
+            $crimesByType = [];
+            $crimesByLocation = [];
+            $monthlyStats = [];
+            
+            $file = fopen($csvPath, 'r');
+            $header = fgetcsv($file); 
+            $headerMap = array_flip($header);
+            $idxDate = $headerMap['date'] ?? 1;
+            $idxBarangay = $headerMap['barangay'] ?? 2;
+            $idxType = $headerMap['crime_type'] ?? 3;
+            $idxCount = $headerMap['crime_count'] ?? 4;
+
+            while (($row = fgetcsv($file)) !== false) {
+                if (count($row) < 5) continue;
+
+                $date = $row[$idxDate];
+                $barangay = trim($row[$idxBarangay]);
+                $type = trim($row[$idxType]);
+                $count = floatval($row[$idxCount]);
+                
+                $rowYear = substr($date, 0, 4);
+                $rowMonth = substr($date, 5, 2);
+
+                if ($month && substr($date, 0, 7) !== $month) continue;
+                if ($year && $rowYear !== $year) continue;
+
+                if (!isset($crimesByType[$type])) $crimesByType[$type] = 0;
+                $crimesByType[$type] += $count;
+
+                if (!isset($crimesByLocation[$barangay])) $crimesByLocation[$barangay] = 0;
+                $crimesByLocation[$barangay] += $count;
+
+                $mKey = "$rowYear-$rowMonth";
+                if (!isset($monthlyStats[$mKey])) {
+                    $monthlyStats[$mKey] = ['year' => intval($rowYear), 'month' => intval($rowMonth), 'count' => 0];
+                }
+                $monthlyStats[$mKey]['count'] += $count;
+            }
+            fclose($file);
+
+            $crimeByType = collect($crimesByType)
+                ->map(function($c, $t) { return ['type' => $t, 'count' => $c]; })
+                ->sortByDesc('count')->values()->take(15);
+
+            $crimeByLocation = collect($crimesByLocation)
+                ->map(function($c, $l) { return ['location' => $l, 'count' => $c]; })
+                ->sortByDesc('count')->values()->take(10);
+
+            $monthlyStatsFormatted = collect($monthlyStats)->sortBy('year')->sortBy('month')->values();
+
+            $totalCrimes = array_sum($crimesByType);
+            $latest = $monthlyStatsFormatted->last();
+            $totalThisMonth = $latest['count'] ?? 0;
+            
+            $percentChange = 0; 
+            if ($monthlyStatsFormatted->count() >= 2) {
+                $prev = $monthlyStatsFormatted[$monthlyStatsFormatted->count() - 2];
+                if ($prev['count'] > 0) {
+                    $percentChange = round((($totalThisMonth - $prev['count']) / $prev['count']) * 100, 2);
+                }
+            }
+
+            return [
+                'monthly' => $monthlyStatsFormatted,
+                'byType' => $crimeByType,
+                'byStatus' => [],
+                'byLocation' => $crimeByLocation,
+                'overview' => [
+                    'total' => $totalCrimes,
+                    'thisMonth' => $totalThisMonth,
+                    'lastMonth' => 0,
+                    'percentChange' => $percentChange
+                ]
+            ];
+        });
+    }
+
+    /**
+     * Export crime data as CSV with optional filters
+     */
+    public function exportCrimeData(Request $request)
+    {
+        $year = $request->input('year');
+        $month = $request->input('month');
+        $crimeType = $request->input('crime_type');
+        
+        try {
+            // If crime type specified, export from DCPO CSV
+            if ($crimeType) {
+                return $this->exportDCPOData($crimeType, $year, $month);
+            }
+            
+            // Otherwise export from reports table
+            $query = DB::table('reports')->where('is_valid', 'valid');
+            
+            if ($year) {
+                $query->whereYear('created_at', $year);
+            }
+            if ($month) {
+                $query->whereMonth('created_at', $month);
+            }
+            
+            $data = $query->select(
+                    DB::raw('YEAR(created_at) as Year'),
+                    DB::raw('MONTH(created_at) as Month'),
+                    DB::raw('COUNT(*) as Count'),
+                    DB::raw('DATE_FORMAT(created_at, "%Y-%m-01") as Date')
+                )
+                ->groupBy('Year', 'Month', 'Date')
+                ->orderBy('Year', 'asc')
+                ->orderBy('Month', 'asc')
+                ->get();
+
+            $csv = "Year,Month,Count,Date\n";
+            foreach ($data as $row) {
+                $csv .= "{$row->Year},{$row->Month},{$row->Count},{$row->Date}\n";
+            }
+            
+            $filename = 'CrimeData';
+            if ($year) $filename .= "_{$year}";
+            if ($month) $filename .= "_M{$month}";
+            $filename .= '_' . date('Y-m-d') . '.csv';
+
+            return response($csv)
+                ->header('Content-Type', 'text/csv')
+                ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to export crime data',
+                'details' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Export crime-specific data from DCPO CSV
+     */
+
+
+
+    /**
+     * Get barangay-level crime statistics from DCPO_5years_monthly.csv
+     * Supports optional month/year filtering
+     */
+    public function getBarangayCrimeStats(Request $request)
+    {
+        $month = $request->input('month');
+        $year = $request->input('year');
+         try {
+            $stats = $this->_getBarangayStats($month, $year);
+             return response()->json([
+                'status' => 'success',
+                'data' => $stats['data'],
+                'total_barangays' => $stats['total_barangays'],
+                'total_crimes' => $stats['total_crimes'],
+                'filter' => ['month' => $month, 'year' => $year]
+            ]);
+        } catch (\Exception $e) {
+             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    private function _getBarangayStats($month, $year) 
+    {
+         $cacheKey = 'barangay_crime_stats_v2' . ($month ? "_$month" : "") . ($year ? "_$year" : "");
+            
+         return Cache::remember($cacheKey, 3600, function () use ($month, $year) {
+             $csvPath = storage_path('app/davao_crime_5years.csv');
+             if (!file_exists($csvPath)) throw new \Exception('Data file not found at: ' . $csvPath);
+
+             $barangayData = [];
+             $barangayCrimeTypes = []; // Track crime types per barangay
+             $file = fopen($csvPath, 'r');
+             $header = fgetcsv($file); 
+             $headerMap = array_flip($header);
+             $idxDate = $headerMap['date'] ?? 1;
+             $idxBarangay = $headerMap['barangay'] ?? 2;
+             $idxType = $headerMap['crime_type'] ?? 3;
+             $idxCount = $headerMap['crime_count'] ?? 4;
+
+            while (($row = fgetcsv($file)) !== false) {
+                if (count($row) < 5) continue;
+                
+                $date = $row[$idxDate];
+                $barangay = trim($row[$idxBarangay]);
+                $crimeType = trim($row[$idxType]);
+                $count = floatval($row[$idxCount]);
+                
+                $rowYear = substr($date, 0, 4);
+
+                if ($month && substr($date, 0, 7) !== $month) continue;
+                if ($year && $rowYear !== $year) continue;
+                
+                // Track total crimes per barangay
+                if (!isset($barangayData[$barangay])) $barangayData[$barangay] = 0;
+                $barangayData[$barangay] += $count;
+                
+                // Track crime types per barangay
+                if (!isset($barangayCrimeTypes[$barangay])) {
+                    $barangayCrimeTypes[$barangay] = [];
+                }
+                if (!isset($barangayCrimeTypes[$barangay][$crimeType])) {
+                    $barangayCrimeTypes[$barangay][$crimeType] = 0;
+                }
+                $barangayCrimeTypes[$barangay][$crimeType] += $count;
+            }
+            fclose($file);
+            
+            $result = [];
+            foreach ($barangayData as $barangay => $totalCrimes) {
+                // Sort crime types by count descending and get top 5
+                $crimeTypes = $barangayCrimeTypes[$barangay] ?? [];
+                arsort($crimeTypes);
+                $topCrimes = array_slice($crimeTypes, 0, 5, true);
+                
+                $crimeBreakdown = [];
+                foreach ($topCrimes as $type => $count) {
+                    $crimeBreakdown[] = ['type' => $type, 'count' => $count];
+                }
+                
+                $result[] = [
+                    'barangay' => $barangay, 
+                    'total_crimes' => $totalCrimes,
+                    'crime_breakdown' => $crimeBreakdown
+                ];
+            }
+            
+            usort($result, function($a, $b) {
+                return $b['total_crimes'] - $a['total_crimes'];
+            });
+            
+            return [
+                'data' => $result,
+                'total_barangays' => count($result),
+                'total_crimes' => array_sum($barangayData)
+            ];
+         });
+    }
+
+    /**
+     * Clear all statistics caches
+     * Useful when CSV files are updated
+     */
+    public function clearCache()
+    {
+        try {
+            // Clear all statistics-related caches
+            Cache::forget('crime_stats_data');
+            Cache::forget('barangay_crime_stats');
+            
+            // Clear all forecast horizon caches (6, 12, 18, 24 months)
+            foreach ([6, 12, 18, 24] as $horizon) {
+                Cache::forget("sarima_forecast_{$horizon}");
+            }
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'All statistics caches cleared successfully',
+                'cleared' => [
+                    'crime_stats_data',
+                    'barangay_crime_stats',
+                    'sarima_forecast_6',
+                    'sarima_forecast_12',
+                    'sarima_forecast_18',
+                    'sarima_forecast_24'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to clear cache',
+                'details' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Get historical monthly data for specific crime type
+     * Filters DCPO_5years_monthly.csv by offense type
+     */
+    private function getHistoricalByCrimeType($crimeType)
+    {
+        $csvPath = storage_path('app/davao_crime_5years.csv');
+        $monthlyData = [];
+        
+        if (!file_exists($csvPath)) {
+            return [];
+        }
+        
+        $file = fopen($csvPath, 'r');
+        $header = fgetcsv($file);
+        $headerMap = array_flip($header);
+        $idxDate = $headerMap['date'] ?? 1;
+        $idxType = $headerMap['crime_type'] ?? 3;
+        $idxCount = $headerMap['crime_count'] ?? 4;
+        
+        while (($row = fgetcsv($file)) !== false) {
+            if (count($row) < 5) continue;
+            
+            $offense = trim($row[$idxType]);
+            
+            if (strcasecmp($offense, $crimeType) === 0) {
+                $date = $row[$idxDate];
+                $yearMonth = substr($date, 0, 7);
+                $count = floatval($row[$idxCount]);
+                
+                if (!isset($monthlyData[$yearMonth])) {
+                    $monthlyData[$yearMonth] = 0;
+                }
+                $monthlyData[$yearMonth] += $count;
+            }
+        }
+        fclose($file);
+        
+        $result = [];
+        foreach ($monthlyData as $yearMonth => $count) {
+            list($year, $month) = explode('-', $yearMonth);
+            $result[] = [
+                'year' => intval($year),
+                'month' => intval($month),
+                'count' => $count
+            ];
+        }
+        
+        usort($result, function($a, $b) {
+            if ($a['year'] != $b['year']) return $a['year'] - $b['year'];
+            return $a['month'] - $b['month'];
+        });
+        
+        return $result;
+    }
+
+    /**
+     * Export crime-specific data from Historical CSV
+     */
+    private function exportDCPOData($crimeType, $year = null, $month = null)
+    {
+        $csvPath = storage_path('app/davao_crime_5years.csv');
+        
+        if (!file_exists($csvPath)) {
+            return response()->json(['status' => 'error', 'message' => 'Data file not found'], 404);
+        }
+        
+        $file = fopen($csvPath, 'r');
+        $header = fgetcsv($file);
+        
+        // Map headers
+        $headerMap = array_flip($header);
+        $idxDate = $headerMap['date'] ?? 1;
+        $idxType = $headerMap['crime_type'] ?? 3;
+        $idxCount = $headerMap['crime_count'] ?? 4;
+        
+        $data = [];
+        while (($row = fgetcsv($file)) !== false) {
+            if (count($row) < 5) continue;
+            
+            $offense = trim($row[$idxType]);
+            
+            if (strcasecmp($offense, $crimeType) === 0) {
+                $date = $row[$idxDate];
+                $rowYear = substr($date, 0, 4);
+                $rowMonth = substr($date, 5, 2);
+                
+                if ($year && $rowYear != $year) continue;
+                if ($month && $rowMonth != $month) continue;
+                
+                $data[] = [
+                    'year' => $rowYear,
+                    'month' => $rowMonth,
+                    'count' => floatval($row[$idxCount]),
+                    'date' => substr($date, 0, 10)
+                ];
+            }
+        }
+        fclose($file);
+        
+        $csv = "Year,Month,Count,Date,CrimeType\n";
+        foreach ($data as $row) {
+            $csv .= "{$row['year']},{$row['month']},{$row['count']},{$row['date']},{$crimeType}\n";
+        }
+        
+        $filename = 'CrimeData_' . str_replace(' ', '_', $crimeType);
+        if ($year) $filename .= "_{$year}";
+        if ($month) $filename .= "_M{$month}";
+        $filename .= '_' . date('Y-m-d') . '.csv';
+        
+        return response($csv)
+            ->header('Content-Type', 'text/csv')
+            ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+    }
+
+    /**
+     * Get barangay risk assessment from SARIMA API
+     * Proxies to /barangay-risk endpoint
+     */
+    public function getBarangayRisk(Request $request)
+    {
+        $months = $request->input('months', 6);
+        
+        try {
+            $this->autoStartSarimaApi();
+            
+            $cacheKey = "sarima_barangay_risk_{$months}";
+            
+            $data = Cache::remember($cacheKey, 1800, function () use ($months) {
+                $response = Http::timeout(30)->get("{$this->sarimaApiUrl}/barangay-risk", [
+                    'months' => $months
+                ]);
+                
+                if ($response->successful()) {
+                    return $response->json();
+                }
+                
+                throw new \Exception('Failed to fetch barangay risk: ' . $response->status());
+            });
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $data,
+                'months' => $months,
+                'source' => 'SARIMA API'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch barangay risk assessment',
+                'details' => $e->getMessage()
+            ], 503);
+        }
+    }
+
+    /**
+     * Get monthly crime warning from SARIMA API
+     * Proxies to /monthly-crime-warning endpoint
+     */
+    public function getMonthlyCrimeWarning(Request $request)
+    {
+        $date = $request->input('date'); // YYYY-MM format
+        
+        try {
+            $this->autoStartSarimaApi();
+            
+            $cacheKey = "sarima_monthly_warning_" . ($date ?? 'current');
+            
+            $data = Cache::remember($cacheKey, 1800, function () use ($date) {
+                $params = [];
+                if ($date) {
+                    $params['date'] = $date;
+                }
+                
+                $response = Http::timeout(30)->get("{$this->sarimaApiUrl}/monthly-crime-warning", $params);
+                
+                if ($response->successful()) {
+                    return $response->json();
+                }
+                
+                throw new \Exception('Failed to fetch monthly warning: ' . $response->status());
+            });
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $data,
+                'date' => $date,
+                'source' => 'SARIMA API'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch monthly crime warning',
+                'details' => $e->getMessage()
+            ], 503);
+        }
+    }
+}
+
+
