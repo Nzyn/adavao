@@ -1047,20 +1047,26 @@ const { runMigrations } = require('./runMigrations');
     if (SARIMA_KEEP_ALIVE_URL) urls.push({ url: SARIMA_KEEP_ALIVE_URL, label: 'SARIMA API' });
 
     if (urls.length > 0) {
-      console.log(`🏓 Keep-alive enabled: pinging every ${KEEP_ALIVE_INTERVAL / 1000}s`);
-      urls.forEach(u => console.log(`   → ${u.label}: ${u.url}`));
+      console.log(`🏓 Auto-ping enabled for ${urls.length} services`);
+      urls.forEach(u => console.log(`   Target: ${u.label} (${u.url})`));
 
       const keepAlive = () => {
+        console.log(`⏰ Executing pings at ${new Date().toISOString()}`);
         urls.forEach(u => pingUrl(u.url, u.label));
       };
 
-      // Start pinging after 30 seconds, then every KEEP_ALIVE_INTERVAL
+      // Start pinging after 5 seconds
+      console.log("⏳ Starting keep-alive timer (5s delay)...");
       setTimeout(() => {
         keepAlive(); // First ping
         setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
-      }, 30000);
+      }, 5000); // Reduced to 5s for faster feedback
     } else {
-      console.log('ℹ️ Keep-alive disabled (set KEEP_ALIVE_URL or RENDER_EXTERNAL_URL to enable)');
+      console.log('ℹ️ Keep-alive disabled: RENDER_EXTERNAL_URL not set?');
+      console.log('   Env vars:', {
+        KEEP_ALIVE_URL: process.env.KEEP_ALIVE_URL ? 'set' : 'missing',
+        RENDER_EXTERNAL_URL: process.env.RENDER_EXTERNAL_URL ? 'set' : 'missing'
+      });
     }
   });
 })();
