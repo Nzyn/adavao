@@ -2,7 +2,7 @@ const db = require('./db');
 const { uploadFile, isConfigured } = require('./cloudinaryService');
 
 // Admin site base URL for storage assets (announcements, etc.)
-const ADMIN_BASE_URL = process.env.ADMIN_KEEP_ALIVE_URL || 'https://alertdavao-admin.onrender.com';
+const ADMIN_BASE_URL = process.env.ADMIN_KEEP_ALIVE_URL || 'https://adminside-ngue.onrender.com';
 
 /**
  * Convert relative attachment paths to full URLs
