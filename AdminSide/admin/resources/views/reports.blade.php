@@ -4504,7 +4504,7 @@ function generatePDF(report) {
     function initSseReportUpdates() {
         if (!('EventSource' in window)) return;
 
-        const sseUrl = "{{ env('SSE_URL', 'https://node-server-gk1u.onrender.com/api/stream') }}";
+        const sseUrl = "{{ env('SSE_URL', 'https://userside-node-server.onrender.com/api/stream') }}";
         let source = null;
         let lastSseUpdate = 0;
 
