@@ -32,12 +32,23 @@ async function resetAllUsersVerification() {
             console.log(`   ${stat.is_verified ? 'Verified' : 'Unverified'}: ${stat.count} users`);
         });
 
-        console.log('\n✅ Verification reset complete!');
-        process.exit(0);
+        if (require.main === module) {
+            console.log('\n✅ Verification reset complete!');
+            process.exit(0);
+        } else {
+            console.log('✅ Verification reset completed (server startup mode)');
+        }
     } catch (error) {
         console.error('❌ Error resetting users:', error);
-        process.exit(1);
+        if (require.main === module) {
+            process.exit(1);
+        }
     }
 }
 
-resetAllUsersVerification();
+// Check if running directly (node reset_verification_status.js) or imported
+if (require.main === module) {
+    resetAllUsersVerification();
+}
+
+module.exports = resetAllUsersVerification;

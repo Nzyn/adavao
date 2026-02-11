@@ -1005,10 +1005,10 @@ const { runMigrations } = require('./runMigrations');
     try {
       // Import the function dynamically to avoid circular dependencies
       // Check if module exports a function or runs standalone
-      const resetScriptPath = './reset_verification_status.js';
-      if (require.resolve(resetScriptPath)) {
-        require(resetScriptPath);
-        console.log("✅ Verification reset script initiated");
+      const resetAllUsersVerification = require('./reset_verification_status.js');
+      if (typeof resetAllUsersVerification === 'function') {
+        await resetAllUsersVerification();
+        console.log("✅ Verification reset script finished");
       }
     } catch (err) {
       console.warn("⚠️ Verification reset failed:", err.message);
