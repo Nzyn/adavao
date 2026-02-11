@@ -44,21 +44,6 @@ export default function TabLayout() {
     }, [pathname])
   );
 
-  // Handle back button on login screen - exit app instead of going back
-  useEffect(() => {
-    const isLoginScreen = pathname === '/login' || pathname === '/(tabs)/login';
-
-    if (isLoginScreen) {
-      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-        console.log('🚪 Back pressed on login - exiting app');
-        BackHandler.exitApp();
-        return true; // Prevent default back behavior
-      });
-
-      return () => backHandler.remove();
-    }
-  }, [pathname]);
-
   return (
     <Tabs
       screenOptions={{
