@@ -983,8 +983,8 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Not found', path: req.originalUrl, method: req.method });
 });
 
+
 // Start server
-const { encryptAllSensitiveData } = require('./encrypt_all_sensitive_data');
 const { runMigrations } = require('./runMigrations');
 
 (async () => {
@@ -993,13 +993,6 @@ const { runMigrations } = require('./runMigrations');
     await runMigrations();
   } catch (err) {
     console.warn("⚠️ Migrations failed, but starting server anyway:", err?.message || err);
-  }
-
-  console.log("🔒 Initializing encryption verification on startup...");
-  try {
-    await encryptAllSensitiveData();
-  } catch (err) {
-    console.error("⚠️ Encryption migration failed, but starting server anyway:", err);
   }
 
   app.listen(PORT, "0.0.0.0", () => {
