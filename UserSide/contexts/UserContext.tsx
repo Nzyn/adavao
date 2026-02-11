@@ -51,11 +51,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     email: 'inicquimbo@gmail.com',
     phone: '+639908666666',
     address: 'Gladiola Street, Buhangin Proper, Davao City, 8000, Philippines',
-    isVerified: true,
+    isVerified: false,
     profileImage: 'https://i.pinimg.com/736x/3c/ae/07/3cae079ca0b9e55ec6bfc1b358c9b1e2.jpg',
     dataSource: 'default'
   };
-  
+
   const [user, setUserState] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -65,11 +65,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const loadUserData = async () => {
       try {
         setIsLoading(true);
-        
+
         // 1. Get logged-in user from AsyncStorage
         console.log('🔑 Loading logged-in user from AsyncStorage...');
         const storedUserData = await AsyncStorage.getItem('userData');
-        
+
         if (!storedUserData) {
           console.warn('⚠️ No user logged in - redirecting to login would be appropriate');
           setUserState(defaultUser);
@@ -77,31 +77,31 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           setIsLoading(false);
           return;
         }
-        
+
         const loggedInUser = JSON.parse(storedUserData);
         const loggedInUserId = loggedInUser.id?.toString() || '0';
         console.log('✅ Found logged-in user in AsyncStorage:', loggedInUser);
         console.log('🆔 User ID from AsyncStorage:', loggedInUserId);
-        
+
         // Check if the user ID has changed (different user logged in)
         if (currentUserId && currentUserId !== loggedInUserId) {
           console.log('🔄 Different user detected! Switching from ID', currentUserId, 'to', loggedInUserId);
         }
-        
+
         // Update current user ID
         setCurrentUserId(loggedInUserId);
-        
+
         // 2. Try loading full profile from database API (which decrypts contact/address)
         const userId = loggedInUser.id?.toString() || '0';
         console.log(`💾 Fetching full profile for user ID ${userId} from database...`);
-        
+
         let savedUser = null;
         try {
           savedUser = await directDbService.getUserById(userId);
         } catch (fetchError) {
           console.warn('⚠️ Could not fetch user profile from API:', fetchError);
         }
-        
+
         if (savedUser) {
           const userWithSource = { ...savedUser, dataSource: 'database' as const };
           setUserState(userWithSource);
@@ -143,7 +143,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             profileImage: loggedInUser.profile_image || loggedInUser.profileImage,
             dataSource: 'default'
           };
-          
+
           await directDbService.insertOrUpdateUser(initialUser);
           setUserState({ ...initialUser, dataSource: 'database' });
           console.log('✅ Created initial user profile in database:', initialUser);
@@ -158,10 +158,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     };
 
     // Run database connectivity test in background (non-blocking)
-    dbTest.runFullTest().catch(() => {/* ignore in UI */});
+    dbTest.runFullTest().catch(() => {/* ignore in UI */ });
 
     loadUserData();
-    
+
     // Set up interval to check for user changes (e.g., when a different user logs in)
     const intervalId = setInterval(async () => {
       try {
@@ -169,7 +169,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         if (storedUserData) {
           const loggedInUser = JSON.parse(storedUserData);
           const loggedInUserId = loggedInUser.id?.toString() || '0';
-          
+
           // If the user ID in AsyncStorage differs from current user, reload
           if (currentUserId && loggedInUserId !== currentUserId) {
             console.log('⚠️ User change detected in AsyncStorage! Reloading profile...');
@@ -187,7 +187,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         console.error('Error checking for user changes:', error);
       }
     }, 1000); // Check every second
-    
+
     // Cleanup interval on unmount
     return () => clearInterval(intervalId);
   }, [currentUserId]);
@@ -249,7 +249,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     try {
       // Refresh data from alertdavao.users table
       const freshData = await directDbService.getUserById(userId);
-      
+
       if (freshData) {
         const userWithSource = { ...freshData, dataSource: 'database' as const };
         setUserState(userWithSource);

@@ -47,8 +47,8 @@ const handleRegister = async (req, res) => {
     // Include NULL values for latitude and longitude, and add verification fields
     // Use users_public table for UserSide app users only
     const sql =
-      "INSERT INTO users_public (firstname, lastname, email, contact, password, latitude, longitude, verification_token, token_expires_at, email_verified_at) VALUES ($1, $2, $3, $4, $5, NULL, NULL, $6, $7, NULL)";
-    await db.query(sql, [firstname, lastname, email, encryptedContact, hashedPassword, verificationToken, tokenExpiresAt]);
+      "INSERT INTO users_public (firstname, lastname, email, contact, password, latitude, longitude, is_verified, verification_token, token_expires_at, email_verified_at) VALUES ($1, $2, $3, $4, $5, NULL, NULL, $6, $7, $8, NULL)";
+    await db.query(sql, [firstname, lastname, email, encryptedContact, hashedPassword, false, verificationToken, tokenExpiresAt]);
 
     console.log('📧 Sending verification email to:', email);
 
