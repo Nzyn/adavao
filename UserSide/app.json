@@ -34,7 +34,7 @@
         "android.permission.ACCESS_NETWORK_STATE"
       ],
       "package": "com.imiyataox.alertdavao",
-      "versionCode": 13
+      "versionCode": 14
     },
     "web": {
       "bundler": "metro",
