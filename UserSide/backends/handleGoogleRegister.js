@@ -49,7 +49,7 @@ const handleGoogleRegister = async (req, res) => {
         const sql = `
             INSERT INTO users_public(
                 firstname, lastname, email, google_id, profile_image, password, contact, created_at, email_verified_at, email_verified, is_verified
-            ) VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), true, true) RETURNING id
+            ) VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), true, false) RETURNING id
         `;
 
         const [result] = await db.query(sql, [
@@ -70,7 +70,7 @@ const handleGoogleRegister = async (req, res) => {
         const { password: pw, ...userWithoutPassword } = createdUser;
         if (userWithoutPassword.contact) userWithoutPassword.contact = decrypt(userWithoutPassword.contact);
         if (userWithoutPassword.address) userWithoutPassword.address = decrypt(userWithoutPassword.address);
-        
+
         return res.status(201).json({
             message: 'User registered successfully',
             user: userWithoutPassword,

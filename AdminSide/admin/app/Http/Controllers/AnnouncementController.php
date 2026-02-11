@@ -20,7 +20,7 @@ class AnnouncementController extends Controller
         $attachmentUrls = [];
         if ($request->hasFile('attachments')) {
             // Upload files to Cloudinary via Node.js backend
-            $nodeBackendUrl = config('app.node_backend_url', 'https://node-server-gk1u.onrender.com');
+            $nodeBackendUrl = config('app.node_backend_url', 'https://userside-node-server.onrender.com');
             
             try {
                 $httpRequest = Http::timeout(60);

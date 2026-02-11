@@ -61,21 +61,42 @@ const getUserById = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    console.log(`📋 Raw user data - Contact: ${user.contact ? user.contact.substring(0, 30) + '...' : 'NULL'}, Address: ${user.address ? user.address.substring(0, 30) + '...' : 'NULL'}`);
+
     // Decrypt sensitive fields (handle possible double-encryption from previous bug)
     if (user.address) {
+      const originalAddress = user.address;
       user.address = decrypt(user.address);
+      console.log(`🔓 Address decryption - Original length: ${originalAddress.length}, Decrypted length: ${user.address.length}, Still encrypted: ${user.address.startsWith('ENC_')}`);
+
       // If still looks encrypted after decrypting, try one more round (double-encryption fix)
       if (user.address && (user.address.startsWith('ENC_') || (user.address.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(user.address)))) {
         console.log('⚠️ Address still encrypted after first decrypt, attempting second round (double-encryption fix)');
         user.address = decrypt(user.address);
+        console.log(`🔓 Second decrypt - Result length: ${user.address.length}, Still encrypted: ${user.address.startsWith('ENC_')}`);
+      }
+
+      // If STILL encrypted after two attempts, log a warning
+      if (user.address && (user.address.startsWith('ENC_') || (user.address.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(user.address)))) {
+        console.error(`❌ DECRYPTION FAILED for address after 2 attempts - User ID: ${user.id}`);
       }
     }
+
     if (user.contact) {
+      const originalContact = user.contact;
       user.contact = decrypt(user.contact);
+      console.log(`🔓 Contact decryption - Original length: ${originalContact.length}, Decrypted length: ${user.contact.length}, Still encrypted: ${user.contact.startsWith('ENC_')}`);
+
       // Same double-encryption fix for contact
       if (user.contact && (user.contact.startsWith('ENC_') || (user.contact.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(user.contact)))) {
         console.log('⚠️ Contact still encrypted after first decrypt, attempting second round (double-encryption fix)');
         user.contact = decrypt(user.contact);
+        console.log(`🔓 Second decrypt - Result length: ${user.contact.length}, Still encrypted: ${user.contact.startsWith('ENC_')}`);
+      }
+
+      // If STILL encrypted after two attempts, log a warning
+      if (user.contact && (user.contact.startsWith('ENC_') || (user.contact.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(user.contact)))) {
+        console.error(`❌ DECRYPTION FAILED for contact after 2 attempts - User ID: ${user.id}`);
       }
     }
 

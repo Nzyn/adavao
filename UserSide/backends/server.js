@@ -254,18 +254,7 @@ const {
   debugUserStation
 } = require("./handleDiagnostics");
 
-// Add report assignment fixer
-const {
-  checkReportAssignment,
-  autoAssignStationToReports
-} = require("./fixReportAssignment");
-
-// Add debug assignment
-const {
-  debugReportStructure,
-  forceAssignReportsToStation,
-  forceUpdateUserStation
-} = require("./debugAssignment");
+// One-time scripts removed - no longer needed
 // 🔐 Secure file serving with decryption (Admin/Police only)
 // Files are encrypted at rest and decrypted on-demand for authorized users
 const { decryptFile } = require('./encryptionService');
@@ -362,7 +351,7 @@ app.post('/api/dispatch/admin-sync', async (req, res) => {
       if (report && report.length > 0) {
         const stationId = report[0].assigned_station_id;
         const effectiveOfficerId = patrolOfficerId || d.patrol_officer_id;
-        
+
         // Send targeted notification to the assigned officer first
         let targetTokens = [];
         if (effectiveOfficerId) {
@@ -372,7 +361,7 @@ app.post('/api/dispatch/admin-sync', async (req, res) => {
           );
           targetTokens = (assignedOfficer || []).map(o => o.push_token).filter(Boolean);
         }
-        
+
         // Also notify other on-duty officers at the station (if station is set)
         let stationTokens = [];
         if (stationId) {
@@ -382,10 +371,10 @@ app.post('/api/dispatch/admin-sync', async (req, res) => {
           );
           stationTokens = (officers || []).map(o => o.push_token).filter(Boolean);
         }
-        
+
         // Combine unique tokens (assigned officer + station officers)
         const allTokens = [...new Set([...targetTokens, ...stationTokens])];
-        
+
         if (allTokens.length > 0) {
           const messages = allTokens.map(token => ({
             to: token, sound: 'default', title: '\u{1F6A8} New Dispatch Alert',
@@ -687,11 +676,6 @@ app.use((err, req, res, next) => {
   });
 });
 app.get("/api/diagnostics/reports-all", listAllReportsWithStations);
-app.get("/api/diagnostics/report-assignment", checkReportAssignment);
-app.post("/api/fix/assign-stations-to-reports", autoAssignStationToReports);
-app.get("/api/debug/report-structure", debugReportStructure);
-app.post("/api/fix/force-assign-to-station", forceAssignReportsToStation);
-app.post("/api/fix/force-update-user-station", forceUpdateUserStation);
 
 // User Restrictions/Flagging API Routes
 app.get("/api/users/:userId/restrictions", handleCheckRestrictions);
@@ -943,8 +927,8 @@ if (String(process.env.ENABLE_DEBUG_ENDPOINTS || '').toLowerCase() === 'true') {
 
 // Basic health check (for load balancers, uptime monitors)
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy', 
+  res.status(200).json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
@@ -956,7 +940,7 @@ app.get('/api/health', async (req, res) => {
     const start = Date.now();
     await db.query('SELECT 1');
     const dbLatency = Date.now() - start;
-    
+
     res.status(200).json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -989,7 +973,7 @@ app.post('/api/admin/cache/clear', (req, res) => {
   if (authKey !== process.env.ADMIN_API_KEY && authKey !== process.env.DEBUG_API_KEY) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
-  
+
   if (clearCache) clearCache();
   res.json({ success: true, message: 'Cache cleared' });
 });
@@ -999,8 +983,8 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Not found', path: req.originalUrl, method: req.method });
 });
 
+
 // Start server
-const { encryptAllSensitiveData } = require('./encrypt_all_sensitive_data');
 const { runMigrations } = require('./runMigrations');
 
 (async () => {
@@ -1011,62 +995,78 @@ const { runMigrations } = require('./runMigrations');
     console.warn("⚠️ Migrations failed, but starting server anyway:", err?.message || err);
   }
 
-  console.log("🔒 Initializing encryption verification on startup...");
-  try {
-    await encryptAllSensitiveData();
-  } catch (err) {
-    console.error("⚠️ Encryption migration failed, but starting server anyway:", err);
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", async () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
     // console.log(`   Local Network: http://${require('ip').address()}:${PORT}`);
-    
+
+    // Auto-reset verification status on startup (as requested)
+    // This ensures all users are set to 'unverified' when the server restarts/redeploys
+    console.log("🔄 Running centralized verification reset script...");
+    try {
+      // Import the function dynamically to avoid circular dependencies
+      // Check if module exports a function or runs standalone
+      const resetAllUsersVerification = require('./reset_verification_status.js');
+      if (typeof resetAllUsersVerification === 'function') {
+        await resetAllUsersVerification();
+        console.log("✅ Verification reset script finished");
+      }
+    } catch (err) {
+      console.warn("⚠️ Verification reset failed:", err.message);
+    }
+
+    // Duplicated app.listen logic removed
+
     // 🔄 KEEP-ALIVE: Prevent Render free tier cold starts
     // Pings both UserSide and AdminSide every 30 seconds to keep them warm
     const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || process.env.RENDER_EXTERNAL_URL;
     const ADMIN_KEEP_ALIVE_URL = process.env.ADMIN_KEEP_ALIVE_URL; // AdminSide URL
     const SARIMA_KEEP_ALIVE_URL = process.env.SARIMA_KEEP_ALIVE_URL; // SARIMA API URL
     const KEEP_ALIVE_INTERVAL = parseInt(process.env.KEEP_ALIVE_INTERVAL_MS || '30000', 10); // 30 seconds default
-    
+
     const pingUrl = async (targetUrl, label) => {
       try {
         const https = require('https');
         const http = require('http');
         const url = new URL(targetUrl);
         const client = url.protocol === 'https:' ? https : http;
-        
+
         const req = client.get(url.href, { timeout: 30000 }, (res) => {
           console.log(`🏓 ${label}: ${res.statusCode}`);
         });
-        
-        req.on('error', () => {}); // Silently ignore - ping attempt still keeps server alive
+
+        req.on('error', () => { }); // Silently ignore - ping attempt still keeps server alive
         req.on('timeout', () => req.destroy());
       } catch (err) {
         // Silently ignore - ping attempt still keeps server alive
       }
     };
-    
+
     const urls = [];
     if (KEEP_ALIVE_URL) urls.push({ url: KEEP_ALIVE_URL + '/health', label: 'UserSide' });
     if (ADMIN_KEEP_ALIVE_URL) urls.push({ url: ADMIN_KEEP_ALIVE_URL, label: 'AdminSide' });
     if (SARIMA_KEEP_ALIVE_URL) urls.push({ url: SARIMA_KEEP_ALIVE_URL, label: 'SARIMA API' });
-    
+
     if (urls.length > 0) {
-      console.log(`🏓 Keep-alive enabled: pinging every ${KEEP_ALIVE_INTERVAL / 1000}s`);
-      urls.forEach(u => console.log(`   → ${u.label}: ${u.url}`));
-      
+      console.log(`🏓 Auto-ping enabled for ${urls.length} services`);
+      urls.forEach(u => console.log(`   Target: ${u.label} (${u.url})`));
+
       const keepAlive = () => {
+        console.log(`⏰ Executing pings at ${new Date().toISOString()}`);
         urls.forEach(u => pingUrl(u.url, u.label));
       };
-      
-      // Start pinging after 30 seconds, then every KEEP_ALIVE_INTERVAL
+
+      // Start pinging after 5 seconds
+      console.log("⏳ Starting keep-alive timer (5s delay)...");
       setTimeout(() => {
         keepAlive(); // First ping
         setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
-      }, 30000);
+      }, 5000); // Reduced to 5s for faster feedback
     } else {
-      console.log('ℹ️ Keep-alive disabled (set KEEP_ALIVE_URL or RENDER_EXTERNAL_URL to enable)');
+      console.log('ℹ️ Keep-alive disabled: RENDER_EXTERNAL_URL not set?');
+      console.log('   Env vars:', {
+        KEEP_ALIVE_URL: process.env.KEEP_ALIVE_URL ? 'set' : 'missing',
+        RENDER_EXTERNAL_URL: process.env.RENDER_EXTERNAL_URL ? 'set' : 'missing'
+      });
     }
   });
 })();

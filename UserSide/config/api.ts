@@ -3,7 +3,7 @@ import { getBackendUrlSync } from '../utils/networkUtils';
 // PRODUCTION CONFIG (Render)
 export const API_CONFIG = {
   // Use environment variable if available (set in eas.json), otherwise fallback to the correct Node server URL
-  BASE_URL: (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://node-server-gk1u.onrender.com') + '/api',
+  BASE_URL: (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://userside-node-server.onrender.com') + '/api',
 
   // Endpoints
   ENDPOINTS: {
