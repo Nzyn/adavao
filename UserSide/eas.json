@@ -20,7 +20,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://node-server-gk1u.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://userside-node-server.onrender.com"
       },
       "android": {
         "buildType": "apk"
