@@ -254,18 +254,7 @@ const {
   debugUserStation
 } = require("./handleDiagnostics");
 
-// Add report assignment fixer
-const {
-  checkReportAssignment,
-  autoAssignStationToReports
-} = require("./fixReportAssignment");
-
-// Add debug assignment
-const {
-  debugReportStructure,
-  forceAssignReportsToStation,
-  forceUpdateUserStation
-} = require("./debugAssignment");
+// One-time scripts removed - no longer needed
 // 🔐 Secure file serving with decryption (Admin/Police only)
 // Files are encrypted at rest and decrypted on-demand for authorized users
 const { decryptFile } = require('./encryptionService');
@@ -687,11 +676,6 @@ app.use((err, req, res, next) => {
   });
 });
 app.get("/api/diagnostics/reports-all", listAllReportsWithStations);
-app.get("/api/diagnostics/report-assignment", checkReportAssignment);
-app.post("/api/fix/assign-stations-to-reports", autoAssignStationToReports);
-app.get("/api/debug/report-structure", debugReportStructure);
-app.post("/api/fix/force-assign-to-station", forceAssignReportsToStation);
-app.post("/api/fix/force-update-user-station", forceUpdateUserStation);
 
 // User Restrictions/Flagging API Routes
 app.get("/api/users/:userId/restrictions", handleCheckRestrictions);
@@ -999,8 +983,8 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Not found', path: req.originalUrl, method: req.method });
 });
 
+
 // Start server
-const { encryptAllSensitiveData } = require('./encrypt_all_sensitive_data');
 const { runMigrations } = require('./runMigrations');
 
 (async () => {
@@ -1009,13 +993,6 @@ const { runMigrations } = require('./runMigrations');
     await runMigrations();
   } catch (err) {
     console.warn("⚠️ Migrations failed, but starting server anyway:", err?.message || err);
-  }
-
-  console.log("🔒 Initializing encryption verification on startup...");
-  try {
-    await encryptAllSensitiveData();
-  } catch (err) {
-    console.error("⚠️ Encryption migration failed, but starting server anyway:", err);
   }
 
   app.listen(PORT, "0.0.0.0", () => {
