@@ -16,3 +16,11 @@ services:
     region: singapore
     buildCommand: cd UserSide/backends && npm install
     startCommand: cd UserSide/backends && npm start
+  - type: cron
+    name: reset-verification-status
+    env: node
+    plan: free
+    region: singapore
+    schedule: "0 0 * * *"
+    buildCommand: cd UserSide/backends && npm install
+    startCommand: cd UserSide/backends && npm run reset-verification
