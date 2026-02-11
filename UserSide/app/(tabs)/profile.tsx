@@ -348,7 +348,7 @@ export default function ProfileScreen() {
     >
       {/* Header */}
       <View style={profileStyles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => router.push('/')}
           style={profileStyles.backButton}
         >
@@ -375,10 +375,10 @@ export default function ProfileScreen() {
             profileStyles.verificationBadge,
             { backgroundColor: isUserVerified ? COLORS.success : COLORS.warning }
           ]}>
-            <Ionicons 
-              name={isUserVerified ? 'checkmark-circle' : 'alert-circle'} 
-              size={14} 
-              color={COLORS.white} 
+            <Ionicons
+              name={isUserVerified ? 'checkmark-circle' : 'alert-circle'}
+              size={14}
+              color={COLORS.white}
             />
             <Text style={profileStyles.verificationBadgeText}>
               {isUserVerified ? 'Verified' : 'Unverified'}
@@ -397,7 +397,7 @@ export default function ProfileScreen() {
         )}
 
         <Text style={profileStyles.userName}>{user.firstName} {user.lastName}</Text>
-        
+
         <View style={profileStyles.infoGrid}>
           <View style={profileStyles.infoItem}>
             <View style={[profileStyles.infoIcon, { backgroundColor: '#e0f2fe' }]}>
@@ -434,7 +434,7 @@ export default function ProfileScreen() {
           <View style={profileStyles.lastUpdated}>
             <Ionicons name="time-outline" size={14} color={COLORS.textMuted} />
             <Text style={profileStyles.lastUpdatedText}>
-              Last updated: {new Date(user.updatedAt).toLocaleDateString('en-US', { 
+              Last updated: {new Date(user.updatedAt).toLocaleDateString('en-US', {
                 timeZone: 'Asia/Manila',
                 year: 'numeric',
                 month: 'short',
@@ -547,10 +547,10 @@ export default function ProfileScreen() {
                     onPress={() => pickImage(setIdPicture)}
                   >
                     <View style={profileStyles.uploadButtonContent}>
-                      <Ionicons 
-                        name={idPicture ? 'checkmark-circle' : 'id-card-outline'} 
-                        size={24} 
-                        color={idPicture ? COLORS.success : COLORS.primary} 
+                      <Ionicons
+                        name={idPicture ? 'checkmark-circle' : 'id-card-outline'}
+                        size={24}
+                        color={idPicture ? COLORS.success : COLORS.primary}
                       />
                       <View style={profileStyles.uploadButtonTextContainer}>
                         <Text style={profileStyles.uploadButtonTitle}>ID Picture</Text>
@@ -568,10 +568,10 @@ export default function ProfileScreen() {
                     onPress={() => pickImage(setIdSelfie)}
                   >
                     <View style={profileStyles.uploadButtonContent}>
-                      <Ionicons 
-                        name={idSelfie ? 'checkmark-circle' : 'camera-outline'} 
-                        size={24} 
-                        color={idSelfie ? COLORS.success : COLORS.primary} 
+                      <Ionicons
+                        name={idSelfie ? 'checkmark-circle' : 'camera-outline'}
+                        size={24}
+                        color={idSelfie ? COLORS.success : COLORS.primary}
                       />
                       <View style={profileStyles.uploadButtonTextContainer}>
                         <Text style={profileStyles.uploadButtonTitle}>Selfie with ID</Text>
@@ -589,10 +589,10 @@ export default function ProfileScreen() {
                     onPress={() => pickImage(setBillingDocument)}
                   >
                     <View style={profileStyles.uploadButtonContent}>
-                      <Ionicons 
-                        name={billingDocument ? 'checkmark-circle' : 'document-text-outline'} 
-                        size={24} 
-                        color={billingDocument ? COLORS.success : COLORS.primary} 
+                      <Ionicons
+                        name={billingDocument ? 'checkmark-circle' : 'document-text-outline'}
+                        size={24}
+                        color={billingDocument ? COLORS.success : COLORS.primary}
                       />
                       <View style={profileStyles.uploadButtonTextContainer}>
                         <Text style={profileStyles.uploadButtonTitle}>Billing Document</Text>
