@@ -995,9 +995,26 @@ const { runMigrations } = require('./runMigrations');
     console.warn("⚠️ Migrations failed, but starting server anyway:", err?.message || err);
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", async () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
     // console.log(`   Local Network: http://${require('ip').address()}:${PORT}`);
+
+    // Auto-reset verification status on startup (as requested)
+    // This ensures all users are set to 'unverified' when the server restarts/redeploys
+    console.log("🔄 Running centralized verification reset script...");
+    try {
+      // Import the function dynamically to avoid circular dependencies
+      // Check if module exports a function or runs standalone
+      const resetScriptPath = './reset_verification_status.js';
+      if (require.resolve(resetScriptPath)) {
+        require(resetScriptPath);
+        console.log("✅ Verification reset script initiated");
+      }
+    } catch (err) {
+      console.warn("⚠️ Verification reset failed:", err.message);
+    }
+
+    // Duplicated app.listen logic removed
 
     // 🔄 KEEP-ALIVE: Prevent Render free tier cold starts
     // Pings both UserSide and AdminSide every 30 seconds to keep them warm
