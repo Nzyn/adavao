@@ -56,35 +56,17 @@ const handleGoogleLogin = async (req, res) => {
         user: userWithoutPassword
       });
     } else {
-      // NEW USER - Check if we have first/last name from Google
-      if (!firstName || !lastName) {
-        // Need to collect name from user
-        return res.status(200).json({
-          message: "Name required to complete registration",
-          requiresName: true,
-          googleInfo: {
-            googleId,
-            email,
-            profilePicture
-          }
-        });
-      }
-
-      // Create new user with Google profile data (skip email verification - Google verified it)
-      const insertResult = await db.query(
-        `INSERT INTO users_public (google_id, email, firstname, lastname, profile_image, is_verified, email_verified, created_at) 
-         VALUES ($1, $2, $3, $4, $5, true, true, NOW()) 
-         RETURNING *`,
-        [googleId, email, firstName, lastName, profilePicture || null]
-      );
-
-      const newUser = insertResult[0][0];
-      const { password, ...userWithoutPassword } = newUser;
-
-      return res.status(201).json({
-        message: "Account created and logged in",
-        user: userWithoutPassword,
-        isNewUser: true
+      // NEW USER - Need phone number before creating account (contact is NOT NULL in DB)
+      return res.status(200).json({
+        message: "Phone number required to complete registration",
+        requiresPhone: true,
+        googleInfo: {
+          googleId,
+          email,
+          firstName: firstName || '',
+          lastName: lastName || '',
+          profilePicture: profilePicture || null
+        }
       });
     }
   } catch (err) {
@@ -297,21 +279,17 @@ const handleGoogleCompleteRegistration = async (req, res) => {
       });
     }
 
-    // Create new user
-    const insertResult = await db.query(
-      `INSERT INTO users_public (google_id, email, firstname, lastname, profile_image, is_verified, email_verified, created_at) 
-       VALUES ($1, $2, $3, $4, $5, true, true, NOW()) 
-       RETURNING *`,
-      [googleId, email, firstName, lastName, profilePicture || null]
-    );
-
-    const newUser = insertResult[0][0];
-    const { password, ...userWithoutPassword } = newUser;
-
-    return res.status(201).json({
-      message: "Account created and logged in",
-      user: userWithoutPassword,
-      isNewUser: true
+    // New user still needs phone number — redirect to phone collection
+    return res.status(200).json({
+      message: "Phone number required to complete registration",
+      requiresPhone: true,
+      googleInfo: {
+        googleId,
+        email,
+        firstName,
+        lastName,
+        profilePicture: profilePicture || null
+      }
     });
   } catch (err) {
     console.error("❌ Google complete registration error:", err);

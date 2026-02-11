@@ -32,17 +32,7 @@ const handleGoogleRegister = async (req, res) => {
             }
 
             // Send OTP even if they exist in this flow as a security verification suitable for "registration attempt"
-            const otpResult = await sendOtpInternal(cleanContact, 'login', email);
-
-            if (otpResult.success) {
-                return res.json({
-                    requireOtp: true,
-                    userId: user.id,
-                    contact: cleanContact,
-                    message: 'Account exists. OTP sent to verify.'
-                });
-            }
-
+            // OTP is disabled — skip OTP and log them in directly
             const { password, ...userWithoutPassword } = user;
             if (userWithoutPassword.contact) userWithoutPassword.contact = decrypt(userWithoutPassword.contact);
             if (userWithoutPassword.address) userWithoutPassword.address = decrypt(userWithoutPassword.address);
@@ -75,25 +65,16 @@ const handleGoogleRegister = async (req, res) => {
         // Fetch new user
         const [newUser] = await db.query('SELECT * FROM users_public WHERE id = $1', [result[0].id]);
 
-        // [MODIFIED] Send OTP instead of returning user
-        const otpResult = await sendOtpInternal(cleanContact, 'register', email);
-
-        if (otpResult.success) {
-            return res.json({
-                requireOtp: true,
-                userId: newUser[0].id,
-                contact: cleanContact,
-                message: 'Registration started. OTP sent to phone.'
-            });
-        }
-
-        // Fallback if OTP fails
-        const fallbackUser = newUser[0];
-        if (fallbackUser.contact) fallbackUser.contact = decrypt(fallbackUser.contact);
-        if (fallbackUser.address) fallbackUser.address = decrypt(fallbackUser.address);
+        // Skip OTP — Google already verified email, just return the user directly
+        const createdUser = newUser[0];
+        const { password: pw, ...userWithoutPassword } = createdUser;
+        if (userWithoutPassword.contact) userWithoutPassword.contact = decrypt(userWithoutPassword.contact);
+        if (userWithoutPassword.address) userWithoutPassword.address = decrypt(userWithoutPassword.address);
+        
         return res.status(201).json({
-            message: 'User registered successfully (OTP failed)',
-            user: fallbackUser
+            message: 'User registered successfully',
+            user: userWithoutPassword,
+            isNewUser: true
         });
 
     } catch (err) {

@@ -58,17 +58,17 @@ const checkUserRestrictions = async (userId) => {
  */
 const getUserFlagHistory = async (userId) => {
   try {
-    // Get total flag count
+    // Get user restriction level
     const [countResult] = await db.query(
       `SELECT 
-        total_flags,
-        false_report_count,
-        spam_count,
-        harassment_count,
-        inappropriate_content_count,
-        last_flag_date,
         restriction_level
        FROM users_public WHERE id = $1`,
+      [userId]
+    );
+
+    // Get total flag count from user_flags table
+    const [flagCountResult] = await db.query(
+      `SELECT COUNT(*) as total_flags FROM user_flags WHERE user_id = $1`,
       [userId]
     );
 
@@ -88,16 +88,24 @@ const getUserFlagHistory = async (userId) => {
       [userId]
     );
 
+    // Get flag breakdown by violation type
+    const [flagBreakdown] = await db.query(
+      `SELECT violation_type, COUNT(*) as count 
+       FROM user_flags WHERE user_id = $1 
+       GROUP BY violation_type`,
+      [userId]
+    );
+
+    const breakdown = {};
+    flagBreakdown.forEach(row => {
+      breakdown[row.violation_type] = parseInt(row.count);
+    });
+
     return {
-      totalFlags: countResult[0]?.total_flags || 0,
+      totalFlags: parseInt(flagCountResult[0]?.total_flags) || 0,
       restrictionLevel: countResult[0]?.restriction_level || 'none',
       recentFlags: recentFlags,
-      flagBreakdown: {
-        falseReport: countResult[0]?.false_report_count || 0,
-        spam: countResult[0]?.spam_count || 0,
-        harassment: countResult[0]?.harassment_count || 0,
-        inappropriateContent: countResult[0]?.inappropriate_content_count || 0
-      }
+      flagBreakdown: breakdown
     };
   } catch (error) {
     console.error("Error getting user flag history:", error);
@@ -129,36 +137,6 @@ const createUserFlag = async (flagData) => {
       [userId, violationType, severity, description, reportedBy, relatedReportId, JSON.stringify(evidence)]
     );
 
-    // Update user's flag counts based on violation type
-    let updateQuery = 'UPDATE users_public SET total_flags = total_flags + 1, last_flag_date = NOW()';
-    let params = [];
-
-    // NOTE: This switch builds the query string, which is fine, but we need to supply params carefully in Postgres if using $n based on position.
-    // However, here we only append simple strings. 
-    // BUT we have `WHERE id = ?` at the end.
-    // Let's rewrite this to be cleaner and safer.
-
-    const updateColumns = ['total_flags = total_flags + 1', 'last_flag_date = NOW()'];
-
-    switch (violationType) {
-      case 'false_report':
-        updateColumns.push('false_report_count = false_report_count + 1');
-        break;
-      case 'prank_spam':
-        updateColumns.push('spam_count = spam_count + 1');
-        break;
-      case 'harassment':
-        updateColumns.push('harassment_count = harassment_count + 1');
-        break;
-      case 'inappropriate_content':
-      case 'inappropriate_upload':
-        updateColumns.push('inappropriate_content_count = inappropriate_content_count + 1');
-        break;
-    }
-
-    const finalUpdateQuery = `UPDATE users_public SET ${updateColumns.join(', ')} WHERE id = $1`;
-    await db.query(finalUpdateQuery, [userId]);
-
     // Check if auto-restriction should be applied
     await checkAndApplyAutoRestriction(userId);
 
@@ -179,15 +157,22 @@ const createUserFlag = async (flagData) => {
  */
 const checkAndApplyAutoRestriction = async (userId) => {
   try {
-    // Get user's current flag counts
+    // Get user's current restriction level and flag count
     const [user] = await db.query(
-      'SELECT total_flags, restriction_level FROM users_public WHERE id = $1',
+      'SELECT restriction_level FROM users_public WHERE id = $1',
       [userId]
     );
 
     if (user.length === 0) return;
 
-    const { total_flags, restriction_level } = user[0];
+    const restriction_level = user[0].restriction_level || 'none';
+
+    // Count total flags from user_flags table
+    const [flagCount] = await db.query(
+      'SELECT COUNT(*) as total_flags FROM user_flags WHERE user_id = $1',
+      [userId]
+    );
+    const total_flags = parseInt(flagCount[0]?.total_flags) || 0;
 
     // Define thresholds
     const THRESHOLDS = {
@@ -208,8 +193,6 @@ const checkAndApplyAutoRestriction = async (userId) => {
       expiresAt = null; // Permanent
       permissions = {
         can_report: false,
-        can_comment: false,
-        can_upload: false,
         can_message: false
       };
     } else if (total_flags >= THRESHOLDS.suspended && restriction_level !== 'suspended' && restriction_level !== 'banned') {
@@ -219,8 +202,6 @@ const checkAndApplyAutoRestriction = async (userId) => {
       expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
       permissions = {
         can_report: false,
-        can_comment: false,
-        can_upload: false,
         can_message: true
       };
     } else if (total_flags >= THRESHOLDS.warning && restriction_level === 'none') {
@@ -230,8 +211,6 @@ const checkAndApplyAutoRestriction = async (userId) => {
       expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
       permissions = {
         can_report: true,
-        can_comment: true,
-        can_upload: false,
         can_message: true
       };
     }
@@ -253,16 +232,14 @@ const checkAndApplyAutoRestriction = async (userId) => {
       // Create new restriction
       await db.query(
         `INSERT INTO user_restrictions 
-         (user_id, restriction_type, reason, expires_at, can_report, can_comment, can_upload, can_message, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         (user_id, restriction_type, reason, expires_at, can_report, can_message, restricted_by, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())`,
         [
           userId,
           restrictionType,
           `Auto-restriction: ${total_flags} violations accumulated`,
           expiresAt,
           permissions.can_report,
-          permissions.can_comment,
-          permissions.can_upload,
           permissions.can_message,
           null // System-generated
         ]

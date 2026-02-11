@@ -127,13 +127,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         } else {
           // User exists in auth but not in users table - create initial profile
           console.log('🆕 User not found in database, creating initial profile...');
+          // Detect encrypted values (ENC_ prefix or very long base64-like strings) and clear them
+          // to avoid double-encryption when insertOrUpdateUser encrypts them again
+          const isEncrypted = (val: string) => !val || val.startsWith('ENC_') || (val.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(val));
+          const safeContact = isEncrypted(loggedInUser.contact || loggedInUser.phone || '') ? '' : (loggedInUser.contact || loggedInUser.phone || '');
+          const safeAddress = isEncrypted(loggedInUser.address || '') ? '' : (loggedInUser.address || '');
           const initialUser: UserData = {
             id: userId,
             firstName: loggedInUser.firstname || loggedInUser.firstName || '',
             lastName: loggedInUser.lastname || loggedInUser.lastName || '',
             email: loggedInUser.email || '',
-            phone: loggedInUser.contact || loggedInUser.phone || '',
-            address: loggedInUser.address || '',
+            phone: safeContact,
+            address: safeAddress,
             isVerified: Boolean(loggedInUser.is_verified || loggedInUser.isVerified),
             profileImage: loggedInUser.profile_image || loggedInUser.profileImage,
             dataSource: 'default'
@@ -208,14 +213,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       await directDbService.insertOrUpdateUser(updatedUser);
       console.log('✅ Database upsert completed');
 
-      // 2) Verify address actually persisted; if not, force-update address column
-      const addressVerified = await directDbService.verifyAddressSave(updatedUser.id, updatedUser.address || '');
-      if (!addressVerified) {
-        console.warn('⚠️ Address not persisted after upsert. Forcing address update...');
-        await directDbService.updateUserAddress(updatedUser.id, updatedUser.address || '');
-      }
-
-      // 3) Reload fresh copy from DB and update state
+      // 2) Reload fresh copy from DB and update state
       const fresh = await directDbService.getUserById(updatedUser.id);
       if (fresh) {
         setUserState({ ...fresh, dataSource: 'database' as const });

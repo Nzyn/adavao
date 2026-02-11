@@ -529,15 +529,15 @@ const approveVerification = async (req, res) => {
 
 // Reject verification
 const rejectVerification = async (req, res) => {
-  const { verificationId, userId } = req.body;
+  const { verificationId, userId, rejection_reason } = req.body;
 
   try {
-    // Update verification status
+    // Update verification status with rejection reason
     await db.query(`
       UPDATE verifications 
-      SET status = 'rejected', is_verified = FALSE
+      SET status = 'rejected', is_verified = FALSE, rejection_reason = $2
       WHERE verification_id = $1 RETURNING verification_id
-    `, [verificationId]);
+    `, [verificationId, rejection_reason || null]);
 
     // Note: We don't update the user's is_verified status here because they should be able to resubmit
 

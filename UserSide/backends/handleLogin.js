@@ -326,9 +326,15 @@ const handleLogin = async (req, res) => {
     // Role normalization: DB uses `user_role` but older clients may read `role`.
     const effectiveRole = user.user_role || user.role || 'user';
 
-    // 🔓 Decrypt sensitive fields for display
-    const decryptedAddress = user.address ? decrypt(user.address) : '';
-    const decryptedContact = user.contact ? decrypt(user.contact) : '';
+    // 🔓 Decrypt sensitive fields for display (handle possible double-encryption)
+    let decryptedAddress = user.address ? decrypt(user.address) : '';
+    if (decryptedAddress && (decryptedAddress.startsWith('ENC_') || (decryptedAddress.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(decryptedAddress)))) {
+      decryptedAddress = decrypt(decryptedAddress);
+    }
+    let decryptedContact = user.contact ? decrypt(user.contact) : '';
+    if (decryptedContact && (decryptedContact.startsWith('ENC_') || (decryptedContact.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(decryptedContact)))) {
+      decryptedContact = decrypt(decryptedContact);
+    }
 
     // Return complete user data
     res.json({

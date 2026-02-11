@@ -240,6 +240,8 @@ class UserController extends Controller
                         'reason' => "Flagged for {$validated['violation_type']} - {$validated['duration_days']} day(s)",
                         'restricted_by' => null,
                         'is_active' => true,
+                        'can_report' => $restrictionType === 'warning' ? true : false,
+                        'can_message' => $restrictionType === 'warning' ? true : false,
                         'expires_at' => $expiresAt,
                         'created_at' => now(),
                         'updated_at' => now()
@@ -840,7 +842,7 @@ class UserController extends Controller
                     'can_report' => (bool)$restriction->can_report,
                     'can_message' => (bool)$restriction->can_message
                 ] : null,
-                'can_report' => $isFlagged ? false : true
+                'can_report' => $restriction ? (bool)$restriction->can_report : true
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([

@@ -320,6 +320,19 @@ export default function ProfileScreen() {
   const hasPendingVerification = verificationStatus?.status === 'pending';
   const wasRejected = verificationStatus?.status === 'rejected';
 
+  // Detect encrypted-looking values and mask them while refreshing
+  const looksEncrypted = (val: string) => val && val.length > 60 && /^[A-Za-z0-9+/=:]+$/.test(val);
+  const displayPhone = looksEncrypted(user.phone) ? 'Loading...' : (user.phone || 'Not provided');
+  const displayAddress = looksEncrypted(user.address) ? 'Loading...' : (user.address || 'Not provided');
+
+  // Auto-refresh if encrypted data detected
+  useEffect(() => {
+    if (user?.id && (looksEncrypted(user.phone) || looksEncrypted(user.address))) {
+      console.log('⚠️ Encrypted data detected in profile display, auto-refreshing...');
+      refreshProfile(user.id);
+    }
+  }, [user?.phone, user?.address]);
+
   // Users can only submit verification once, unless they were rejected
   const canSubmitVerification = !isUserVerified && !hasPendingVerification;
 
@@ -402,7 +415,7 @@ export default function ProfileScreen() {
             </View>
             <View style={profileStyles.infoTextContainer}>
               <Text style={profileStyles.infoLabel}>Phone</Text>
-              <Text style={profileStyles.infoValue}>{user.phone || 'Not provided'}</Text>
+              <Text style={profileStyles.infoValue}>{displayPhone}</Text>
             </View>
           </View>
 
@@ -412,7 +425,7 @@ export default function ProfileScreen() {
             </View>
             <View style={profileStyles.infoTextContainer}>
               <Text style={profileStyles.infoLabel}>Address</Text>
-              <Text style={profileStyles.infoValue}>{user.address || 'Not provided'}</Text>
+              <Text style={profileStyles.infoValue}>{displayAddress}</Text>
             </View>
           </View>
         </View>

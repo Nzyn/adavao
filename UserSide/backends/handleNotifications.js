@@ -143,7 +143,7 @@ const getUserNotifications = async (req, res) => {
           ON nr.notification_id = CONCAT('verify_', v.verification_id) 
           AND nr.user_id = $1
         WHERE v.user_id = $2 
-        AND v.status IN ('approved', 'rejected')
+        AND v.status IN ('verified', 'rejected')
         ORDER BY v.created_at DESC 
         LIMIT 5`,
         [userId, userId]

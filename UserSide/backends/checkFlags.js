@@ -8,7 +8,7 @@ async function diagnoseFlagSystem() {
     // 1. Check if user_flags table exists
     console.log("1️⃣  Checking if 'user_flags' table exists...");
     try {
-      const [tables] = await db.query("SHOW TABLES LIKE 'user_flags'");
+      const [tables] = await db.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_flags'");
       if (tables.length === 0) {
         console.log("❌ user_flags table does NOT exist!");
       } else {
@@ -16,7 +16,7 @@ async function diagnoseFlagSystem() {
         
         // Show table structure
         console.log("2️⃣  Table structure:");
-        const [columns] = await db.query("DESCRIBE user_flags");
+        const [columns] = await db.query("SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = 'user_flags' ORDER BY ordinal_position");
         console.table(columns.map(col => ({
           Field: col.Field,
           Type: col.Type,
@@ -32,7 +32,7 @@ async function diagnoseFlagSystem() {
     // 2. Check if flag_types table exists
     console.log("\n3️⃣  Checking if 'flag_types' table exists...");
     try {
-      const [tables] = await db.query("SHOW TABLES LIKE 'flag_types'");
+      const [tables] = await db.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'flag_types'");
       if (tables.length === 0) {
         console.log("❌ flag_types table does NOT exist!");
       } else {

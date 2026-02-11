@@ -208,7 +208,22 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Case 1: New user but Google didn't provide name - need to collect it
+        // Case 1: New user needs phone number (Google doesn't provide it)
+        if (data.requiresPhone) {
+          console.log('📱 Phone number required for Google registration');
+          setGoogleInfo({
+            googleId: data.googleInfo.googleId,
+            email: data.googleInfo.email,
+            firstName: data.googleInfo.firstName,
+            lastName: data.googleInfo.lastName,
+            profilePicture: data.googleInfo.profilePicture,
+          });
+          setShowPhoneModal(true);
+          setIsLoading(false);
+          return;
+        }
+
+        // Case 2: New user but Google didn't provide name - need to collect it
         if (data.requiresName) {
           console.log('📝 Name required for Google registration');
           setGoogleInfo({
@@ -221,7 +236,7 @@ const Login = () => {
           return;
         }
 
-        // Case 2: Login successful (existing or new user with Google name)
+        // Case 3: Login successful (existing user)
         if (data.user) {
           if (data.isNewUser) {
             Alert.alert('Welcome!', 'Your account has been created successfully.');

@@ -129,12 +129,16 @@ const editStyles = StyleSheet.create({
 export default function EditProfileScreen() {
     const { user, updateUser, refreshProfile } = useUser();
     const { showLoading, hideLoading, isLoading } = useLoading();
+
+    // Detect encrypted-looking values and clear them to avoid showing gibberish
+    const looksEncrypted = (val: string | undefined) => val && val.length > 60 && /^[A-Za-z0-9+/=:]+$/.test(val);
+
     const [userInfo, setUserInfo] = useState({
         firstName: user?.firstName || '',
         lastName: user?.lastName || '',
         email: user?.email || '',
-        phone: user?.phone || '',
-        address: user?.address || '',
+        phone: looksEncrypted(user?.phone) ? '' : (user?.phone || ''),
+        address: looksEncrypted(user?.address) ? '' : (user?.address || ''),
     });
 
     const [dialogVisible, setDialogVisible] = useState(false);

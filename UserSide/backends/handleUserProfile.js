@@ -61,9 +61,23 @@ const getUserById = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Decrypt sensitive fields
-    if (user.address) user.address = decrypt(user.address);
-    if (user.contact) user.contact = decrypt(user.contact);
+    // Decrypt sensitive fields (handle possible double-encryption from previous bug)
+    if (user.address) {
+      user.address = decrypt(user.address);
+      // If still looks encrypted after decrypting, try one more round (double-encryption fix)
+      if (user.address && (user.address.startsWith('ENC_') || (user.address.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(user.address)))) {
+        console.log('⚠️ Address still encrypted after first decrypt, attempting second round (double-encryption fix)');
+        user.address = decrypt(user.address);
+      }
+    }
+    if (user.contact) {
+      user.contact = decrypt(user.contact);
+      // Same double-encryption fix for contact
+      if (user.contact && (user.contact.startsWith('ENC_') || (user.contact.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(user.contact)))) {
+        console.log('⚠️ Contact still encrypted after first decrypt, attempting second round (double-encryption fix)');
+        user.contact = decrypt(user.contact);
+      }
+    }
 
     console.log("✅ User profile fetched:", { id: user.id, name: `${user.firstname} ${user.lastname}`, role: user.role || 'user' });
 
@@ -102,9 +116,13 @@ const upsertUser = async (req, res) => {
   try {
     console.log("💾 Upserting user profile:", req.body);
 
-    // Encrypt sensitive fields before checking/saving
-    const encryptedAddress = address ? encrypt(address) : null;
-    const encryptedContact = contact ? encrypt(contact) : null;
+    // Detect if values are already encrypted (ENC_ prefix or long base64-like strings)
+    // to prevent double-encryption
+    const looksEncrypted = (val) => val && (val.startsWith('ENC_') || (val.length > 80 && /^[A-Za-z0-9+/=:]+$/.test(val)));
+
+    // Encrypt sensitive fields before checking/saving (skip if already encrypted)
+    const encryptedAddress = address ? (looksEncrypted(address) ? address : encrypt(address)) : null;
+    const encryptedContact = contact ? (looksEncrypted(contact) ? contact : encrypt(contact)) : null;
 
     // NOTE: We use the *plain* contact for OTP checks to match user input, 
     // but we use *encrypted* contact for database storage.

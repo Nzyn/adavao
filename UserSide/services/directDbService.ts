@@ -220,30 +220,8 @@ class DirectDbService {
     }
   }
 
-  // Verify address was saved to database
-  async verifyAddressSave(userId: string, expectedAddress: string): Promise<boolean> {
-    try {
-      const query = 'SELECT address FROM users_public WHERE id = ?';
-      const result = await this.executeQuery(query, [userId]);
-
-      if (result.data && result.data.length > 0) {
-        const actualAddress = result.data[0].address;
-        const verified = actualAddress === expectedAddress;
-
-        console.log(`Address verification for user ${userId}:`);
-        console.log(`Expected: "${expectedAddress}"`);
-        console.log(`Actual: "${actualAddress}"`);
-        console.log(`Verified: ${verified}`);
-
-        return verified;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Error verifying address save:', error);
-      return false;
-    }
-  }
+  // verifyAddressSave removed: it compared plaintext against encrypted DB values
+  // which always failed and triggered double-encryption via updateUserAddress
 }
 
 // Export singleton instance

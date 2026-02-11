@@ -26,18 +26,18 @@ class VerificationController extends Controller
             // Debug log
             Log::info('getAllVerifications called', ['count' => $verifications->count()]);
             
-            // Decrypt image paths for each verification
-            $verifications = $verifications->map(function($v) {
-                // Decrypt the image path fields using the EncryptionService
-                $v->id_picture = EncryptionService::decrypt($v->id_picture);
-                $v->id_selfie = EncryptionService::decrypt($v->id_selfie);
-                $v->billing_document = EncryptionService::decrypt($v->billing_document);
-                return $v;
+            // Decrypt image paths on a cloned collection to avoid mutating cached models
+            $decrypted = $verifications->map(function($v) {
+                $clone = clone $v;
+                $clone->id_picture = EncryptionService::decrypt($clone->id_picture);
+                $clone->id_selfie = EncryptionService::decrypt($clone->id_selfie);
+                $clone->billing_document = EncryptionService::decrypt($clone->billing_document);
+                return $clone;
             });
             
             // Log the first few verifications for debugging
-            if ($verifications->count() > 0) {
-                $sampleData = $verifications->take(3)->map(function($v) {
+            if ($decrypted->count() > 0) {
+                $sampleData = $decrypted->take(3)->map(function($v) {
                     return [
                         'verification_id' => $v->verification_id,
                         'user_id' => $v->user_id,
@@ -57,10 +57,9 @@ class VerificationController extends Controller
             
             return response()->json([
                 'success' => true,
-                'data' => $verifications
+                'data' => $decrypted
             ]);
         } catch (\Exception $e) {
-            // Debug log
             Log::error('Error in getAllVerifications', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -87,9 +86,18 @@ class VerificationController extends Controller
                     ->get();
             });
             
+            // Decrypt image paths on cloned models
+            $decrypted = $verifications->map(function($v) {
+                $clone = clone $v;
+                $clone->id_picture = EncryptionService::decrypt($clone->id_picture);
+                $clone->id_selfie = EncryptionService::decrypt($clone->id_selfie);
+                $clone->billing_document = EncryptionService::decrypt($clone->billing_document);
+                return $clone;
+            });
+            
             return response()->json([
                 'success' => true,
-                'data' => $verifications
+                'data' => $decrypted
             ]);
         } catch (\Exception $e) {
             return response()->json([

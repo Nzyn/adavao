@@ -128,12 +128,12 @@ const checkUserFlagStatus = async (req, res) => {
  */
 const autoExpireFlags = async (userId) => {
   try {
-    // Find expired flags for this user (both confirmed and dismissed)
+    // Find expired confirmed flags for this user
     const [expiredFlags] = await db.query(
       `SELECT id, user_id, violation_type 
        FROM user_flags 
        WHERE user_id = $1
-         AND status IN ('confirmed', 'dismissed') 
+         AND status = 'confirmed'
          AND expires_at IS NOT NULL 
          AND expires_at <= NOW()`,
       [userId]
@@ -145,12 +145,12 @@ const autoExpireFlags = async (userId) => {
 
     console.log(`   🔄 Found ${expiredFlags.length} expired flag(s) to process`);
 
-    // Mark flags as expired (both confirmed and dismissed)
+    // Mark flags as expired
     await db.query(
       `UPDATE user_flags 
        SET status = 'expired', updated_at = NOW() 
        WHERE user_id = $1
-         AND status IN ('confirmed', 'dismissed') 
+         AND status = 'confirmed'
          AND expires_at IS NOT NULL 
          AND expires_at <= NOW()`,
       [userId]
@@ -167,26 +167,25 @@ const autoExpireFlags = async (userId) => {
       [userId]
     );
 
-    // Count remaining active flags (both confirmed and dismissed)
+    // Count remaining active confirmed flags
     const [remainingFlags] = await db.query(
       `SELECT COUNT(*) as count 
        FROM user_flags 
        WHERE user_id = $1
-         AND status IN ('confirmed', 'dismissed') 
+         AND status = 'confirmed'
          AND (expires_at IS NULL OR expires_at > NOW())`,
       [userId]
     );
 
-    const remainingCount = remainingFlags[0]?.count || 0;
+    const remainingCount = parseInt(remainingFlags[0]?.count) || 0;
 
-    // Update user record
+    // Update user restriction level
     await db.query(
       `UPDATE users_public 
-       SET total_flags = $1, 
-           restriction_level = $2,
+       SET restriction_level = $1,
            updated_at = NOW() 
-       WHERE id = $3`,
-      [remainingCount, remainingCount > 0 ? 'warning' : 'none', userId]
+       WHERE id = $2`,
+      [remainingCount > 0 ? 'warning' : 'none', userId]
     );
 
     // Create notification for user that their flag expired
