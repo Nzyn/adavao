@@ -218,7 +218,6 @@ class AuthController extends Controller
                     ]
                 ]);
                 $body = json_decode((string)$response->getBody());
-                
                 $score = $body->score ?? 0.5; // Default to 0.5 if null
                 if (!$body->success || $score < 0.01) {
                     \Log::warning('reCAPTCHA failed', [
