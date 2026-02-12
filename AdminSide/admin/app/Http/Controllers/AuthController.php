@@ -72,14 +72,13 @@ class AuthController extends Controller
                 ]);
                 $body = json_decode((string)$response->getBody());
                 
-                $score = $body->score ?? 0.5; // Default to 0.5 if null
-                if (!$body->success || $score < 0.01) {
+                if (!$body->success || $body->score < 0.07) {
                     \Log::warning('Registration reCAPTCHA failed', [
                         'success' => $body->success, 
                         'score' => $body->score ?? 'null', 
                         'email' => $request->email
                     ]);
-                    return back()->withErrors(['email' => 'Security verification failed. Please try again.'])->withInput();
+                    // return back()->withErrors(['email' => 'Security verification failed. Please try again.'])->withInput();
                 }
             } catch (\Exception $e) {
                 \Log::error('reCAPTCHA connection error: ' . $e->getMessage());
